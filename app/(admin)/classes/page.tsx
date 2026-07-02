@@ -458,7 +458,7 @@ export default function ClassesPage() {
     .srow{display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;transition:background .15s;border-bottom:1px solid ${bd};}
     .srow:last-child{border-bottom:none;}
     .srow:hover{background:${navyM};}
-    .rc{background:#fff;border:1px solid ${bd};border-radius:10px;padding:16px;margin-bottom:10px;}
+    .rc{background:#fff;border:1px solid ${bd};border-radius:10px;padding:16px;margin-bottom:0;}
     .rch{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid ${bd};}
     .pb{height:6px;background:${bd};border-radius:99px;flex:1;}
     .pf{height:100%;border-radius:99px;}
@@ -675,7 +675,8 @@ export default function ClassesPage() {
         </div>
         {stuRecs.length === 0
           ? <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: '60px 0', textAlign: 'center', color: tx3, fontSize: 14 }}>수업 기록 없음</div>
-          : stuRecs.map(r => {
+          : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: 12 }}>
+            {stuRecs.map(r => {
             const tItems = (r.record_test_items ?? [])
             return (
               <div key={r.id} className="rc">
@@ -778,7 +779,8 @@ export default function ClassesPage() {
                 )}
               </div>
             )
-          })
+          })}
+          </div>
         }
       </>}
 
