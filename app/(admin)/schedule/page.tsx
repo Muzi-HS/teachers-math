@@ -16,10 +16,17 @@ type Evt = {
     memo: string | null
 }
 
-const BLANK = {
+type FormState = {
+  title: string; start_date: string; end_date: string
+  start_time: string; end_time: string
+  type: 'normal' | 'holiday'
+  parent_visible: boolean; memo: string; useTime: boolean
+}
+
+const BLANK: FormState = {
     title: '', start_date: '', end_date: '',
     start_time: '', end_time: '',
-    type: 'normal' as const,
+    type: 'normal',
     parent_visible: true, memo: '', useTime: false,
 }
 
@@ -44,7 +51,7 @@ export default function SchedulePage() {
     const [evts, setEvts] = useState<Evt[]>([])
     const [loading, setLoading] = useState(true)
     const [modal, setModal] = useState(false)
-    const [form, setForm] = useState({ ...BLANK })
+    const [form, setForm] = useState<FormState>({ ...BLANK })
     const [editId, setEditId] = useState<number | null>(null)
     const [saving, setSaving] = useState(false)
     const [yr, setYr] = useState(new Date().getFullYear())
