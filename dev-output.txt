@@ -1,0 +1,13 @@
+
+> teachers-math@0.1.0 dev
+> next dev
+
+▲ Next.js 16.2.9 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.138.1:3000
+- Environments: .env.local
+✓ Ready in 755ms
+
+ GET /dashboard 200 in 1592ms (next.js: 787ms, application-code: 805ms)
+ GET /parent/notices 200 in 319ms (next.js: 147ms, application-code: 173ms)
+^C^C
