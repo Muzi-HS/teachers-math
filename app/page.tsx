@@ -125,6 +125,10 @@ export default function LoginPage() {
           onChange={e => onChange(e.target.value.replace(/\D/g,'').slice(0,4))}
           autoFocus={autoFocus}
           readOnly={false}
+          onFocus={e => {
+            const parent = e.currentTarget.parentElement
+            setTimeout(() => parent?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)
+          }}
           style={{
             position:'absolute', top:0, left:0, width:'100%', height:'100%',
             opacity:0, fontSize:16, border:'none', outline:'none',
@@ -225,7 +229,7 @@ export default function LoginPage() {
         input:focus { border-color: #D87E13 !important; }
       `}</style>
 
-      <div style={{ minHeight:'100vh', background:'#071A3E', display:'flex', alignItems:'center', justifyContent:'center', padding:'0 16px' }}>
+      <div style={{ minHeight: (!showSignup && tab==='parent' && (pStep==='pin'||pStep==='pin-setup')) ? '130vh' : '100vh', background:'#071A3E', display:'flex', alignItems:'center', justifyContent:'center', padding:'0 16px' }}>
         <div style={{ width:'100%', maxWidth:380, padding:'48px 20px' }}>
 
           {/* 로고 */}
