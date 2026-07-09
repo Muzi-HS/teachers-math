@@ -58,7 +58,7 @@ export default function LoginPage() {
     width:'100%', padding:'12px 16px', borderRadius:8,
     border:'1.5px solid rgba(255,255,255,.12)',
     background:'rgba(255,255,255,.06)', color:'#fff',
-    fontSize:14, fontFamily:"'Noto Sans KR',sans-serif", outline:'none',
+    fontSize:16, fontFamily:"'Noto Sans KR',sans-serif", outline:'none',
     boxSizing:'border-box',
   }
 
@@ -127,7 +127,7 @@ export default function LoginPage() {
           readOnly={false}
           style={{
             position:'absolute', top:0, left:0, width:'100%', height:'100%',
-            opacity:0, fontSize:1, border:'none', outline:'none',
+            opacity:0, fontSize:16, border:'none', outline:'none',
             caretColor:'transparent', background:'transparent',
             color:'transparent', pointerEvents:'auto',
           }}
@@ -225,8 +225,8 @@ export default function LoginPage() {
         input:focus { border-color: #D87E13 !important; }
       `}</style>
 
-      <div style={{ minHeight:'100vh', background:'#071A3E', display:'flex', alignItems:'center', justifyContent:'center' }}>
-        <div style={{ width:380, padding:'48px 36px' }}>
+      <div style={{ minHeight:'100vh', background:'#071A3E', display:'flex', alignItems:'center', justifyContent:'center', padding:'0 16px' }}>
+        <div style={{ width:'100%', maxWidth:380, padding:'48px 20px' }}>
 
           {/* 로고 */}
           <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:32 }}>
@@ -372,7 +372,7 @@ export default function LoginPage() {
                 </div>
                 <div>
                   <label style={{ display:'block', fontSize:12, color:'rgba(255,255,255,.5)', marginBottom:7 }}>연락처</label>
-                  <input type="tel" value={sgPhone} onChange={e=>setSgPhone(e.target.value.replace(/-/g,''))} placeholder="01000000000" style={iStyle}/>
+                  <input type="tel" value={sgPhone} onChange={e=>setSgPhone(e.target.value.replace(/-/g,''))} placeholder="전화번호 입력" style={iStyle}/>
                 </div>
               </div>
               <div style={{ marginBottom:12 }}>

@@ -90,11 +90,6 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Montserrat:wght@700;800&display=swap');
         * { box-sizing: border-box; }
-        .parent-main { padding-bottom: max(80px, calc(62px + env(safe-area-inset-bottom, 20px))) !important; }
-        .parent-nav {
-          height: calc(62px + env(safe-area-inset-bottom, 0px)) !important;
-          padding-bottom: env(safe-area-inset-bottom, 0px) !important;
-        }
       `}</style>
 
       {/* 상단 헤더 */}
@@ -145,39 +140,42 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
       )}
 
       {/* 본문 */}
-      <main className="parent-main" style={{ flex: 1, padding: '16px 16px 80px', maxWidth: 640, width: '100%', margin: '0 auto' }}>
+      <main style={{ flex: 1, padding: '16px', paddingBottom: 'max(80px, calc(62px + env(safe-area-inset-bottom, 0px)))', maxWidth: 640, width: '100%', margin: '0 auto' }}>
         <ParentChildContext.Provider value={{ selChild, setSelChild, children: childList }}>
           {children}
         </ParentChildContext.Provider>
       </main>
 
       {/* 하단 탭바 */}
-      <nav className="parent-nav" style={{
+      <nav style={{
         position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100,
         background: '#fff', borderTop: `1px solid ${bd}`,
-        display: 'flex',
+        display: 'flex', flexDirection: 'column',
         boxShadow: '0 -2px 10px rgba(0,0,0,.08)',
-        alignItems: 'flex-start',
       }}>
-        {NAV.map(item => {
-          const active = pathname.startsWith(item.href)
-          return (
-            <button key={item.href} onClick={() => router.push(item.href)} style={{
-              flex: 1, display: 'flex', flexDirection: 'column',
-              alignItems: 'center', justifyContent: 'center', gap: 3,
-              height: 62,
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: active ? navy : tx3,
-              fontFamily: "'Noto Sans KR',sans-serif",
-              transition: 'color .15s',
-              borderTop: active ? `2.5px solid ${navy}` : '2.5px solid transparent',
-              paddingTop: 2,
-            }}>
-              <span style={{ color: active ? navy : tx3, display: 'flex' }}>{item.icon}</span>
-              <span style={{ fontSize: 10, fontWeight: active ? 700 : 400 }}>{item.label}</span>
-            </button>
-          )
-        })}
+        <div style={{ display: 'flex' }}>
+          {NAV.map(item => {
+            const active = pathname.startsWith(item.href)
+            return (
+              <button key={item.href} onClick={() => router.push(item.href)} style={{
+                flex: 1, display: 'flex', flexDirection: 'column',
+                alignItems: 'center', justifyContent: 'center', gap: 3,
+                height: 62,
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: active ? navy : tx3,
+                fontFamily: "'Noto Sans KR',sans-serif",
+                transition: 'color .15s',
+                borderTop: active ? `2.5px solid ${navy}` : '2.5px solid transparent',
+                paddingTop: 2,
+              }}>
+                <span style={{ color: active ? navy : tx3, display: 'flex' }}>{item.icon}</span>
+                <span style={{ fontSize: 10, fontWeight: active ? 700 : 400 }}>{item.label}</span>
+              </button>
+            )
+          })}
+        </div>
+        {/* iOS 홈 인디케이터 안전 영역 */}
+        <div style={{ height: 'env(safe-area-inset-bottom, 0px)', background: '#fff', flexShrink: 0 }} />
       </nav>
     </div>
   )
