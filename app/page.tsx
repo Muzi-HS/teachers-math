@@ -9,8 +9,7 @@ import { useAuth } from '@/context/AuthContext'
 type Tab      = 'parent' | 'teacher'
 type PStep    = 'phone' | 'pin' | 'pin-setup'  // 학부모 로그인 단계
 
-const AUTO_KEY  = 'parent_auto_login'   // localStorage key
-const AUTO_DAYS = 30
+const AUTO_KEY = 'parent_auto_login'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -29,7 +28,6 @@ export default function LoginPage() {
       const raw = localStorage.getItem(AUTO_KEY)
       if (!raw) return
       const saved = JSON.parse(raw)
-      if (Date.now() > saved.expiry) { localStorage.removeItem(AUTO_KEY); return }
       loginAsParent(saved.session)
     } catch {}
   }, [authLoading])
@@ -155,7 +153,7 @@ export default function LoginPage() {
       const session = { parentId: result.parentId, phone: result.phone, children: result.children }
       if (autoLogin) {
         localStorage.setItem(AUTO_KEY, JSON.stringify({
-          session, expiry: Date.now() + AUTO_DAYS * 86400000
+          session
         }))
       }
       sessionStorage.setItem('parent_session', JSON.stringify(session))
@@ -188,7 +186,7 @@ export default function LoginPage() {
       const session = { parentId: parentData.parentId, phone: parentData.phone, children: parentData.children }
       if (autoLogin) {
         localStorage.setItem(AUTO_KEY, JSON.stringify({
-          session, expiry: Date.now() + AUTO_DAYS * 86400000
+          session
         }))
       }
       sessionStorage.setItem('parent_session', JSON.stringify(session))
@@ -259,10 +257,20 @@ export default function LoginPage() {
                 위 영역을 탭하면 키패드가 열립니다
               </p>
               {error && <p style={{ fontSize:12, color:'#F48771', textAlign:'center', margin:'6px 0' }}>{error}</p>}
-              <label style={{ display:'flex', alignItems:'center', gap:8, marginTop:20, cursor:'pointer', justifyContent:'center' }}>
-                <input type="checkbox" checked={autoLogin} onChange={e => setAutoLogin(e.target.checked)} style={{ accentColor:'#D87E13' }}/>
-                <span style={{ fontSize:12, color:'rgba(255,255,255,.45)' }}>자동 로그인 (30일)</span>
-              </label>
+              <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:24, justifyContent:'center', cursor:'pointer' }}
+                onClick={() => setAutoLogin(v => !v)}>
+                <div style={{ width:42, height:24, borderRadius:12, flexShrink:0, position:'relative',
+                  background: autoLogin ? '#D87E13' : 'rgba(255,255,255,.1)',
+                  border: `1.5px solid ${autoLogin ? '#D87E13' : 'rgba(255,255,255,.2)'}`,
+                  transition:'background .2s, border-color .2s' }}>
+                  <div style={{ position:'absolute', top:3, left: autoLogin ? 19 : 3, width:16, height:16,
+                    borderRadius:'50%', background:'#fff', transition:'left .2s',
+                    boxShadow:'0 1px 4px rgba(0,0,0,.3)' }}/>
+                </div>
+                <span style={{ fontSize:13, color: autoLogin ? 'rgba(255,255,255,.85)' : 'rgba(255,255,255,.4)', transition:'color .2s' }}>
+                  자동 로그인
+                </span>
+              </div>
             </>
           )}
 
@@ -293,10 +301,20 @@ export default function LoginPage() {
                 위 영역을 탭하면 키패드가 열립니다
               </p>
               {error && <p style={{ fontSize:12, color:'#F48771', textAlign:'center', margin:'6px 0' }}>{error}</p>}
-              <label style={{ display:'flex', alignItems:'center', gap:8, marginTop:20, cursor:'pointer', justifyContent:'center' }}>
-                <input type="checkbox" checked={autoLogin} onChange={e => setAutoLogin(e.target.checked)} style={{ accentColor:'#D87E13' }}/>
-                <span style={{ fontSize:12, color:'rgba(255,255,255,.45)' }}>자동 로그인 (30일)</span>
-              </label>
+              <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:24, justifyContent:'center', cursor:'pointer' }}
+                onClick={() => setAutoLogin(v => !v)}>
+                <div style={{ width:42, height:24, borderRadius:12, flexShrink:0, position:'relative',
+                  background: autoLogin ? '#D87E13' : 'rgba(255,255,255,.1)',
+                  border: `1.5px solid ${autoLogin ? '#D87E13' : 'rgba(255,255,255,.2)'}`,
+                  transition:'background .2s, border-color .2s' }}>
+                  <div style={{ position:'absolute', top:3, left: autoLogin ? 19 : 3, width:16, height:16,
+                    borderRadius:'50%', background:'#fff', transition:'left .2s',
+                    boxShadow:'0 1px 4px rgba(0,0,0,.3)' }}/>
+                </div>
+                <span style={{ fontSize:13, color: autoLogin ? 'rgba(255,255,255,.85)' : 'rgba(255,255,255,.4)', transition:'color .2s' }}>
+                  자동 로그인
+                </span>
+              </div>
             </>
           )}
 

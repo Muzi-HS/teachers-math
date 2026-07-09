@@ -115,6 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setTeacher(null)
     setParent(null)
     sessionStorage.removeItem('parent_session')
+    localStorage.removeItem('parent_auto_login')
     await supabase.auth.signOut()
     setLoading(false)
     router.replace('/')
