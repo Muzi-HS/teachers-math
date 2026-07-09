@@ -86,27 +86,49 @@ export default function LoginPage() {
   }
 
   // ── PIN 키패드 입력 ──
-  function pressKey(k: string) {
-    if (pStep === 'pin') {
-      if (k === 'del') { setPin(p => p.slice(0,-1)); return }
-      if (pin.length >= 4) return
-      const next = pin + k
-      setPin(next)
-      if (next.length === 4) setTimeout(() => handlePinSubmit(next), 120)
-    } else if (pStep === 'pin-setup') {
-      const target = newPin.length < 4 ? 'new' : 'confirm'
-      if (k === 'del') {
-        if (target === 'confirm') setNewPin2(p => p.slice(0,-1))
-        else setNewPin(p => p.slice(0,-1))
-        return
-      }
-      if (target === 'new' && newPin.length < 4)   { setNewPin(p => p+k) }
-      else if (newPin2.length < 4) {
-        const next2 = newPin2 + k
-        setNewPin2(next2)
-        if (next2.length === 4) setTimeout(() => handlePinSetup(next2), 120)
-      }
+  // ── PIN 입력 핸들러 (숨겨진 input → 네이티브 키패드) ──
+  function handlePinInput(val: string, target: 'pin' | 'new' | 'confirm') {
+    const digits = val.replace(/\D/g, '').slice(0, 4)
+    if (target === 'pin') {
+      setPin(digits)
+      if (digits.length === 4) setTimeout(() => handlePinSubmit(digits), 80)
+    } else if (target === 'new') {
+      setNewPin(digits)
+    } else {
+      setNewPin2(digits)
+      if (digits.length === 4) setTimeout(() => handlePinSetup(digits), 80)
     }
+  }
+
+  // PIN 점 표시 + 숨겨진 input
+  function PinInput({ value, onChange, autoFocus=false }: { value:string; onChange:(v:string)=>void; autoFocus?:boolean }) {
+    return (
+      <div style={{ position:'relative', margin:'20px 0 8px' }}>
+        {/* 점 표시 */}
+        <div style={{ display:'flex', gap:16, justifyContent:'center', marginBottom:12 }}>
+          {Array.from({length:4}).map((_,i) => (
+            <div key={i} style={{
+              width:16, height:16, borderRadius:'50%',
+              background: i < value.length ? '#D87E13' : 'rgba(255,255,255,.2)',
+              transition:'background .12s',
+            }}/>
+          ))}
+        </div>
+        {/* 숨겨진 input — 클릭 시 네이티브 숫자 키패드 */}
+        <input
+          type="tel"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          value={value}
+          onChange={e => onChange(e.target.value.replace(/\D/g,'').slice(0,4))}
+          autoFocus={autoFocus}
+          style={{
+            position:'absolute', top:0, left:0, width:'100%', height:'100%',
+            opacity:0, cursor:'pointer', fontSize:16,
+          }}
+        />
+      </div>
+    )
   }
 
   // ── 학부모 2단계: PIN 검증 ──
@@ -188,43 +210,6 @@ export default function LoginPage() {
     finally { setLoading(false) }
   }
 
-  // PIN 키패드 렌더
-  function PinDots({ value, length=4 }: { value:string; length?:number }) {
-    return (
-      <div style={{ display:'flex', gap:10, justifyContent:'center', margin:'20px 0 8px' }}>
-        {Array.from({length}).map((_,i) => (
-          <div key={i} style={{
-            width:14, height:14, borderRadius:'50%',
-            background: i < value.length ? '#D87E13' : 'rgba(255,255,255,.18)',
-            transition:'background .15s',
-          }}/>
-        ))}
-      </div>
-    )
-  }
-
-  function Keypad() {
-    const keys = ['1','2','3','4','5','6','7','8','9','','0','del']
-    return (
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginTop:16 }}>
-        {keys.map((k, i) => k === '' ? <div key={`empty-${i}`}/> : (
-          <button key={`key-${i}`} onClick={() => pressKey(k)} style={{
-            padding:'16px 0', borderRadius:12, fontSize: k==='del'?18:20,
-            fontWeight:600, border:'1.5px solid rgba(255,255,255,.12)',
-            background:'rgba(255,255,255,.06)', color:'#fff',
-            cursor:'pointer', fontFamily:"'Noto Sans KR',sans-serif",
-            transition:'background .1s',
-          }}
-          onMouseDown={e => (e.currentTarget.style.background='rgba(216,126,19,.25)')}
-          onMouseUp={e   => (e.currentTarget.style.background='rgba(255,255,255,.06)')}
-          >
-            {k === 'del' ? '⌫' : k}
-          </button>
-        ))}
-      </div>
-    )
-  }
-
   return (
     <>
       <style>{`
@@ -255,12 +240,17 @@ export default function LoginPage() {
                 ← 전화번호 다시 입력
               </button>
               <p style={{ fontSize:18, fontWeight:700, color:'#fff', marginBottom:4 }}>PIN 입력</p>
-              <p style={{ fontSize:13, color:'rgba(255,255,255,.4)', marginBottom:4 }}>{phone}</p>
-              <PinDots value={pin} />
-              <p style={{ fontSize:12, color:'rgba(255,255,255,.3)', textAlign:'center', marginBottom:4 }}>4자리 PIN을 입력하세요</p>
+              <p style={{ fontSize:13, color:'rgba(255,255,255,.4)', marginBottom:16 }}>{phone}</p>
+              <PinInput
+                value={pin}
+                onChange={v => { setPin(v); if(v.length===4) setTimeout(()=>handlePinSubmit(v),80) }}
+                autoFocus
+              />
+              <p style={{ fontSize:12, color:'rgba(255,255,255,.3)', textAlign:'center', marginBottom:4 }}>
+                위 영역을 탭하면 키패드가 열립니다
+              </p>
               {error && <p style={{ fontSize:12, color:'#F48771', textAlign:'center', margin:'6px 0' }}>{error}</p>}
-              <Keypad/>
-              <label style={{ display:'flex', alignItems:'center', gap:8, marginTop:14, cursor:'pointer', justifyContent:'center' }}>
+              <label style={{ display:'flex', alignItems:'center', gap:8, marginTop:20, cursor:'pointer', justifyContent:'center' }}>
                 <input type="checkbox" checked={autoLogin} onChange={e => setAutoLogin(e.target.checked)} style={{ accentColor:'#D87E13' }}/>
                 <span style={{ fontSize:12, color:'rgba(255,255,255,.45)' }}>자동 로그인 (30일)</span>
               </label>
@@ -273,19 +263,28 @@ export default function LoginPage() {
               <p style={{ fontSize:18, fontWeight:700, color:'#fff', marginBottom:4 }}>PIN 설정</p>
               <p style={{ fontSize:13, color:'rgba(255,255,255,.4)', marginBottom:16 }}>처음 로그인하셨습니다. 새 PIN을 설정해주세요</p>
               <p style={{ fontSize:12, color:'rgba(255,255,255,.5)', textAlign:'center' }}>
-                {newPin.length < 4 ? '새 PIN 입력' : 'PIN 확인 입력'}
+                {newPin.length < 4 ? '새 PIN 입력 (4자리)' : 'PIN 확인 입력'}
               </p>
-              <PinDots value={newPin.length < 4 ? newPin : newPin2}/>
+              <PinInput
+                value={newPin.length < 4 ? newPin : newPin2}
+                onChange={v => {
+                  if (newPin.length < 4) setNewPin(v)
+                  else { setNewPin2(v); if(v.length===4) setTimeout(()=>handlePinSetup(v),80) }
+                }}
+                autoFocus
+              />
               {newPin.length >= 4 && (
-                <div style={{ display:'flex', gap:6, justifyContent:'center', marginBottom:4 }}>
+                <div style={{ display:'flex', gap:8, justifyContent:'center', marginBottom:8 }}>
                   {Array.from({length:4}).map((_,i) => (
-                    <div key={i} style={{ width:10, height:10, borderRadius:'50%', background: i < newPin.length ? 'rgba(255,255,255,.3)':'transparent', border:'1px solid rgba(255,255,255,.2)' }}/>
+                    <div key={i} style={{ width:10, height:10, borderRadius:'50%', background:'rgba(255,255,255,.3)' }}/>
                   ))}
                 </div>
               )}
+              <p style={{ fontSize:12, color:'rgba(255,255,255,.3)', textAlign:'center', marginBottom:4 }}>
+                위 영역을 탭하면 키패드가 열립니다
+              </p>
               {error && <p style={{ fontSize:12, color:'#F48771', textAlign:'center', margin:'6px 0' }}>{error}</p>}
-              <Keypad/>
-              <label style={{ display:'flex', alignItems:'center', gap:8, marginTop:14, cursor:'pointer', justifyContent:'center' }}>
+              <label style={{ display:'flex', alignItems:'center', gap:8, marginTop:20, cursor:'pointer', justifyContent:'center' }}>
                 <input type="checkbox" checked={autoLogin} onChange={e => setAutoLogin(e.target.checked)} style={{ accentColor:'#D87E13' }}/>
                 <span style={{ fontSize:12, color:'rgba(255,255,255,.45)' }}>자동 로그인 (30일)</span>
               </label>
@@ -300,17 +299,16 @@ export default function LoginPage() {
 
               {/* 탭 */}
               <div style={{ display:'flex', gap:8, marginBottom:24 }}>
-                {([{key:'parent',label:'학부모',emoji:'👪'},{key:'teacher',label:'선생님',emoji:'👨‍🏫'}] as const).map(({key,label,emoji}) => (
+                {([{key:'parent',label:'학부모'},{key:'teacher',label:'선생님'}] as const).map(({key,label}) => (
                   <button key={key} onClick={() => { setTab(key); setError('') }} style={{
-                    flex:1, padding:'10px 0', borderRadius:8,
+                    flex:1, padding:'12px 0', borderRadius:8,
                     border:`1.5px solid ${tab===key?'#D87E13':'rgba(255,255,255,.15)'}`,
                     background: tab===key?'rgba(216,126,19,.18)':'rgba(255,255,255,.05)',
                     color: tab===key?'#F09830':'rgba(255,255,255,.6)',
-                    fontSize:12, fontWeight:500, cursor:'pointer',
+                    fontSize:14, fontWeight:600, cursor:'pointer',
                     fontFamily:"'Noto Sans KR',sans-serif",
                   }}>
-                    <div>{emoji}</div>
-                    <div style={{ marginTop:4 }}>{label}</div>
+                    {label}
                   </button>
                 ))}
               </div>

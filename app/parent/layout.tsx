@@ -90,6 +90,8 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Montserrat:wght@700;800&display=swap');
         * { box-sizing: border-box; }
+        .parent-main { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
+        .parent-nav { padding-bottom: env(safe-area-inset-bottom); height: calc(62px + env(safe-area-inset-bottom)); }
       `}</style>
 
       {/* 상단 헤더 */}
@@ -140,18 +142,19 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
       )}
 
       {/* 본문 */}
-      <main style={{ flex: 1, padding: '16px 16px 80px', maxWidth: 640, width: '100%', margin: '0 auto' }}>
+      <main className="parent-main" style={{ flex: 1, padding: '16px 16px 80px', maxWidth: 640, width: '100%', margin: '0 auto' }}>
         <ParentChildContext.Provider value={{ selChild, setSelChild, children: childList }}>
           {children}
         </ParentChildContext.Provider>
       </main>
 
       {/* 하단 탭바 */}
-      <nav style={{
+      <nav className="parent-nav" style={{
         position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100,
         background: '#fff', borderTop: `1px solid ${bd}`,
-        display: 'flex', height: 62,
+        display: 'flex',
         boxShadow: '0 -2px 10px rgba(0,0,0,.08)',
+        alignItems: 'flex-start',
       }}>
         {NAV.map(item => {
           const active = pathname.startsWith(item.href)
@@ -159,6 +162,7 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
             <button key={item.href} onClick={() => router.push(item.href)} style={{
               flex: 1, display: 'flex', flexDirection: 'column',
               alignItems: 'center', justifyContent: 'center', gap: 3,
+              height: 62,
               background: 'none', border: 'none', cursor: 'pointer',
               color: active ? navy : tx3,
               fontFamily: "'Noto Sans KR',sans-serif",
