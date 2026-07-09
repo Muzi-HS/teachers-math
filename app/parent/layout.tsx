@@ -90,8 +90,11 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Montserrat:wght@700;800&display=swap');
         * { box-sizing: border-box; }
-        .parent-main { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
-        .parent-nav { padding-bottom: env(safe-area-inset-bottom); height: calc(62px + env(safe-area-inset-bottom)); }
+        .parent-main { padding-bottom: max(80px, calc(62px + env(safe-area-inset-bottom, 20px))) !important; }
+        .parent-nav {
+          height: calc(62px + env(safe-area-inset-bottom, 0px)) !important;
+          padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+        }
       `}</style>
 
       {/* 상단 헤더 */}

@@ -103,7 +103,9 @@ export default function LoginPage() {
   // PIN 점 표시 + 숨겨진 input
   function PinInput({ value, onChange, autoFocus=false }: { value:string; onChange:(v:string)=>void; autoFocus?:boolean }) {
     return (
-      <div style={{ position:'relative', margin:'20px 0 8px' }}>
+      <div style={{ position:'relative', margin:'20px 0 8px' }}
+        onClick={e => (e.currentTarget.querySelector('input') as HTMLInputElement)?.focus()}
+      >
         {/* 점 표시 */}
         <div style={{ display:'flex', gap:16, justifyContent:'center', marginBottom:12 }}>
           {Array.from({length:4}).map((_,i) => (
@@ -114,7 +116,7 @@ export default function LoginPage() {
             }}/>
           ))}
         </div>
-        {/* 숨겨진 input — 클릭 시 네이티브 숫자 키패드 */}
+        {/* 완전히 숨겨진 input — 커서 안 보이게, 자동 키패드 */}
         <input
           type="tel"
           inputMode="numeric"
@@ -122,9 +124,12 @@ export default function LoginPage() {
           value={value}
           onChange={e => onChange(e.target.value.replace(/\D/g,'').slice(0,4))}
           autoFocus={autoFocus}
+          readOnly={false}
           style={{
             position:'absolute', top:0, left:0, width:'100%', height:'100%',
-            opacity:0, cursor:'pointer', fontSize:16,
+            opacity:0, fontSize:1, border:'none', outline:'none',
+            caretColor:'transparent', background:'transparent',
+            color:'transparent', pointerEvents:'auto',
           }}
         />
       </div>
