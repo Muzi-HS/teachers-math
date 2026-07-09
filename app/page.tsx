@@ -336,7 +336,7 @@ export default function LoginPage() {
                 <div style={{ marginBottom:14 }}>
                   <label style={{ display:'block', fontSize:12, color:'rgba(255,255,255,.5)', marginBottom:7 }}>전화번호</label>
                   <input type="tel" value={phone} onChange={e=>setPhone(e.target.value)}
-                    onKeyDown={e=>e.key==='Enter'&&handlePhoneCheck()} placeholder="01000000000" style={iStyle}/>
+                    onKeyDown={e=>e.key==='Enter'&&handlePhoneCheck()} placeholder="전화번호 입력" style={iStyle}/>
                   <p style={{ fontSize:12, color:'rgba(255,255,255,.3)', marginTop:7 }}>하이픈(-) 없이 숫자만 입력하세요</p>
                 </div>
               )}
@@ -372,7 +372,7 @@ export default function LoginPage() {
                 </div>
                 <div>
                   <label style={{ display:'block', fontSize:12, color:'rgba(255,255,255,.5)', marginBottom:7 }}>연락처</label>
-                  <input type="tel" value={sgPhone} onChange={e=>setSgPhone(e.target.value.replace(/-/g,''))} placeholder="전화번호 입력" style={iStyle}/>
+                  <input type="tel" value={sgPhone} onChange={e=>setSgPhone(e.target.value.replace(/-/g,''))} placeholder="하이픈(-) 없이 입력" style={iStyle}/>
                 </div>
               </div>
               <div style={{ marginBottom:12 }}>
