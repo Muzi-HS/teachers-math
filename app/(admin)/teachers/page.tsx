@@ -39,7 +39,6 @@ export default function TeachersPage(){
   const [selMonth,  setSelMonth]  = useState(new Date().getMonth()+1)
   const [selTeacher,setSelTeacher]= useState<Teacher|null>(null)
   const [notif,     setNotif]     = useState<{msg:string;ok:boolean}|null>(null)
-  const [editPhone, setEditPhone] = useState<{id:number;phone:string}|null>(null)
 
   useEffect(()=>{ fetchTeachers() },[])
   useEffect(()=>{ if(tabIdx===1) fetchAtt() },[tabIdx,selYear,selMonth])
@@ -74,16 +73,6 @@ export default function TeachersPage(){
     const {error}=await supabase.from('teachers').update({role}).eq('id',t.id)
     if(error) return toast('역할 변경 실패',false)
     toast(`${t.name} 역할이 ${role==='admin'?'관리자':'선생님'}으로 변경됨`)
-    fetchTeachers()
-  }
-
-  async function savePhone(){
-    if(!editPhone) return
-    const phone=editPhone.phone.replace(/-/g,'')
-    const {error}=await supabase.from('teachers').update({phone}).eq('id',editPhone.id)
-    if(error) return toast('연락처 수정 실패',false)
-    toast('연락처가 수정됐습니다')
-    setEditPhone(null)
     fetchTeachers()
   }
 
@@ -126,10 +115,6 @@ export default function TeachersPage(){
     .fsel{padding:7px 11px;border:1px solid ${bd};border-radius:8px;font-size:12px;font-family:inherit;color:${tx2};background:#fff;outline:none;cursor:pointer;}
     .tab-btn{padding:8px 20px;border:none;background:none;cursor:pointer;font-size:14px;font-family:inherit;color:${tx3};border-bottom:2.5px solid transparent;transition:all .15s;}
     .tab-btn.active{color:${navy};font-weight:700;border-bottom-color:${navy};}
-    .fi{width:100%;padding:8px 11px;border:1.5px solid ${bd};border-radius:8px;font-size:13px;font-family:inherit;color:${tx};outline:none;background:#fff;transition:border-color .2s;box-sizing:border-box;}
-    .fi:focus{border-color:${navy};}
-    .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;display:flex;align-items:center;justify-content:center;}
-    .modal{background:#fff;border-radius:12px;padding:24px;width:320px;box-shadow:0 8px 40px rgba(0,0,0,.18);}
   `
 
   return(
@@ -140,24 +125,6 @@ export default function TeachersPage(){
         <div style={{position:'fixed',top:18,right:18,zIndex:9999,background:'#fff',borderRadius:8,padding:'11px 14px',borderLeft:`4px solid ${notif.ok?gr:re}`,boxShadow:'0 4px 18px rgba(0,0,0,.1)',minWidth:200}}>
           <div style={{fontWeight:600,marginBottom:2,color:tx,fontSize:13}}>{notif.ok?'완료':'알림'}</div>
           <div style={{fontSize:12,color:tx2}}>{notif.msg}</div>
-        </div>
-      )}
-
-      {editPhone&&(
-        <div className="modal-bg" onClick={()=>setEditPhone(null)}>
-          <div className="modal" onClick={e=>e.stopPropagation()}>
-            <div style={{fontSize:16,fontWeight:700,color:tx,marginBottom:16}}>연락처 수정</div>
-            <label style={{display:'block',fontSize:12,color:tx2,marginBottom:6}}>전화번호</label>
-            <input className="fi" type="tel" value={editPhone.phone}
-              onChange={e=>setEditPhone({...editPhone,phone:e.target.value.replace(/-/g,'')})}
-              onKeyDown={e=>e.key==='Enter'&&savePhone()}
-              placeholder="01000000000" style={{marginBottom:16}}/>
-            <p style={{fontSize:11,color:tx3,marginBottom:16}}>하이픈(-) 없이 숫자만 입력하세요</p>
-            <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
-              <button className="bout" onClick={()=>setEditPhone(null)}>취소</button>
-              <button className="bgold" onClick={savePhone}>저장</button>
-            </div>
-          </div>
         </div>
       )}
 
@@ -215,7 +182,6 @@ export default function TeachersPage(){
                     <td style={{color:tx3,fontSize:12}}>{t.created_at.slice(0,10)}</td>
                     <td>
                       <div style={{display:'flex',gap:6}}>
-                        <button className="bout" onClick={()=>setEditPhone({id:t.id,phone:t.phone??''})}>수정</button>
                         <button className={t.approved?'bdng':'bapv'} onClick={()=>toggleApprove(t)}>
                           {t.approved?'승인 취소':'승인'}
                         </button>
@@ -308,6 +274,7 @@ export default function TeachersPage(){
           </div>
         </>
       )}
+
     </div>
   )
 }

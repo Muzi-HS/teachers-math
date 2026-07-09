@@ -1,0 +1,22 @@
+{
+  "name": "티처스 수학학원",
+  "short_name": "티처스",
+  "description": "티처스 수학학원",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#071A3E",
+  "theme_color": "#0D2A5E",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

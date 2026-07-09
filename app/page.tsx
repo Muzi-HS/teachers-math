@@ -3,66 +3,166 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
-import { teacherLogin, parentLogin } from '@/lib/auth'
+import { teacherLogin, parentLookup, parentLoginWithPin } from '@/lib/auth'
 import { useAuth } from '@/context/AuthContext'
 
-type Tab = 'parent' | 'teacher'
+type Tab      = 'parent' | 'teacher'
+type PStep    = 'phone' | 'pin' | 'pin-setup'  // 학부모 로그인 단계
+
+const AUTO_KEY  = 'parent_auto_login'   // localStorage key
+const AUTO_DAYS = 30
 
 export default function LoginPage() {
   const router = useRouter()
   const { role, loading: authLoading, loginAsTeacher, loginAsParent } = useAuth()
 
-  // role이 확정된 후에 이동 — 상태가 적용된 다음 렌더에서만 실행
   useEffect(() => {
     if (authLoading) return
-    if (role === 'admin') router.replace('/dashboard')
-    else if (role === 'teacher') router.replace('/attendance')
+    if (role === 'admin' || role === 'teacher') router.replace('/dashboard')
     else if (role === 'parent') router.replace('/parent/notices')
   }, [role, authLoading])
 
-  const [tab,        setTab]       = useState<Tab>('parent')
-  const [showSignup, setShowSignup] = useState(false)
-  const [email,    setEmail]    = useState('')
-  const [phone,    setPhone]    = useState('')
-  const [password, setPassword] = useState('')
-  const [error,    setError]    = useState('')
-  const [loading,  setLoading]  = useState(false)
-  const [success,  setSuccess]  = useState('')
+  // 자동로그인 복원
+  useEffect(() => {
+    if (authLoading || role) return
+    try {
+      const raw = localStorage.getItem(AUTO_KEY)
+      if (!raw) return
+      const saved = JSON.parse(raw)
+      if (Date.now() > saved.expiry) { localStorage.removeItem(AUTO_KEY); return }
+      loginAsParent(saved.session)
+    } catch {}
+  }, [authLoading])
 
-  // 회원가입 필드
-  const [sgName,  setSgName]  = useState('')
-  const [sgEmail, setSgEmail] = useState('')
-  const [sgPhone, setSgPhone] = useState('')
-  const [sgPw,    setSgPw]    = useState('')
-  const [sgPw2,   setSgPw2]   = useState('')
+  const [tab,       setTab]       = useState<Tab>('parent')
+  const [showSignup,setShowSignup]= useState(false)
+  const [pStep,     setPStep]     = useState<PStep>('phone')
+  const [phone,     setPhone]     = useState('')
+  const [pin,       setPin]       = useState('')
+  const [newPin,    setNewPin]    = useState('')
+  const [newPin2,   setNewPin2]   = useState('')
+  const [autoLogin, setAutoLogin] = useState(false)
+  const [parentData,setParentData]= useState<any>(null)
+  const [email,     setEmail]     = useState('')
+  const [password,  setPassword]  = useState('')
+  const [error,     setError]     = useState('')
+  const [loading,   setLoading]   = useState(false)
+  const [success,   setSuccess]   = useState('')
+  const [sgName,    setSgName]    = useState('')
+  const [sgEmail,   setSgEmail]   = useState('')
+  const [sgPhone,   setSgPhone]   = useState('')
+  const [sgPw,      setSgPw]      = useState('')
+  const [sgPw2,     setSgPw2]     = useState('')
 
-  const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '12px 16px', borderRadius: 8,
-    border: '1.5px solid rgba(255,255,255,.12)',
-    background: 'rgba(255,255,255,.06)', color: '#fff',
-    fontSize: 14, fontFamily: "'Noto Sans KR', sans-serif", outline: 'none',
-    boxSizing: 'border-box',
+  const iStyle: React.CSSProperties = {
+    width:'100%', padding:'12px 16px', borderRadius:8,
+    border:'1.5px solid rgba(255,255,255,.12)',
+    background:'rgba(255,255,255,.06)', color:'#fff',
+    fontSize:14, fontFamily:"'Noto Sans KR',sans-serif", outline:'none',
+    boxSizing:'border-box',
   }
 
-  async function handleLogin() {
+  // ── 선생님 로그인 ──
+  async function handleTeacherLogin() {
     setError(''); setLoading(true)
     try {
-      if (tab === 'teacher') {
-        if (!email || !password) throw new Error('이메일과 비밀번호를 입력하세요.')
-        const teacher = await teacherLogin(email, password)
-        loginAsTeacher(teacher)
-        // 이동은 위의 useEffect가 role 변경 후 처리
-      } else {
-        if (!phone) throw new Error('전화번호를 입력하세요.')
-        const parent = await parentLogin(phone)
-        sessionStorage.setItem('parent_session', JSON.stringify(parent))
-        loginAsParent(parent)
-        // 이동은 위의 useEffect가 role 변경 후 처리
+      if (!email || !password) throw new Error('이메일과 비밀번호를 입력하세요.')
+      const teacher = await teacherLogin(email, password)
+      loginAsTeacher(teacher)
+    } catch(e:any) { setError(e.message); setLoading(false) }
+  }
+
+  // ── 학부모 1단계: 전화번호 확인 ──
+  async function handlePhoneCheck() {
+    setError(''); setLoading(true)
+    try {
+      if (!phone) throw new Error('전화번호를 입력하세요.')
+      const data = await parentLookup(phone)
+      setParentData(data)
+      setPin('')
+      setPStep('pin')
+    } catch(e:any) { setError(e.message) }
+    finally { setLoading(false) }
+  }
+
+  // ── PIN 키패드 입력 ──
+  function pressKey(k: string) {
+    if (pStep === 'pin') {
+      if (k === 'del') { setPin(p => p.slice(0,-1)); return }
+      if (pin.length >= 4) return
+      const next = pin + k
+      setPin(next)
+      if (next.length === 4) setTimeout(() => handlePinSubmit(next), 120)
+    } else if (pStep === 'pin-setup') {
+      const target = newPin.length < 4 ? 'new' : 'confirm'
+      if (k === 'del') {
+        if (target === 'confirm') setNewPin2(p => p.slice(0,-1))
+        else setNewPin(p => p.slice(0,-1))
+        return
       }
-    } catch (e: any) {
+      if (target === 'new' && newPin.length < 4)   { setNewPin(p => p+k) }
+      else if (newPin2.length < 4) {
+        const next2 = newPin2 + k
+        setNewPin2(next2)
+        if (next2.length === 4) setTimeout(() => handlePinSetup(next2), 120)
+      }
+    }
+  }
+
+  // ── 학부모 2단계: PIN 검증 ──
+  async function handlePinSubmit(submittedPin: string) {
+    setError(''); setLoading(true)
+    try {
+      const result = await parentLoginWithPin(phone, submittedPin)
+      if (result.isDefaultPin) {
+        setParentData(result)
+        setNewPin(''); setNewPin2('')
+        setPStep('pin-setup')
+        setLoading(false)
+        return
+      }
+      const session = { parentId: result.parentId, phone: result.phone, children: result.children }
+      if (autoLogin) {
+        localStorage.setItem(AUTO_KEY, JSON.stringify({
+          session, expiry: Date.now() + AUTO_DAYS * 86400000
+        }))
+      }
+      sessionStorage.setItem('parent_session', JSON.stringify(session))
+      loginAsParent(session)
+    } catch(e:any) {
       setError(e.message)
+      setPin('')
       setLoading(false)
     }
+  }
+
+  // ── PIN 설정 ──
+  async function handlePinSetup(confirmPin: string) {
+    setError('')
+    if (newPin !== confirmPin) {
+      setError('PIN이 일치하지 않습니다. 다시 입력해주세요.')
+      setNewPin(''); setNewPin2('')
+      return
+    }
+    setLoading(true)
+    try {
+      // 직접 supabase 호출 (anon UPDATE 정책 사용)
+      const { error: updateErr } = await supabase
+        .from('parents')
+        .update({ pin: newPin })
+        .eq('id', parentData.parentId)
+      if (updateErr) throw new Error('PIN 저장 실패: ' + updateErr.message)
+
+      // 업데이트 성공 후 바로 세션 생성
+      const session = { parentId: parentData.parentId, phone: parentData.phone, children: parentData.children }
+      if (autoLogin) {
+        localStorage.setItem(AUTO_KEY, JSON.stringify({
+          session, expiry: Date.now() + AUTO_DAYS * 86400000
+        }))
+      }
+      sessionStorage.setItem('parent_session', JSON.stringify(session))
+      loginAsParent(session)
+    } catch(e:any) { setError(e.message); setLoading(false) }
   }
 
   async function handleSignup() {
@@ -74,38 +174,56 @@ export default function LoginPage() {
     if (sgPw.length < 6) return setError('비밀번호는 6자 이상이어야 합니다.')
     setLoading(true)
     try {
-      // 1. Supabase Auth 계정 생성
-      const { data, error: authErr } = await supabase.auth.signUp({
-        email: sgEmail.trim(),
-        password: sgPw,
-      })
+      const { data, error: authErr } = await supabase.auth.signUp({ email: sgEmail.trim(), password: sgPw })
       if (authErr) throw new Error(authErr.message)
       if (!data.user) throw new Error('회원가입에 실패했습니다.')
-
-      // 2. teachers 테이블에 등록 (승인 대기)
       const { error: tErr } = await supabase.from('teachers').insert({
-        user_id:  data.user.id,
-        name:     sgName.trim(),
-        email:    sgEmail.trim(),
-        phone:    sgPhone.replace(/-/g, ''),
-        role:     'teacher',
-        approved: false,
+        user_id: data.user.id, name: sgName.trim(), email: sgEmail.trim(),
+        phone: sgPhone.replace(/-/g,''), role: 'teacher', approved: false,
       })
       if (tErr) throw new Error('선생님 정보 등록 실패: ' + tErr.message)
-
       setSuccess('가입 신청이 완료됐습니다. 관리자 승인 후 로그인할 수 있습니다.')
       setSgName(''); setSgEmail(''); setSgPhone(''); setSgPw(''); setSgPw2('')
-    } catch (e: any) {
-      setError(e.message)
-    } finally {
-      setLoading(false)
-    }
+    } catch(e:any) { setError(e.message) }
+    finally { setLoading(false) }
   }
 
-  const TABS = [
-    { key: 'parent',  label: '학부모', emoji: '👪' },
-    { key: 'teacher', label: '선생님', emoji: '👨‍🏫' },
-  ] as const
+  // PIN 키패드 렌더
+  function PinDots({ value, length=4 }: { value:string; length?:number }) {
+    return (
+      <div style={{ display:'flex', gap:10, justifyContent:'center', margin:'20px 0 8px' }}>
+        {Array.from({length}).map((_,i) => (
+          <div key={i} style={{
+            width:14, height:14, borderRadius:'50%',
+            background: i < value.length ? '#D87E13' : 'rgba(255,255,255,.18)',
+            transition:'background .15s',
+          }}/>
+        ))}
+      </div>
+    )
+  }
+
+  function Keypad() {
+    const keys = ['1','2','3','4','5','6','7','8','9','','0','del']
+    return (
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginTop:16 }}>
+        {keys.map((k, i) => k === '' ? <div key={`empty-${i}`}/> : (
+          <button key={`key-${i}`} onClick={() => pressKey(k)} style={{
+            padding:'16px 0', borderRadius:12, fontSize: k==='del'?18:20,
+            fontWeight:600, border:'1.5px solid rgba(255,255,255,.12)',
+            background:'rgba(255,255,255,.06)', color:'#fff',
+            cursor:'pointer', fontFamily:"'Noto Sans KR',sans-serif",
+            transition:'background .1s',
+          }}
+          onMouseDown={e => (e.currentTarget.style.background='rgba(216,126,19,.25)')}
+          onMouseUp={e   => (e.currentTarget.style.background='rgba(255,255,255,.06)')}
+          >
+            {k === 'del' ? '⌫' : k}
+          </button>
+        ))}
+      </div>
+    )
+  }
 
   return (
     <>
@@ -117,155 +235,173 @@ export default function LoginPage() {
         input:focus { border-color: #D87E13 !important; }
       `}</style>
 
-      <div style={{ minHeight: '100vh', background: '#071A3E', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ width: 420, padding: '48px 40px' }}>
+      <div style={{ minHeight:'100vh', background:'#071A3E', display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <div style={{ width:380, padding:'48px 36px' }}>
 
           {/* 로고 */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 36 }}>
-            <Image src="/logo.png" alt="로고" width={52} height={52} style={{ objectFit: 'contain', flexShrink: 0 }} />
+          <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:32 }}>
+            <Image src="/logo.png" alt="로고" width={48} height={48} style={{ objectFit:'contain', flexShrink:0 }}/>
             <div>
-              <h1 style={{ fontFamily: "'Noto Sans KR',sans-serif", fontSize: 18, fontWeight: 700, color: '#fff', letterSpacing: 0.5 }}>
-                TEACHERS MATH
-              </h1>
-              <p style={{ fontSize: 11, color: 'rgba(255,255,255,.5)', letterSpacing: 2, marginTop: 2 }}>
-                티처스 수학학원
-              </p>
+              <h1 style={{ fontFamily:"'Noto Sans KR',sans-serif", fontSize:17, fontWeight:700, color:'#fff', letterSpacing:.5 }}>TEACHERS MATH</h1>
+              <p style={{ fontSize:11, color:'rgba(255,255,255,.45)', letterSpacing:2, marginTop:2 }}>티처스 수학학원</p>
             </div>
           </div>
 
-          <p style={{ fontSize: 24, fontWeight: 700, color: '#fff', marginBottom: 8 }}>티처스 수학학원</p>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,.5)', marginBottom: 28 }}>계정 유형을 선택하고 로그인하세요</p>
-
-          {/* 탭 */}
-          {!showSignup && (
-            <div style={{ display: 'flex', gap: 8, marginBottom: 28 }}>
-              {TABS.map(({ key, label, emoji }) => (
-                <button key={key} onClick={() => { setTab(key as Tab); setError(''); setSuccess('') }} style={{
-                  flex: 1, padding: '10px 0', borderRadius: 8,
-                  border: `1.5px solid ${tab === key ? '#D87E13' : 'rgba(255,255,255,.15)'}`,
-                  background: tab === key ? 'rgba(216,126,19,.18)' : 'rgba(255,255,255,.05)',
-                  color: tab === key ? '#F09830' : 'rgba(255,255,255,.6)',
-                  fontSize: 12, fontWeight: 500, cursor: 'pointer',
-                  fontFamily: "'Noto Sans KR',sans-serif", transition: 'all .2s',
-                }}>
-                  <div>{emoji}</div>
-                  <div style={{ marginTop: 4 }}>{label}</div>
-                </button>
-              ))}
-            </div>
+          {/* ── 학부모 PIN 단계 ── */}
+          {!showSignup && tab === 'parent' && pStep === 'pin' && (
+            <>
+              <button onClick={() => { setPStep('phone'); setPin(''); setError('') }}
+                style={{ background:'none', border:'none', color:'rgba(255,255,255,.4)', fontSize:12, cursor:'pointer', marginBottom:16, fontFamily:'inherit', display:'flex', alignItems:'center', gap:4 }}>
+                ← 전화번호 다시 입력
+              </button>
+              <p style={{ fontSize:18, fontWeight:700, color:'#fff', marginBottom:4 }}>PIN 입력</p>
+              <p style={{ fontSize:13, color:'rgba(255,255,255,.4)', marginBottom:4 }}>{phone}</p>
+              <PinDots value={pin} />
+              <p style={{ fontSize:12, color:'rgba(255,255,255,.3)', textAlign:'center', marginBottom:4 }}>4자리 PIN을 입력하세요</p>
+              {error && <p style={{ fontSize:12, color:'#F48771', textAlign:'center', margin:'6px 0' }}>{error}</p>}
+              <Keypad/>
+              <label style={{ display:'flex', alignItems:'center', gap:8, marginTop:14, cursor:'pointer', justifyContent:'center' }}>
+                <input type="checkbox" checked={autoLogin} onChange={e => setAutoLogin(e.target.checked)} style={{ accentColor:'#D87E13' }}/>
+                <span style={{ fontSize:12, color:'rgba(255,255,255,.45)' }}>자동 로그인 (30일)</span>
+              </label>
+            </>
           )}
 
-          {/* 로그인 폼 */}
-          {!showSignup && (
+          {/* ── PIN 설정 단계 ── */}
+          {!showSignup && tab === 'parent' && pStep === 'pin-setup' && (
             <>
+              <p style={{ fontSize:18, fontWeight:700, color:'#fff', marginBottom:4 }}>PIN 설정</p>
+              <p style={{ fontSize:13, color:'rgba(255,255,255,.4)', marginBottom:16 }}>처음 로그인하셨습니다. 새 PIN을 설정해주세요</p>
+              <p style={{ fontSize:12, color:'rgba(255,255,255,.5)', textAlign:'center' }}>
+                {newPin.length < 4 ? '새 PIN 입력' : 'PIN 확인 입력'}
+              </p>
+              <PinDots value={newPin.length < 4 ? newPin : newPin2}/>
+              {newPin.length >= 4 && (
+                <div style={{ display:'flex', gap:6, justifyContent:'center', marginBottom:4 }}>
+                  {Array.from({length:4}).map((_,i) => (
+                    <div key={i} style={{ width:10, height:10, borderRadius:'50%', background: i < newPin.length ? 'rgba(255,255,255,.3)':'transparent', border:'1px solid rgba(255,255,255,.2)' }}/>
+                  ))}
+                </div>
+              )}
+              {error && <p style={{ fontSize:12, color:'#F48771', textAlign:'center', margin:'6px 0' }}>{error}</p>}
+              <Keypad/>
+              <label style={{ display:'flex', alignItems:'center', gap:8, marginTop:14, cursor:'pointer', justifyContent:'center' }}>
+                <input type="checkbox" checked={autoLogin} onChange={e => setAutoLogin(e.target.checked)} style={{ accentColor:'#D87E13' }}/>
+                <span style={{ fontSize:12, color:'rgba(255,255,255,.45)' }}>자동 로그인 (30일)</span>
+              </label>
+            </>
+          )}
+
+          {/* ── 일반 로그인 폼 (전화번호 or 선생님) ── */}
+          {(!showSignup && (tab === 'teacher' || pStep === 'phone')) && (
+            <>
+              <p style={{ fontSize:22, fontWeight:700, color:'#fff', marginBottom:6 }}>티처스 수학학원</p>
+              <p style={{ fontSize:13, color:'rgba(255,255,255,.45)', marginBottom:24 }}>계정 유형을 선택하고 로그인하세요</p>
+
+              {/* 탭 */}
+              <div style={{ display:'flex', gap:8, marginBottom:24 }}>
+                {([{key:'parent',label:'학부모',emoji:'👪'},{key:'teacher',label:'선생님',emoji:'👨‍🏫'}] as const).map(({key,label,emoji}) => (
+                  <button key={key} onClick={() => { setTab(key); setError('') }} style={{
+                    flex:1, padding:'10px 0', borderRadius:8,
+                    border:`1.5px solid ${tab===key?'#D87E13':'rgba(255,255,255,.15)'}`,
+                    background: tab===key?'rgba(216,126,19,.18)':'rgba(255,255,255,.05)',
+                    color: tab===key?'#F09830':'rgba(255,255,255,.6)',
+                    fontSize:12, fontWeight:500, cursor:'pointer',
+                    fontFamily:"'Noto Sans KR',sans-serif",
+                  }}>
+                    <div>{emoji}</div>
+                    <div style={{ marginTop:4 }}>{label}</div>
+                  </button>
+                ))}
+              </div>
+
               {tab === 'teacher' && (
                 <>
-                  <div style={{ marginBottom: 16 }}>
-                    <label style={{ display: 'block', fontSize: 12, color: 'rgba(255,255,255,.5)', marginBottom: 8 }}>이메일</label>
-                    <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-                      placeholder="이메일 입력" style={inputStyle} />
+                  <div style={{ marginBottom:14 }}>
+                    <label style={{ display:'block', fontSize:12, color:'rgba(255,255,255,.5)', marginBottom:7 }}>이메일</label>
+                    <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="이메일 입력" style={iStyle}/>
                   </div>
-                  <div style={{ marginBottom: 16 }}>
-                    <label style={{ display: 'block', fontSize: 12, color: 'rgba(255,255,255,.5)', marginBottom: 8 }}>비밀번호</label>
-                    <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && handleLogin()}
-                      placeholder="비밀번호 입력" style={inputStyle} />
+                  <div style={{ marginBottom:14 }}>
+                    <label style={{ display:'block', fontSize:12, color:'rgba(255,255,255,.5)', marginBottom:7 }}>비밀번호</label>
+                    <input type="password" value={password} onChange={e=>setPassword(e.target.value)}
+                      onKeyDown={e=>e.key==='Enter'&&handleTeacherLogin()} placeholder="비밀번호 입력" style={iStyle}/>
                   </div>
                 </>
               )}
 
-              {tab === 'parent' && (
-                <div style={{ marginBottom: 16 }}>
-                  <label style={{ display: 'block', fontSize: 12, color: 'rgba(255,255,255,.5)', marginBottom: 8 }}>전화번호</label>
-                  <input type="tel" value={phone} onChange={e => setPhone(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleLogin()}
-                    placeholder="전화번호 입력" style={inputStyle} />
-                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,.3)', marginTop: 8 }}>
-                    하이픈(-) 없이 숫자만 입력하세요
-                  </p>
+              {tab === 'parent' && pStep === 'phone' && (
+                <div style={{ marginBottom:14 }}>
+                  <label style={{ display:'block', fontSize:12, color:'rgba(255,255,255,.5)', marginBottom:7 }}>전화번호</label>
+                  <input type="tel" value={phone} onChange={e=>setPhone(e.target.value)}
+                    onKeyDown={e=>e.key==='Enter'&&handlePhoneCheck()} placeholder="01000000000" style={iStyle}/>
+                  <p style={{ fontSize:12, color:'rgba(255,255,255,.3)', marginTop:7 }}>하이픈(-) 없이 숫자만 입력하세요</p>
                 </div>
               )}
+
+              {error && (
+                <div style={{ padding:'10px 14px', background:'rgba(192,57,43,.15)', border:'1px solid rgba(192,57,43,.4)', borderRadius:8, marginBottom:12, fontSize:13, color:'#F48771' }}>
+                  {error}
+                </div>
+              )}
+
+              <button onClick={tab==='teacher'?handleTeacherLogin:handlePhoneCheck} disabled={loading}
+                style={{ width:'100%', marginTop:8, padding:14, borderRadius:8, border:'none', background:loading?'#a86010':'#D87E13', color:'#071A3E', fontSize:15, fontWeight:700, fontFamily:"'Noto Sans KR',sans-serif", cursor:loading?'not-allowed':'pointer' }}>
+                {loading ? '확인 중...' : tab==='parent' ? '다음' : '로그인'}
+              </button>
+
+              <div style={{ textAlign:'center', marginTop:10 }}>
+                <button onClick={()=>{setShowSignup(true);setError('')}}
+                  style={{ background:'none', border:'none', color:'rgba(255,255,255,.35)', fontSize:12, cursor:'pointer', fontFamily:"'Noto Sans KR',sans-serif", textDecoration:'underline' }}>
+                  선생님 계정 생성
+                </button>
+              </div>
             </>
           )}
 
-          {/* 회원가입 폼 */}
+          {/* ── 회원가입 폼 ── */}
           {showSignup && (
             <>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+              <p style={{ fontSize:20, fontWeight:700, color:'#fff', marginBottom:20 }}>선생님 회원가입</p>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: 12, color: 'rgba(255,255,255,.5)', marginBottom: 8 }}>이름 *</label>
-                  <input value={sgName} onChange={e => setSgName(e.target.value)} placeholder="홍길동" style={inputStyle} />
+                  <label style={{ display:'block', fontSize:12, color:'rgba(255,255,255,.5)', marginBottom:7 }}>이름 *</label>
+                  <input value={sgName} onChange={e=>setSgName(e.target.value)} placeholder="홍길동" style={iStyle}/>
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: 12, color: 'rgba(255,255,255,.5)', marginBottom: 8 }}>연락처</label>
-                  <input type="tel" value={sgPhone} onChange={e => setSgPhone(e.target.value.replace(/-/g,''))}
-                    placeholder="01000000000" style={inputStyle} />
-                </div>
-              </div>
-              <div style={{ marginBottom: 12 }}>
-                <label style={{ display: 'block', fontSize: 12, color: 'rgba(255,255,255,.5)', marginBottom: 8 }}>이메일 *</label>
-                <input type="email" value={sgEmail} onChange={e => setSgEmail(e.target.value)}
-                  placeholder="example@email.com" style={inputStyle} />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: 12, color: 'rgba(255,255,255,.5)', marginBottom: 8 }}>비밀번호 *</label>
-                  <input type="password" value={sgPw} onChange={e => setSgPw(e.target.value)}
-                    placeholder="6자 이상" style={inputStyle} />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: 12, color: 'rgba(255,255,255,.5)', marginBottom: 8 }}>비밀번호 확인 *</label>
-                  <input type="password" value={sgPw2} onChange={e => setSgPw2(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleSignup()}
-                    placeholder="동일하게 입력" style={inputStyle} />
+                  <label style={{ display:'block', fontSize:12, color:'rgba(255,255,255,.5)', marginBottom:7 }}>연락처</label>
+                  <input type="tel" value={sgPhone} onChange={e=>setSgPhone(e.target.value.replace(/-/g,''))} placeholder="01000000000" style={iStyle}/>
                 </div>
               </div>
-              <p style={{ fontSize: 12, color: 'rgba(255,255,255,.3)', marginBottom: 16 }}>
-                가입 신청 후 관리자 승인을 받아야 로그인할 수 있습니다
-              </p>
+              <div style={{ marginBottom:12 }}>
+                <label style={{ display:'block', fontSize:12, color:'rgba(255,255,255,.5)', marginBottom:7 }}>이메일 *</label>
+                <input type="email" value={sgEmail} onChange={e=>setSgEmail(e.target.value)} placeholder="example@email.com" style={iStyle}/>
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
+                <div>
+                  <label style={{ display:'block', fontSize:12, color:'rgba(255,255,255,.5)', marginBottom:7 }}>비밀번호 *</label>
+                  <input type="password" value={sgPw} onChange={e=>setSgPw(e.target.value)} placeholder="6자 이상" style={iStyle}/>
+                </div>
+                <div>
+                  <label style={{ display:'block', fontSize:12, color:'rgba(255,255,255,.5)', marginBottom:7 }}>비밀번호 확인 *</label>
+                  <input type="password" value={sgPw2} onChange={e=>setSgPw2(e.target.value)}
+                    onKeyDown={e=>e.key==='Enter'&&handleSignup()} placeholder="동일하게 입력" style={iStyle}/>
+                </div>
+              </div>
+              <p style={{ fontSize:12, color:'rgba(255,255,255,.3)', marginBottom:14 }}>가입 신청 후 관리자 승인을 받아야 로그인할 수 있습니다</p>
+              {error && <div style={{ padding:'10px 14px', background:'rgba(192,57,43,.15)', border:'1px solid rgba(192,57,43,.4)', borderRadius:8, marginBottom:12, fontSize:13, color:'#F48771' }}>{error}</div>}
+              {success && <div style={{ padding:'10px 14px', background:'rgba(26,127,78,.15)', border:'1px solid rgba(26,127,78,.4)', borderRadius:8, marginBottom:12, fontSize:13, color:'#4ade80' }}>{success}</div>}
+              <button onClick={handleSignup} disabled={loading}
+                style={{ width:'100%', padding:14, borderRadius:8, border:'none', background:loading?'#a86010':'#D87E13', color:'#071A3E', fontSize:15, fontWeight:700, fontFamily:"'Noto Sans KR',sans-serif", cursor:loading?'not-allowed':'pointer' }}>
+                {loading?'처리 중...':'가입 신청'}
+              </button>
+              <div style={{ textAlign:'center', marginTop:10 }}>
+                <button onClick={()=>{setShowSignup(false);setError('');setSuccess('')}}
+                  style={{ background:'none', border:'none', color:'rgba(255,255,255,.4)', fontSize:12, cursor:'pointer', fontFamily:"'Noto Sans KR',sans-serif" }}>
+                  ← 로그인으로 돌아가기
+                </button>
+              </div>
             </>
           )}
-
-          {/* 에러 / 성공 메시지 */}
-          {error && (
-            <div style={{ padding: '10px 14px', background: 'rgba(192,57,43,.15)', border: '1px solid rgba(192,57,43,.4)', borderRadius: 8, marginBottom: 12, fontSize: 13, color: '#F48771' }}>
-              {error}
-            </div>
-          )}
-          {success && (
-            <div style={{ padding: '10px 14px', background: 'rgba(26,127,78,.15)', border: '1px solid rgba(26,127,78,.4)', borderRadius: 8, marginBottom: 12, fontSize: 13, color: '#4ade80' }}>
-              {success}
-            </div>
-          )}
-
-          {/* 버튼 */}
-          <button
-            onClick={showSignup ? handleSignup : handleLogin}
-            disabled={loading}
-            style={{
-              width: '100%', marginTop: 8, padding: 14, borderRadius: 8, border: 'none',
-              background: loading ? '#a86010' : '#D87E13', color: '#071A3E',
-              fontSize: 15, fontWeight: 700, fontFamily: "'Noto Sans KR',sans-serif",
-              cursor: loading ? 'not-allowed' : 'pointer', transition: 'background .2s',
-            }}
-          >
-            {loading ? '처리 중...' : showSignup ? '가입 신청' : '로그인'}
-          </button>
-
-          {/* 회원가입 링크 */}
-          <div style={{ textAlign: 'center', marginTop: 5 }}>
-            {showSignup ? (
-              <button onClick={() => { setShowSignup(false); setError(''); setSuccess('') }}
-                style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.4)', fontSize: 12, cursor: 'pointer', fontFamily: "'Noto Sans KR',sans-serif" }}>
-                ← 로그인으로 돌아가기
-              </button>
-            ) : (
-              <button onClick={() => { setShowSignup(true); setError(''); setSuccess('') }}
-                style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.35)', fontSize: 12, cursor: 'pointer', fontFamily: "'Noto Sans KR',sans-serif", textDecoration: 'underline' }}>
-                선생님 계정 생성
-              </button>
-            )}
-          </div>
 
         </div>
       </div>

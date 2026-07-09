@@ -11,7 +11,11 @@
       "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://localhost:3000/dashboard\" -UseBasicParsing -ErrorAction Stop; $r.Content | Select-String -Pattern \"error|Error|404|not found\" -SimpleMatch | Select-Object -First 5 } catch { $_.Exception.Message; try { $_.Exception.Response.GetResponseStream\\(\\) | ForEach-Object { $reader = New-Object System.IO.StreamReader\\($_\\); $reader.ReadToEnd\\(\\) } | Select-String -Pattern \"error|Error|layout|not.found\" -SimpleMatch } catch { \"Could not read response body\" } })",
       "PowerShell($wc = New-Object System.Net.WebClient; try { $content = $wc.DownloadString\\(\"http://localhost:3000/dashboard\"\\) } catch { $err = $_.Exception; if \\($err.InnerException -and $err.InnerException.Response\\) { $stream = $err.InnerException.Response.GetResponseStream\\(\\); $reader = New-Object System.IO.StreamReader\\($stream\\); $reader.ReadToEnd\\(\\) } else { $err.Message } })",
       "PowerShell(taskkill /PID 30132 /F)",
-      "PowerShell(Start-Sleep -Seconds 3; $r1 = try { \\(Invoke-WebRequest -Uri \"http://localhost:3000/dashboard\" -UseBasicParsing\\).StatusCode } catch { $_.Exception.Response.StatusCode.value__ }; $r2 = try { \\(Invoke-WebRequest -Uri \"http://localhost:3000/parent/notices\" -UseBasicParsing\\).StatusCode } catch { $_.Exception.Response.StatusCode.value__ }; \"dashboard: $r1, parent/notices: $r2\")"
+      "PowerShell(Start-Sleep -Seconds 3; $r1 = try { \\(Invoke-WebRequest -Uri \"http://localhost:3000/dashboard\" -UseBasicParsing\\).StatusCode } catch { $_.Exception.Response.StatusCode.value__ }; $r2 = try { \\(Invoke-WebRequest -Uri \"http://localhost:3000/parent/notices\" -UseBasicParsing\\).StatusCode } catch { $_.Exception.Response.StatusCode.value__ }; \"dashboard: $r1, parent/notices: $r2\")",
+      "Bash(npx tsc *)",
+      "Bash(npx next *)",
+      "Bash(curl -s http://localhost:3000/ -o /dev/null -w \"%{http_code}\")",
+      "Bash(python -c ' *)"
     ]
   }
 }

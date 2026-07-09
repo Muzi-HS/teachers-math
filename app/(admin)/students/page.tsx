@@ -123,6 +123,17 @@ export default function StudentsPage() {
     await fetchAll()
   }
 
+  async function resetParentPin(parentPhone: string, studentName: string) {
+    if (!confirm(`${studentName} 학부모의 PIN을 0000으로 초기화하시겠습니까?`)) return
+    const normalized = parentPhone.replace(/-/g, '')
+    const { error } = await supabase
+      .from('parents')
+      .update({ pin: '0000' })
+      .eq('phone', normalized)
+    if (error) return toast('PIN 초기화 실패: ' + error.message, false)
+    toast(`${studentName} 학부모 PIN이 초기화됐습니다`)
+  }
+
   async function remove(id: number, name: string) {
     if (!confirm(`${name} 학생을 삭제하시겠습니까?`)) return
 
@@ -280,7 +291,22 @@ export default function StudentsPage() {
                       <td style={{ color:tx2 }}>{ageOf(s.birth_year)}세</td>
                       <td style={{ color:tx2 }}>{s.school || '-'}</td>
                       {canFull && <td style={{ color:tx2 }}>{fmtPhone(s.phone)}</td>}
-                      {canFull && <td style={{ color:tx2 }}>{fmtPhone(s.parent_phone)}</td>}
+                      {canFull && (
+                        <td>
+                          <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                            <span style={{ color:tx2 }}>{fmtPhone(s.parent_phone)}</span>
+                            {isAdmin && s.parent_phone && (
+                              <button
+                                className="bdng"
+                                style={{ padding:'2px 7px', fontSize:10 }}
+                                onClick={() => resetParentPin(s.parent_phone, s.name)}
+                              >
+                                PIN초기화
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      )}
                       <td>
                         {cls
                           ? <span className="badge" style={{ background:navyM,color:navy }}>{cls.name}</span>
