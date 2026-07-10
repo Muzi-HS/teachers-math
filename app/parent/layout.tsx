@@ -46,14 +46,18 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
 
   async function registerFCMToken(parentId: number) {
     try {
+      console.log('[FCM] 토큰 등록 시작, parentId:', parentId)
       const token = await requestFCMToken()
+      console.log('[FCM] 토큰 발급 결과:', token ? '성공' : '실패(null)')
       if (!token) return
-      await supabase.from('fcm_tokens').upsert(
+      const { error } = await supabase.from('fcm_tokens').upsert(
         { parent_id: parentId, token },
         { onConflict: 'parent_id,token' }
       )
+      if (error) console.error('[FCM] DB 저장 실패:', error)
+      else console.log('[FCM] DB 저장 성공')
     } catch (e) {
-      console.error('FCM 토큰 등록 실패:', e)
+      console.error('[FCM] 토큰 등록 오류:', e)
     }
   }
 
