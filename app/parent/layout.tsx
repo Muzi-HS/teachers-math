@@ -50,12 +50,27 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
       const token = await requestFCMToken()
       console.log('[FCM] 토큰 발급 결과:', token ? '성공' : '실패(null)')
       if (!token) return
-      const { error } = await supabase.from('fcm_tokens').upsert(
-        { parent_id: parentId, token },
-        { onConflict: 'parent_id,token' }
+
+      // anon key로 직접 REST API 호출 (RLS anon 정책 사용)
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/fcm_tokens?on_conflict=parent_id,token`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}`,
+            'Prefer': 'resolution=merge-duplicates',
+          },
+          body: JSON.stringify({ parent_id: parentId, token }),
+        }
       )
-      if (error) console.error('[FCM] DB 저장 실패:', error)
-      else console.log('[FCM] DB 저장 성공')
+      if (!res.ok) {
+        const err = await res.text()
+        console.error('[FCM] DB 저장 실패:', res.status, err)
+      } else {
+        console.log('[FCM] DB 저장 성공')
+      }
     } catch (e) {
       console.error('[FCM] 토큰 등록 오류:', e)
     }
