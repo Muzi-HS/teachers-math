@@ -52,15 +52,16 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
       if (!token) return
 
       // anon key로 직접 REST API 호출 (RLS anon 정책 사용)
+      // INSERT만 사용 (중복 시 무시)
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/fcm_tokens?on_conflict=parent_id,token`,
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/fcm_tokens`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
             'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}`,
-            'Prefer': 'resolution=merge-duplicates',
+            'Prefer': 'resolution=ignore-duplicates',
           },
           body: JSON.stringify({ parent_id: parentId, token }),
         }
