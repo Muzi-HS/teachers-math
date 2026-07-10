@@ -298,12 +298,17 @@ export default function ClassesPage() {
       // 푸시 알림 발송 (학부모 전화번호 있는 경우)
       const stu = detailStus.find(s => s.id === sid)
       if (stu?.parent_phone) {
-        supabase.functions.invoke('send-push', {
-          body: {
+        fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
             parent_phone: stu.parent_phone,
             title: '티처스 수학학원',
             body: `${stu.name} 학생의 수업기록이 등록됐습니다.`,
-          },
+          }),
         }).catch(() => {})
       }
     }
@@ -412,12 +417,17 @@ export default function ClassesPage() {
 
       // 신규 저장 시에만 푸시 알림 발송
       if (curStu.parent_phone) {
-        supabase.functions.invoke('send-push', {
-          body: {
+        fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
             parent_phone: curStu.parent_phone,
             title: '티처스 수학학원',
             body: `${curStu.name} 학생의 수업기록이 등록됐습니다.`,
-          },
+          }),
         }).catch(() => {})
       }
     }
