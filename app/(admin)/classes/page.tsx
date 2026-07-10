@@ -294,6 +294,18 @@ export default function ClassesPage() {
         }
       }
       cnt++
+
+      // 푸시 알림 발송 (학부모 전화번호 있는 경우)
+      const stu = detailStus.find(s => s.id === sid)
+      if (stu?.parent_phone) {
+        supabase.functions.invoke('send-push', {
+          body: {
+            parent_phone: stu.parent_phone,
+            title: '티처스 수학학원',
+            body: `${stu.name} 학생의 수업기록이 등록됐습니다.`,
+          },
+        }).catch(() => {})
+      }
     }
     if (detailCls) sessionStorage.removeItem('bulkDraft_' + detailCls.id)
     setSaving(false); setBulkModal(false); setHasDraft(false)
@@ -397,6 +409,17 @@ export default function ClassesPage() {
       if (recErr || !rec) { toast('저장 실패: ' + (recErr?.message || ''), false); setSaving(false); return }
       recId = rec.id
       toast('수업 기록 저장됨')
+
+      // 신규 저장 시에만 푸시 알림 발송
+      if (curStu.parent_phone) {
+        supabase.functions.invoke('send-push', {
+          body: {
+            parent_phone: curStu.parent_phone,
+            title: '티처스 수학학원',
+            body: `${curStu.name} 학생의 수업기록이 등록됐습니다.`,
+          },
+        }).catch(() => {})
+      }
     }
 
     // 시험 항목 저장 (여러 개 지원)

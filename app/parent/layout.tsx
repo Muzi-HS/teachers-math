@@ -3,6 +3,8 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Image from 'next/image'
 import { useAuth } from '@/context/AuthContext'
+import { supabase } from '@/lib/supabase'
+import { requestFCMToken, onForegroundMessage } from '@/lib/firebase'
 
 const navy='#0D2A5E', navyDk='#071A3E', bd='#DDE3EE', bg='#F5F7FA', tx2='#4B5C7E', tx3='#96A4BF'
 
@@ -42,6 +44,19 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
   // useRef로 초기화 여부 추적 — 리렌더에 영향 없음
   const initDone = useRef(false)
 
+  async function registerFCMToken(parentId: number) {
+    try {
+      const token = await requestFCMToken()
+      if (!token) return
+      await supabase.from('fcm_tokens').upsert(
+        { parent_id: parentId, token },
+        { onConflict: 'parent_id,token' }
+      )
+    } catch (e) {
+      console.error('FCM 토큰 등록 실패:', e)
+    }
+  }
+
   useEffect(() => {
     if (loading) return
 
@@ -58,6 +73,11 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
     // 자녀 1명이면 자동 선택
     if (parent?.children?.length === 1) {
       setSelChild(parent.children[0].id)
+    }
+
+    // FCM 토큰 등록 (백그라운드)
+    if (parent?.parentId) {
+      registerFCMToken(parent.parentId)
     }
 
     setReady(true)
@@ -90,6 +110,8 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Montserrat:wght@700;800&display=swap');
         * { box-sizing: border-box; }
+        .parent-main { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
+        .parent-nav { padding-bottom: env(safe-area-inset-bottom); height: calc(62px + env(safe-area-inset-bottom)); }
       `}</style>
 
       {/* 상단 헤더 */}
@@ -140,42 +162,39 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
       )}
 
       {/* 본문 */}
-      <main style={{ flex: 1, padding: '16px', paddingBottom: 'max(80px, calc(62px + env(safe-area-inset-bottom, 0px)))', maxWidth: 640, width: '100%', margin: '0 auto' }}>
+      <main className="parent-main" style={{ flex: 1, padding: '16px 16px 80px', maxWidth: 640, width: '100%', margin: '0 auto' }}>
         <ParentChildContext.Provider value={{ selChild, setSelChild, children: childList }}>
           {children}
         </ParentChildContext.Provider>
       </main>
 
       {/* 하단 탭바 */}
-      <nav style={{
+      <nav className="parent-nav" style={{
         position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100,
         background: '#fff', borderTop: `1px solid ${bd}`,
-        display: 'flex', flexDirection: 'column',
+        display: 'flex',
         boxShadow: '0 -2px 10px rgba(0,0,0,.08)',
+        alignItems: 'flex-start',
       }}>
-        <div style={{ display: 'flex' }}>
-          {NAV.map(item => {
-            const active = pathname.startsWith(item.href)
-            return (
-              <button key={item.href} onClick={() => router.push(item.href)} style={{
-                flex: 1, display: 'flex', flexDirection: 'column',
-                alignItems: 'center', justifyContent: 'center', gap: 3,
-                height: 62,
-                background: 'none', border: 'none', cursor: 'pointer',
-                color: active ? navy : tx3,
-                fontFamily: "'Noto Sans KR',sans-serif",
-                transition: 'color .15s',
-                borderTop: active ? `2.5px solid ${navy}` : '2.5px solid transparent',
-                paddingTop: 2,
-              }}>
-                <span style={{ color: active ? navy : tx3, display: 'flex' }}>{item.icon}</span>
-                <span style={{ fontSize: 10, fontWeight: active ? 700 : 400 }}>{item.label}</span>
-              </button>
-            )
-          })}
-        </div>
-        {/* iOS 홈 인디케이터 안전 영역 */}
-        <div style={{ height: 'env(safe-area-inset-bottom, 0px)', background: '#fff', flexShrink: 0 }} />
+        {NAV.map(item => {
+          const active = pathname.startsWith(item.href)
+          return (
+            <button key={item.href} onClick={() => router.push(item.href)} style={{
+              flex: 1, display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center', gap: 3,
+              height: 62,
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: active ? navy : tx3,
+              fontFamily: "'Noto Sans KR',sans-serif",
+              transition: 'color .15s',
+              borderTop: active ? `2.5px solid ${navy}` : '2.5px solid transparent',
+              paddingTop: 2,
+            }}>
+              <span style={{ color: active ? navy : tx3, display: 'flex' }}>{item.icon}</span>
+              <span style={{ fontSize: 10, fontWeight: active ? 700 : 400 }}>{item.label}</span>
+            </button>
+          )
+        })}
       </nav>
     </div>
   )
