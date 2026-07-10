@@ -3,42 +3,108 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-const FCM_SERVER_KEY = Deno.env.get('FCM_SERVER_KEY')! // Firebase 서비스 계정 키
+const CLIENT_EMAIL = Deno.env.get('FIREBASE_CLIENT_EMAIL')!
+const PRIVATE_KEY = Deno.env.get('FIREBASE_PRIVATE_KEY')!.replace(/\\n/g, '\n')
+const PROJECT_ID = 'teachers-math'
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+
+async function getAccessToken(): Promise<string> {
+  const now = Math.floor(Date.now() / 1000)
+  const header = { alg: 'RS256', typ: 'JWT' }
+  const payload = {
+    iss: CLIENT_EMAIL,
+    scope: 'https://www.googleapis.com/auth/firebase.messaging',
+    aud: 'https://oauth2.googleapis.com/token',
+    exp: now + 3600,
+    iat: now,
+  }
+
+  const encode = (obj: object) =>
+    btoa(JSON.stringify(obj)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+
+  const signingInput = `${encode(header)}.${encode(payload)}`
+
+  const keyData = PRIVATE_KEY
+    .replace('-----BEGIN PRIVATE KEY-----', '')
+    .replace('-----END PRIVATE KEY-----', '')
+    .replace(/\s/g, '')
+
+  const binaryKey = Uint8Array.from(atob(keyData), c => c.charCodeAt(0))
+  const cryptoKey = await crypto.subtle.importKey(
+    'pkcs8', binaryKey,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false, ['sign']
+  )
+
+  const signature = await crypto.subtle.sign(
+    'RSASSA-PKCS1-v1_5',
+    cryptoKey,
+    new TextEncoder().encode(signingInput)
+  )
+
+  const sigB64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
+    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+
+  const jwt = `${signingInput}.${sigB64}`
+
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
+  })
+
+  const data = await res.json()
+  return data.access_token
+}
 
 serve(async (req) => {
+  // CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
   try {
     const { parent_phone, title, body } = await req.json()
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-    // 전화번호로 parent_id 조회
+    const normalized = parent_phone.replace(/-/g, '')
     const { data: parent } = await supabase
       .from('parents')
       .select('id')
-      .eq('phone', parent_phone)
+      .eq('phone', normalized)
       .single()
 
     if (!parent) {
-      return new Response(JSON.stringify({ error: '학부모를 찾을 수 없습니다.' }), { status: 404 })
+      return new Response(JSON.stringify({ message: '학부모 없음' }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
-    // FCM 토큰 조회
     const { data: tokens } = await supabase
       .from('fcm_tokens')
       .select('token')
       .eq('parent_id', parent.id)
 
     if (!tokens || tokens.length === 0) {
-      return new Response(JSON.stringify({ message: '등록된 FCM 토큰 없음' }), { status: 200 })
+      return new Response(JSON.stringify({ message: 'FCM 토큰 없음' }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
-    // FCM 발송
+    const accessToken = await getAccessToken()
+
     const results = await Promise.allSettled(
       tokens.map(({ token }) =>
-        fetch('https://fcm.googleapis.com/v1/projects/teachers-math/messages:send', {
+        fetch(`https://fcm.googleapis.com/v1/projects/${PROJECT_ID}/messages:send`, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${FCM_SERVER_KEY}`,
+            'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
@@ -46,24 +112,27 @@ serve(async (req) => {
               token,
               notification: { title, body },
               webpush: {
-                notification: {
-                  title,
-                  body,
-                  icon: '/logo.png',
-                  badge: '/logo.png',
-                  click_action: '/parent/records',
-                },
+                notification: { title, body, icon: '/logo.png', badge: '/logo.png' },
+                fcm_options: { link: '/parent/records' },
               },
             },
           }),
-        })
+        }).then(r => r.json())
       )
     )
 
     const succeeded = results.filter(r => r.status === 'fulfilled').length
-    return new Response(JSON.stringify({ sent: succeeded, total: tokens.length }), { status: 200 })
+    console.log(`푸시 발송: ${succeeded}/${tokens.length}`)
+
+    return new Response(
+      JSON.stringify({ sent: succeeded, total: tokens.length }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
 
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500 })
+    console.error('오류:', e)
+    return new Response(JSON.stringify({ error: String(e) }), {
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
   }
 })
