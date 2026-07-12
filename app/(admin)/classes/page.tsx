@@ -1014,6 +1014,22 @@ export default function ClassesPage() {
               if (recErr || !rec) { toast('저장 실패', false); setSaving(false); return }
               recId = rec.id
               toast('수업 기록 저장됨')
+
+              // 푸시 알림 발송
+              if (curStu.parent_phone) {
+                fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+                  },
+                  body: JSON.stringify({
+                    parent_phone: curStu.parent_phone,
+                    title: '티처스 수학학원',
+                    body: `${curStu.name} 학생의 수업기록이 등록됐습니다.`,
+                  }),
+                }).catch(() => {})
+              }
             }
             if (recId && showT && form.testItems.length > 0) {
               for (const ti of form.testItems) {
