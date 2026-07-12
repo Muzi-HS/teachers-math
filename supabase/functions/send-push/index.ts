@@ -100,8 +100,8 @@ serve(async (req) => {
     const accessToken = await getAccessToken()
 
     const results = await Promise.allSettled(
-      tokens.map(({ token }) =>
-        fetch(`https://fcm.googleapis.com/v1/projects/${PROJECT_ID}/messages:send`, {
+      tokens.map(async ({ token }) => {
+        const r = await fetch(`https://fcm.googleapis.com/v1/projects/${PROJECT_ID}/messages:send`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -117,8 +117,11 @@ serve(async (req) => {
               },
             },
           }),
-        }).then(r => r.json())
-      )
+        })
+        const json = await r.json()
+        console.log('FCM 응답:', JSON.stringify(json))
+        return json
+      })
     )
 
     const succeeded = results.filter(r => r.status === 'fulfilled').length

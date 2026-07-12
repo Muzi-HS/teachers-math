@@ -297,6 +297,7 @@ export default function ClassesPage() {
 
       // 푸시 알림 발송 (학부모 전화번호 있는 경우)
       const stu = detailStus.find(s => s.id === sid)
+      console.log('[PUSH] stu:', stu?.name, 'parent_phone:', stu?.parent_phone)
       if (stu?.parent_phone) {
         fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push`, {
           method: 'POST',
@@ -416,6 +417,7 @@ export default function ClassesPage() {
       toast('수업 기록 저장됨')
 
       // 신규 저장 시에만 푸시 알림 발송
+      console.log('[PUSH] curStu:', curStu?.name, 'parent_phone:', curStu?.parent_phone)
       if (curStu.parent_phone) {
         fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push`, {
           method: 'POST',
