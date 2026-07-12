@@ -255,10 +255,18 @@ export default function ClassesPage() {
   async function saveBulkRec() {
     setSaving(true)
     let cnt = 0
+    let errCnt = 0
     const checkedSids = Object.entries(bulkChks).filter(([, v]) => v).map(([k]) => Number(k))
     for (const sid of checkedSids) {
       const f = bulkForms[sid]
-      if (!f || (!f.content && !f.homework && !f.feedback)) continue
+      // 폼 자체가 없거나, 모든 필드가 기본값 그대로인 경우 스킵
+      const blank = !f || (
+        !f.content && !f.homework && !f.feedback &&
+        f.attitude === 10 && f.hw_rate === 80 && f.hw_cor === 75 &&
+        !f.late && !f.has_test && !f.hw_rate_na && !f.hw_cor_na &&
+        (!f.testItems || f.testItems.length === 0)
+      )
+      if (blank) continue
 
       // 1. records 저장 후 id 받기
       const { data: rec, error: recErr } = await supabase.from('records').insert({
@@ -268,7 +276,7 @@ export default function ClassesPage() {
         attitude: f.attitude,
         late: f.late, has_test: f.has_test, feedback: f.feedback, is_draft: false,
       }).select('id').single()
-      if (recErr || !rec) { console.error('record insert error', recErr); continue }
+      if (recErr || !rec) { toast('저장 실패: ' + (recErr?.message || '알 수 없는 오류'), false); errCnt++; continue }
 
       // 2. 시험 항목 저장 (여러 개 지원)
       if (f.has_test && f.testItems && f.testItems.length > 0) {
@@ -313,9 +321,15 @@ export default function ClassesPage() {
       }
     }
     if (detailCls) sessionStorage.removeItem('bulkDraft_' + detailCls.id)
-    setSaving(false); setBulkModal(false); setHasDraft(false)
+    setSaving(false)
+    if (cnt > 0) setBulkModal(false)
+    setHasDraft(false)
     await fetchAll()
-    toast(cnt + '명 수업기록 저장됨')
+    if (cnt === 0 && errCnt === 0) {
+      toast('저장할 내용이 없습니다. 수업 내용·숙제·피드백이나 수치 항목을 수정 후 저장하세요.', false)
+    } else if (cnt > 0) {
+      toast(cnt + '명 수업기록 저장됨')
+    }
   }
   function setBF(sid: number, key: keyof RecForm, val: any) {
     setBulkForms(p => ({ ...p, [sid]: { ...p[sid], [key]: val } }))
