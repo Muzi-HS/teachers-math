@@ -295,10 +295,9 @@ export default function ClassesPage() {
       }
       cnt++
 
-      // 푸시 알림 발송 (학부모 전화번호 있는 경우)
-      const stu = detailStus.find(s => s.id === sid)
-      console.log('[PUSH] stu:', stu?.name, 'parent_phone:', stu?.parent_phone)
-      if (stu?.parent_phone) {
+      // 푸시 알림 발송 — students 배열에서 직접 조회 (parent_phone 포함)
+      const stuFull = students.find(s => s.id === sid)
+      if (stuFull?.parent_phone) {
         fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push`, {
           method: 'POST',
           headers: {
@@ -306,9 +305,9 @@ export default function ClassesPage() {
             'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
           },
           body: JSON.stringify({
-            parent_phone: stu.parent_phone,
+            parent_phone: stuFull.parent_phone,
             title: '티처스 수학학원',
-            body: `${stu.name} 학생의 수업기록이 등록됐습니다.`,
+            body: `${stuFull.name} 학생의 수업기록이 등록됐습니다.`,
           }),
         }).catch(() => {})
       }
@@ -415,23 +414,6 @@ export default function ClassesPage() {
       if (recErr || !rec) { toast('저장 실패: ' + (recErr?.message || ''), false); setSaving(false); return }
       recId = rec.id
       toast('수업 기록 저장됨')
-
-      // 신규 저장 시에만 푸시 알림 발송
-      console.log('[PUSH] curStu:', curStu?.name, 'parent_phone:', curStu?.parent_phone)
-      if (curStu.parent_phone) {
-        fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({
-            parent_phone: curStu.parent_phone,
-            title: '티처스 수학학원',
-            body: `${curStu.name} 학생의 수업기록이 등록됐습니다.`,
-          }),
-        }).catch(() => {})
-      }
     }
 
     // 시험 항목 저장 (여러 개 지원)
