@@ -17,7 +17,10 @@
       "Bash(curl -s http://localhost:3000/ -o /dev/null -w \"%{http_code}\")",
       "Bash(python -c ' *)",
       "Bash(mkdir -p \"c:\\\\Users\\\\hs991\\\\teachers-math\\\\supabase\\\\functions\\\\register-fcm-token\")",
-      "Bash(npx supabase *)"
+      "Bash(npx supabase *)",
+      "Bash(sed -i 's/detail\\\\.created_at\\\\.slice\\(0, 10\\)/kstDateOf\\(detail.created_at\\)/g;    s/notice\\\\.created_at\\\\.slice\\(0, 10\\)/kstDateOf\\(notice.created_at\\)/g' 'app/\\(admin\\)/notices/page.tsx')",
+      "Bash(sed -i 's/detail\\\\.created_at\\\\.slice\\(0, 10\\)/kstDateOf\\(detail.created_at\\)/g;    s/n\\\\.created_at\\\\.slice\\(5, 10\\)/kstDateOf\\(n.created_at\\).slice\\(5, 10\\)/g' app/parent/notices/page.tsx)",
+      "Bash(grep -v \"//\")"
     ],
     "additionalDirectories": [
       "c:\\Users\\hs991\\teachers-math\\supabase\\functions"

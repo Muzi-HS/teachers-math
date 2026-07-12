@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { kstDateOf } from '@/lib/kst'
 
 const navy='#0D2A5E', tx='#0D1B36', tx2='#4B5C7E', tx3='#96A4BF', bd='#DDE3EE', bg='#F5F7FA'
 const gold='#D87E13'
@@ -47,7 +48,7 @@ export default function ParentNotices() {
       <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: 20 }}>
         {detail.pinned && <span style={{ background: gold, color: '#fff', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4, marginBottom: 10, display: 'inline-block' }}>📌 공지</span>}
         <h2 style={{ fontSize: 17, fontWeight: 700, color: tx, marginBottom: 8 }}>{detail.title}</h2>
-        <p style={{ fontSize: 12, color: tx3, marginBottom: 16 }}>{detail.created_at.slice(0, 10)}</p>
+        <p style={{ fontSize: 12, color: tx3, marginBottom: 16 }}>{kstDateOf(detail.created_at)}</p>
         {detail.image_url && <img src={detail.image_url} alt="첨부이미지" style={{ width: '100%', borderRadius: 8, marginBottom: 16 }} />}
         <p style={{ fontSize: 14, color: tx, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{detail.content}</p>
       </div>
@@ -93,7 +94,7 @@ export default function ParentNotices() {
                 <span style={{ fontSize: 13, fontWeight: 700, color: tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.title}</span>
                 {isNew(n.created_at) && <span style={{ color: '#C0392B', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>N</span>}
               </div>
-              <div style={{ textAlign: 'center', fontSize: 11, color: tx3 }}>{n.created_at.slice(5, 10)}</div>
+              <div style={{ textAlign: 'center', fontSize: 11, color: tx3 }}>{kstDateOf(n.created_at).slice(5, 10)}</div>
             </div>
           ))}
 
@@ -111,7 +112,7 @@ export default function ParentNotices() {
                 <span style={{ fontSize: 13, color: tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.title}</span>
                 {isNew(n.created_at) && <span style={{ color: '#C0392B', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>N</span>}
               </div>
-              <div style={{ textAlign: 'center', fontSize: 11, color: tx3 }}>{n.created_at.slice(5, 10)}</div>
+              <div style={{ textAlign: 'center', fontSize: 11, color: tx3 }}>{kstDateOf(n.created_at).slice(5, 10)}</div>
             </div>
           ))}
         </div>

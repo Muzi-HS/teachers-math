@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { can, Role } from '@/lib/permissions'
+import { kstDateOf } from '@/lib/kst'
 
 type Notice = {
   id: number
@@ -212,7 +213,7 @@ export default function NoticesPage() {
               <div>
                 <h2 style={{ fontSize: 18, fontWeight: 700, color: tx }}>{detail.title}</h2>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                  <p style={{ fontSize: 12, color: tx3 }}>{detail.created_at.slice(0, 10)}</p>
+                  <p style={{ fontSize: 12, color: tx3 }}>{kstDateOf(detail.created_at)}</p>
                   {detail.pinned && <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 20, background: goldPale, color: gold, fontWeight: 500 }}>상단 고정</span>}
                   {detail.parent_visible
                     ? <span className="badge-green">학부모 공개</span>
@@ -375,7 +376,7 @@ function BoardRow({ notice, index, pinned, canWrite, onClick, onEdit, onDelete, 
         }
       </div>
 
-      <div style={{ textAlign: 'center', fontSize: 11, color: tx3 }}>{notice.created_at.slice(0, 10)}</div>
+      <div style={{ textAlign: 'center', fontSize: 11, color: tx3 }}>{kstDateOf(notice.created_at)}</div>
 
       <div style={{ textAlign: 'center', position: 'relative' }}>
         {canWrite ? (
