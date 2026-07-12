@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
+import { kstDateStr, kstNow } from '@/lib/kst'
 
 type Student = { id: number; name: string; parent_phone: string }
 type Class_ = { id: number; name: string }
@@ -31,7 +32,7 @@ function rateBg(v: number) { return v >= 80 ? '#E0F5EB' : v >= 60 ? '#FEF3E2' : 
 function attColor(v: number) { return v >= 8 ? '#1A7F4E' : v >= 5 ? '#C05621' : '#C0392B' }
 function attBg(v: number) { return v >= 8 ? '#E0F5EB' : v >= 5 ? '#FEF3E2' : '#FDECEA' }
 function attLabel(v: number) { return v >= 8 ? '우수' : v >= 5 ? '보통' : '노력필요' }
-function todayStr() { return new Date().toISOString().split('T')[0] }
+function todayStr() { return kstDateStr() }
 function fmtDate(dt: string) {
   const [y, m, d] = dt.split('-')
   return `${y}년 ${parseInt(m)}월 ${parseInt(d)}일`
@@ -144,8 +145,8 @@ export default function RecordsPage() {
   const [classes,  setClasses]  = useState<Class_[]>([])
   const [tests,    setTests]    = useState<Test[]>([])
   const [csMap,    setCsMap]    = useState<Record<number, number>>({})
-  const [llYear,   setLlYear]   = useState(new Date().getFullYear())
-  const [llMonth,  setLlMonth]  = useState(new Date().getMonth())
+  const [llYear,   setLlYear]   = useState(kstNow().getFullYear())
+  const [llMonth,  setLlMonth]  = useState(kstNow().getMonth())
   const [selDate,  setSelDate]  = useState(todayStr())
   const [recDates, setRecDates] = useState<Set<string>>(new Set())
   const [dayRecs,  setDayRecs]  = useState<Rec[]>([])
@@ -546,13 +547,13 @@ export default function RecordsPage() {
                       </div>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <button className="bout" style={{ color: gr, borderColor: gr + '66' }}
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+                    <button className="bout" style={{ color: gr, borderColor: gr + '66', whiteSpace: 'nowrap' }}
                       onClick={() => { setSmsTarget(r.student_id); setSmsModal(true) }}>
-                      ✉️ 개별발송
+                      개별발송
                     </button>
-                    <button className="bout" onClick={() => openEdit(r)}>수정</button>
-                    <button className="bdng" onClick={() => delRec(r.id)}>삭제</button>
+                    <button className="bout" style={{ whiteSpace: 'nowrap' }} onClick={() => openEdit(r)}>수정</button>
+                    <button className="bdng" style={{ whiteSpace: 'nowrap' }} onClick={() => delRec(r.id)}>삭제</button>
                   </div>
                 </div>
 

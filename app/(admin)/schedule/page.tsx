@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { can, Role } from '@/lib/permissions'
+import { kstDateStr, kstNow } from '@/lib/kst'
 
 type Evt = {
     id: number
@@ -54,8 +55,8 @@ export default function SchedulePage() {
     const [form, setForm] = useState<FormState>({ ...BLANK })
     const [editId, setEditId] = useState<number | null>(null)
     const [saving, setSaving] = useState(false)
-    const [yr, setYr] = useState(new Date().getFullYear())
-    const [mo, setMo] = useState(new Date().getMonth())  // 0-based
+    const [yr, setYr] = useState(kstNow().getFullYear())
+    const [mo, setMo] = useState(kstNow().getMonth())  // 0-based
     const [notif, setNotif] = useState<{ msg: string; ok: boolean } | null>(null)
 
     useEffect(() => { load() }, [yr, mo])
@@ -156,7 +157,7 @@ export default function SchedulePage() {
         setMo(m); setYr(y)
     }
 
-    const today = new Date()
+    const today = kstNow()
     const dim = new Date(yr, mo + 1, 0).getDate()   // days in month
     const fd = new Date(yr, mo, 1).getDay()         // first day of week
     const pmd = new Date(yr, mo, 0).getDate()        // prev month last day
@@ -249,7 +250,7 @@ export default function SchedulePage() {
                         const day = i + 1
                         const ds = `${yr}-${String(mo + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
                         const dow = (fd + i) % 7
-                        const isTod = ds === today.toISOString().split('T')[0]
+                        const isTod = ds === kstDateStr()
                         const de = dayEvts(ds)
                         const isHol = de.some(e => e.type === 'holiday')
                         let cls = 'cd'

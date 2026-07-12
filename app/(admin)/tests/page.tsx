@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { can } from '@/lib/permissions'
+import { kstDateStr, kstNow } from '@/lib/kst'
 
 type Test = { id:number; name:string; date:string; total:number }
 type ScoreRow = {
@@ -27,7 +28,7 @@ export default function TestsPage() {
   const [loading,   setLoading]   = useState(true)
   const [search,    setSearch]    = useState('')
   const [addModal,  setAddModal]  = useState(false)
-  const [form,      setForm]      = useState({ name:'', date:new Date().toISOString().split('T')[0], total:'' })
+  const [form,      setForm]      = useState({ name:'', date:kstDateStr(), total:'' })
   const [editId,    setEditId]    = useState<number|null>(null)
   const [editSc,    setEditSc]    = useState<{row:ScoreRow;cor:string;score:string}|null>(null)
   const [saving,    setSaving]    = useState(false)
@@ -133,7 +134,7 @@ export default function TestsPage() {
 
   function openAdd() {
     setEditId(null)
-    setForm({ name:'', date:new Date().toISOString().split('T')[0], total:'' })
+    setForm({ name:'', date:kstDateStr(), total:'' })
     setAddModal(true)
   }
   function openEdit(t:Test, e:React.MouseEvent) {
@@ -204,11 +205,11 @@ export default function TestsPage() {
   }
 
   // ── 달력 state ──
-  const [calYear,  setCalYear]  = useState(new Date().getFullYear())
-  const [calMonth, setCalMonth] = useState(new Date().getMonth())
+  const [calYear,  setCalYear]  = useState(kstNow().getFullYear())
+  const [calMonth, setCalMonth] = useState(kstNow().getMonth())
   const [selDate,  setSelDate]  = useState<string|null>(null)
 
-  const todayStr = new Date().toISOString().split('T')[0]
+  const todayStr = kstDateStr()
   function prevCal(){ if(calMonth===0){setCalYear(y=>y-1);setCalMonth(11)}else setCalMonth(m=>m-1); setSelDate(null) }
   function nextCal(){ if(calMonth===11){setCalYear(y=>y+1);setCalMonth(0)}else setCalMonth(m=>m+1); setSelDate(null) }
 

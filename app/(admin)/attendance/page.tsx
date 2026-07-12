@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
+import { kstDateStr, kstNow } from '@/lib/kst'
 
 const navy='#0D2A5E', bg='#F5F7FA', bd='#DDE3EE'
 const tx='#0D1B36', tx2='#4B5C7E', tx3='#96A4BF'
@@ -18,7 +19,7 @@ function fmtHours(m:number|null){
   return min>0?`${h}시간 ${min}분`:`${h}시간`
 }
 
-function todayStr(){ return new Date().toISOString().split('T')[0] }
+function todayStr(){ return kstDateStr() }
 
 export default function AttendancePage(){
   const { teacher } = useAuth()
@@ -29,8 +30,8 @@ export default function AttendancePage(){
   const [memo,    setMemo]    = useState('')
   const [saving,  setSaving]  = useState(false)
   const [notif,   setNotif]   = useState<{msg:string;ok:boolean}|null>(null)
-  const [selYear,  setSelYear]  = useState(new Date().getFullYear())
-  const [selMonth, setSelMonth] = useState(new Date().getMonth()+1)
+  const [selYear,  setSelYear]  = useState(kstNow().getFullYear())
+  const [selMonth, setSelMonth] = useState(kstNow().getMonth()+1)
   const [selDate,  setSelDate]  = useState(todayStr())
 
   function handleDateChange(d: string) {

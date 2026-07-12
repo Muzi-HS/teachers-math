@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { can } from '@/lib/permissions'
+import { kstDateStr, kstNow } from '@/lib/kst'
 
 type Student = {
   id: number
@@ -17,9 +18,9 @@ type Student = {
 type Class = { id: number; name: string }
 
 const BLANK: Omit<Student, 'id'> = {
-  name: '', birth_year: new Date().getFullYear() - 15,
+  name: '', birth_year: kstNow().getFullYear() - 15,
   school: '', phone: '', parent_phone: '',
-  reg_date: new Date().toISOString().split('T')[0],
+  reg_date: kstDateStr(),
 }
 
 const navy = '#0D2A5E', navyDk = '#071A3E', navyM = '#E8EEF8'
@@ -68,7 +69,7 @@ export default function StudentsPage() {
   }
 
   function ageOf(birth: number) {
-    return new Date().getFullYear() - birth + 1
+    return kstNow().getFullYear() - birth + 1
   }
 
   // 전화번호 표시용 포맷 (01012341234 → 010-1234-1234)
@@ -92,7 +93,7 @@ export default function StudentsPage() {
     setForm({
       name: s.name, birth_year: s.birth_year, school: s.school,
       phone: s.phone ?? '', parent_phone: s.parent_phone ?? '',
-      reg_date: s.reg_date ?? new Date().toISOString().split('T')[0],
+      reg_date: s.reg_date ?? kstDateStr(),
     })
     setNoPhone(!s.phone)
     setModal(true)

@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
+import { kstDateStr } from '@/lib/kst'
 
 type Student = {
   id: number
@@ -32,7 +33,7 @@ const tx = '#0D1B36', tx2 = '#4B5C7E', tx3 = '#96A4BF'
 const re = '#C0392B', rbg = '#FDECEA'
 const gr = '#1A7F4E', gbg = '#E0F5EB'
 
-function todayStr() { return new Date().toISOString().split('T')[0] }
+function todayStr() { return kstDateStr() }
 
 export default function RecordWritePage() {
   const router      = useRouter()

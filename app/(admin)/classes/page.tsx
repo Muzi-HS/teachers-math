@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { can } from '@/lib/permissions'
 import { useSearchParams } from 'next/navigation'
+import { kstDateStr } from '@/lib/kst'
 
 type Class = { id: number; name: string; days: string; time: string; mode?: string }
 type Student = { id: number; name: string; birth_year: number; school: string; parent_phone?: string }
@@ -66,12 +67,12 @@ export default function ClassesPage() {
   // mAddRec (개별 기록 추가/수정)
   const [recModal, setRecModal] = useState(false)
   const [editRecId, setEditRecId] = useState<number | null>(null)
-  const [recDate, setRecDate] = useState(() => new Date().toISOString().split('T')[0])
+  const [recDate, setRecDate] = useState(() => kstDateStr())
   const [recF, setRecF] = useState<RecForm>(BLANK_REC(0))
   const [showTest, setShowTest] = useState(false)
   // mBulkRec (반 수업기록 일괄)
   const [bulkModal, setBulkModal] = useState(false)
-  const [bulkDate, setBulkDate] = useState(() => new Date().toISOString().split('T')[0])
+  const [bulkDate, setBulkDate] = useState(() => kstDateStr())
   const [bulkChks, setBulkChks] = useState<Record<number, boolean>>({}) // student_id→checked
   const [bulkForms, setBulkForms] = useState<Record<number, RecForm>>({})
   const [bulkShowTest, setBulkShowTest] = useState<Record<number, boolean>>({})
@@ -163,6 +164,12 @@ export default function ClassesPage() {
 
   function toast(msg: string, ok = true) { setNotif({ msg, ok }); setTimeout(() => setNotif(null), 3000) }
   function ageOf(b: number) { return new Date().getFullYear() - b + 1 }
+
+  // 한국 시간 기준 날짜 포맷 (YYYY년 M월 D일)
+  function fmtKorDate(dateStr: string) {
+    const [y, m, d] = dateStr.split('-')
+    return `${y}년 ${parseInt(m)}월 ${parseInt(d)}일`
+  }
   const isAdmin = role === 'admin'
   // 반 추가/수정/삭제, 반에 학생 추가/제외 — admin만 가능
   const canManageClassInfo = role ? can.manageClassInfo(role as any) : false
@@ -221,7 +228,7 @@ export default function ClassesPage() {
     const showT: Record<number, boolean> = {}
     sids.forEach(sid => { chks[sid] = true; forms[sid] = BLANK_REC(sid); showT[sid] = false })
     setBulkChks(chks); setBulkForms(forms); setBulkShowTest(showT)
-    setBulkDate(new Date().toISOString().split('T')[0])
+    setBulkDate(kstDateStr())
     // 임시저장 확인
     const draft = sessionStorage.getItem('bulkDraft_' + detailCls.id)
     setHasDraft(!!draft)
@@ -234,7 +241,7 @@ export default function ClassesPage() {
     if (!raw) return
     try {
       const d = JSON.parse(raw)
-      setBulkDate(d.date || new Date().toISOString().split('T')[0])
+      setBulkDate(d.date || kstDateStr())
       setBulkChks(d.chks || {})
       setBulkForms(d.forms || {})
       setBulkShowTest(d.showTest || {})
@@ -315,7 +322,7 @@ export default function ClassesPage() {
           body: JSON.stringify({
             parent_phone: stuFull.parent_phone,
             title: '티처스 수학학원',
-            body: `${stuFull.name} 학생의 수업기록이 등록됐습니다.`,
+            body: `[${fmtKorDate(bulkDate)}] ${stuFull.name}학생의 수업기록이 등록됐습니다!`,
           }),
         }).catch(() => {})
       }
@@ -371,7 +378,7 @@ export default function ClassesPage() {
     }
     setRecF(BLANK_REC(curStu.id))
     setShowTest(false)
-    setRecDate(new Date().toISOString().split('T')[0])
+    setRecDate(kstDateStr())
     setRecModal(true)
   }
   function openEditRec(r: Rec) {
@@ -1022,7 +1029,7 @@ export default function ClassesPage() {
                   body: JSON.stringify({
                     parent_phone: curStu.parent_phone,
                     title: '티처스 수학학원',
-                    body: `${curStu.name} 학생의 수업기록이 등록됐습니다.`,
+                    body: `[${fmtKorDate(date)}] ${curStu.name}학생의 수업기록이 등록됐습니다!`,
                   }),
                 }).catch(() => {})
               }

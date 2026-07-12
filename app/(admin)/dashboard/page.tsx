@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
+import { kstNow } from '@/lib/kst'
 
 type Class_   = { id:number; name:string; days:string; time:string }
 type Student  = { id:number; name:string }
@@ -48,7 +49,7 @@ export default function DashboardPage(){
   }
 
   // 오늘 요일에 해당하는 반만 필터링
-  const todayDow = DOW[new Date().getDay()]
+  const todayDow = DOW[kstNow().getDay()]
   const todayClasses = classes.filter(c => (c.days??'').includes(todayDow))
 
   function goToClassDetail(classId: number){
@@ -85,7 +86,7 @@ export default function DashboardPage(){
             안녕하세요, {teacher?.name ?? '선생님'}님 👋
           </p>
           <p style={{ fontSize: 13, color: tx2, margin: '4px 0 0' }}>
-            {new Date().toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric', weekday:'long' })}
+            {kstNow().toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric', weekday:'long' })}
             {' · '}오늘 수업 {todayClasses.length}개 예정
           </p>
         </div>
