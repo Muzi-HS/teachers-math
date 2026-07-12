@@ -51,14 +51,21 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
       console.log('[FCM] 토큰 발급 결과:', token ? '성공' : '실패(null)')
       if (!token) return
 
-      const { error } = await supabase.functions.invoke('register-fcm-token', {
-        body: { parent_id: parentId, token },
-      })
-      if (error) {
-        console.error('[FCM] DB 저장 실패:', error)
-      } else {
-        console.log('[FCM] DB 저장 성공')
-      }
+      // register-fcm-token Edge Function 호출 (기존 토큰 삭제 후 새 토큰 저장)
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/register-fcm-token`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ parent_id: parentId, token }),
+        }
+      )
+      const data = await res.json()
+      if (data.success) console.log('[FCM] DB 저장 성공')
+      else console.error('[FCM] DB 저장 실패:', data.error)
     } catch (e) {
       console.error('[FCM] 토큰 등록 오류:', e)
     }
