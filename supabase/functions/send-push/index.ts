@@ -110,10 +110,17 @@ serve(async (req) => {
           body: JSON.stringify({
             message: {
               token,
-              notification: { title, body },
+              // notification 페이로드 제거 — FCM 자동 표시 방지
+              // onBackgroundMessage에서만 1번 표시
+              data: {
+                title,
+                body,
+                link: '/parent/records',
+              },
               webpush: {
-                notification: { title, body, icon: '/logo.png', badge: '/logo.png' },
-                fcm_options: { link: '/parent/records' },
+                headers: {
+                  Urgency: 'high',
+                },
               },
             },
           }),
