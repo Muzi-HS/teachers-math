@@ -26,14 +26,32 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
+    // 이미 동일 토큰이 등록된 경우 → 중복 저장 불필요
+    const { data: existing } = await supabase
+      .from('fcm_tokens')
+      .select('id')
+      .eq('parent_id', parent_id)
+      .eq('token', token)
+      .maybeSingle()
+
+    if (existing) {
+      return new Response(
+        JSON.stringify({ success: true }),
+        { status: 200, headers: { ...CORS, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // 기존 토큰 전부 삭제 후 새 토큰으로 교체 (중복 푸시 방지)
+    await supabase
+      .from('fcm_tokens')
+      .delete()
+      .eq('parent_id', parent_id)
+
     const { error } = await supabase
       .from('fcm_tokens')
       .insert({ parent_id, token })
-      .select()
-      .limit(1)
 
-    // 중복 토큰(23505 unique violation)은 성공으로 처리
-    if (error && error.code !== '23505') {
+    if (error) {
       return new Response(
         JSON.stringify({ error: error.message }),
         { status: 500, headers: { ...CORS, 'Content-Type': 'application/json' } }
