@@ -83,21 +83,6 @@ export default function LoginPage() {
     finally { setLoading(false) }
   }
 
-  // ── PIN 키패드 입력 ──
-  // ── PIN 입력 핸들러 (숨겨진 input → 네이티브 키패드) ──
-  function handlePinInput(val: string, target: 'pin' | 'new' | 'confirm') {
-    const digits = val.replace(/\D/g, '').slice(0, 4)
-    if (target === 'pin') {
-      setPin(digits)
-      if (digits.length === 4) setTimeout(() => handlePinSubmit(digits), 80)
-    } else if (target === 'new') {
-      setNewPin(digits)
-    } else {
-      setNewPin2(digits)
-      if (digits.length === 4) setTimeout(() => handlePinSetup(digits), 80)
-    }
-  }
-
   // PIN 점 표시 + 숨겨진 input
   function PinInput({ value, onChange, autoFocus=false }: { value:string; onChange:(v:string)=>void; autoFocus?:boolean }) {
     return (
@@ -203,14 +188,13 @@ export default function LoginPage() {
     if (sgPw.length < 6) return setError('비밀번호는 6자 이상이어야 합니다.')
     setLoading(true)
     try {
-      const { data, error: authErr } = await supabase.auth.signUp({ email: sgEmail.trim(), password: sgPw })
-      if (authErr) throw new Error(authErr.message)
-      if (!data.user) throw new Error('회원가입에 실패했습니다.')
-      const { error: tErr } = await supabase.from('teachers').insert({
-        user_id: data.user.id, name: sgName.trim(), email: sgEmail.trim(),
-        phone: sgPhone.replace(/-/g,''), role: 'teacher', approved: false,
+      const res = await fetch('/api/teacher-signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: sgName.trim(), email: sgEmail.trim(), phone: sgPhone, password: sgPw }),
       })
-      if (tErr) throw new Error('선생님 정보 등록 실패: ' + tErr.message)
+      const json = await res.json()
+      if (!res.ok || json.error) throw new Error(json.error || '가입 신청에 실패했습니다.')
       setSuccess('가입 신청이 완료됐습니다. 관리자 승인 후 로그인할 수 있습니다.')
       setSgName(''); setSgEmail(''); setSgPhone(''); setSgPw(''); setSgPw2('')
     } catch(e:any) { setError(e.message) }

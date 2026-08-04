@@ -8,7 +8,9 @@ export function kstDateStr(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date())
 }
 
-/** UTC 타임스탬프 문자열을 KST 기준 'YYYY-MM-DD'로 변환 */
+/** UTC 타임스탬프/날짜 문자열을 KST 기준 'YYYY-MM-DD'로 변환 */
 export function kstDateOf(utcStr: string): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date(utcStr))
+  // timezone 정보 없는 datetime 문자열은 UTC로 강제 처리
+  const s = utcStr.length > 10 && !/[Z+]/.test(utcStr.slice(10)) ? utcStr + 'Z' : utcStr
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date(s))
 }

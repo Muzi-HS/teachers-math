@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { can, Role } from '@/lib/permissions'
-import { kstDateOf } from '@/lib/kst'
+import { kstDateOf, kstDateStr } from '@/lib/kst'
 
 type Notice = {
   id: number
@@ -81,7 +81,7 @@ export default function NoticesPage() {
       await supabase.from('notices').update({ ...form }).eq('id', editId)
       toast('공지가 수정되었습니다.')
     } else {
-      await supabase.from('notices').insert({ ...form, created_by: teacher?.userId })
+      await supabase.from('notices').insert({ ...form, created_by: teacher?.userId, created_at: kstDateStr() })
       toast('공지가 등록되었습니다.')
     }
     setSaving(false); setModal(false); fetchNotices()

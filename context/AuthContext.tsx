@@ -39,9 +39,10 @@ const AuthContext = createContext<AuthContextType>({
 async function fetchTeacherProfile(userId: string): Promise<TeacherSession | null> {
   const { data, error } = await supabase
     .from('teachers')
-    .select('name, role')
+    .select('name, role, approved')
     .eq('user_id', userId)
-    .single()
+    .eq('approved', true)
+    .maybeSingle()
   if (error || !data) return null
   return { userId, email: '', name: data.name, role: data.role }
 }
