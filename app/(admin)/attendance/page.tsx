@@ -104,11 +104,19 @@ export default function AttendancePage() {
       : supabase.from('attendance_log').insert(row)
 
     let { error } = await doSave(full)
-    // slots/approved 컬럼이 없으면 기본 필드만으로 재시도
     if (error) {
       const msg = error.message?.toLowerCase() ?? ''
       if (msg.includes('column') || msg.includes('does not exist') || error.code === '42703') {
+        // slots/approved 컬럼 없으면 base로 재시도
         ;({ error } = await doSave(base))
+        if (error) {
+          const msg2 = error.message?.toLowerCase() ?? ''
+          // work_minutes가 generated column이면 제외하고 재시도
+          if (msg2.includes('non-default') || msg2.includes('generated') || msg2.includes('work_minutes')) {
+            const { work_minutes: _wm, ...noWm } = base as any
+            ;({ error } = await doSave(noWm))
+          }
+        }
       }
     }
     if (error) toast('저장 실패: '+error.message, false)
