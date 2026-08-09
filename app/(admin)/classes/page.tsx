@@ -6,7 +6,7 @@ import { can } from '@/lib/permissions'
 import { useSearchParams } from 'next/navigation'
 import { kstDateStr } from '@/lib/kst'
 
-type Class = { id: number; name: string; days: string; time: string; mode?: string }
+type Class = { id: number; name: string; days: string; time: string; mode?: string; active?: boolean }
 type Student = { id: number; name: string; birth_year: number; school: string; parent_phone?: string }
 type Test = { id: number; name: string; date: string; total: number }
 type TestItem = { testId: number | null; tTotal: number; tCor: number; tScore: number }
@@ -63,7 +63,8 @@ export default function ClassesPage() {
   // 학생 추가
   const [stuModal, setStuModal] = useState(false)
   const [s2cSrch, setS2cSrch] = useState('')
-  const [selStu, setSelStu] = useState<number | null>(null)
+  const [selStus, setSelStus] = useState<Set<number>>(new Set())
+  const [ageFilter, setAgeFilter] = useState('')
   // mAddRec (개별 기록 추가/수정)
   const [recModal, setRecModal] = useState(false)
   const [editRecId, setEditRecId] = useState<number | null>(null)
@@ -203,6 +204,12 @@ export default function ClassesPage() {
     if (detailCls?.id === id) { setDetailCls(null); setView('list') }
     toast(name + ' 삭제됨', false); await fetchAll()
   }
+  async function toggleClsActive(cls: Class) {
+    const next = !(cls.active ?? true)
+    await supabase.from('classes').update({ active: next }).eq('id', cls.id)
+    toast(cls.name + (next ? ' 활성화됨' : ' 비활성화됨'), next)
+    await fetchAll()
+  }
 
   /* ─── 학생 제외/추가 ─── */
   async function removeStu(classId: number, stuId: number) {
@@ -211,11 +218,15 @@ export default function ClassesPage() {
     toast('학생 제외됨', false); await fetchAll()
   }
   async function addStuToCls() {
-    if (!selStu || !detailCls) return
-    const { error } = await supabase.from('class_students').insert({ class_id: detailCls.id, student_id: selStu })
-    if (error) { toast('이미 소속된 학생이거나 오류 발생', false); return }
-    toast(students.find(s => s.id === selStu)?.name + ' 추가됨')
-    setSelStu(null); setStuModal(false); await fetchAll()
+    if (!selStus.size || !detailCls) return
+    let added = 0
+    for (const sid of selStus) {
+      const { error } = await supabase.from('class_students').insert({ class_id: detailCls.id, student_id: sid })
+      if (!error) added++
+    }
+    if (added > 0) toast(added + '명 추가됨')
+    else toast('이미 소속된 학생이거나 오류 발생', false)
+    setSelStus(new Set()); setStuModal(false); await fetchAll()
   }
 
   /* ─── mBulkRec 열기 (v18: openClsBulkRec) ─── */
@@ -477,7 +488,12 @@ export default function ClassesPage() {
   })
   const detailStus = detailCls ? (csMap[detailCls.id] ?? []).map(id => students.find(s => s.id === id)).filter(Boolean) as Student[] : []
   const alreadyIn = new Set(detailCls ? (csMap[detailCls.id] ?? []) : [])
-  const available = students.filter(s => !alreadyIn.has(s.id) && (s.name.includes(s2cSrch) || s.school.includes(s2cSrch)))
+  const available = students.filter(s =>
+    !alreadyIn.has(s.id) &&
+    (s.name.includes(s2cSrch) || s.school.includes(s2cSrch)) &&
+    (ageFilter === '' || String(ageOf(s.birth_year)) === ageFilter)
+  )
+  const availableAges = [...new Set(students.filter(s => !alreadyIn.has(s.id)).map(s => ageOf(s.birth_year)))].sort((a, b) => a - b)
   const bulkCheckedSids = (csMap[detailCls?.id ?? 0] ?? []).filter(sid => bulkChks[sid])
 
   const css = `
@@ -566,19 +582,25 @@ export default function ClassesPage() {
               <div
                 key={c.id}
                 onClick={() => { setDetailCls(c); setView('detail') }}
-                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: idx < filtered.length - 1 ? `1px solid ${bd}` : 'none', cursor: 'pointer' }}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: idx < filtered.length - 1 ? `1px solid ${bd}` : 'none', cursor: 'pointer', opacity: c.active === false ? 0.55 : 1 }}
                 onMouseEnter={e => (e.currentTarget.style.background = navyM)}
                 onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
               >
-                <div style={{ width: 4, height: 36, background: barColor, borderRadius: 2, flexShrink: 0 }} />
+                <div style={{ width: 4, height: 36, background: c.active === false ? tx3 : barColor, borderRadius: 2, flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: 13, fontWeight: 600, color: tx, margin: 0 }}>{c.name}</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: c.active === false ? tx3 : tx, margin: 0 }}>{c.name}</p>
+                    {c.active === false && <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 10, background: '#F0F0F0', color: tx3, border: `1px solid ${bd}` }}>비활성</span>}
+                  </div>
                   <p style={{ fontSize: 11, color: tx3, margin: 0 }}>
                     {[c.days, c.time, `학생 ${(csMap[c.id] ?? []).length}명`].filter(Boolean).join(' · ')}
                   </p>
                 </div>
                 {canManageClassInfo && (
                   <div style={{ display: 'flex', gap: 5 }} onClick={e => e.stopPropagation()}>
+                    <button className="bout" onClick={() => toggleClsActive(c)} style={{ color: c.active === false ? gr : wa, borderColor: (c.active === false ? gr : wa) + '88' }}>
+                      {c.active === false ? '활성화' : '비활성화'}
+                    </button>
                     <button className="bout" onClick={() => openEditCls(c)}>수정</button>
                     <button className="bdng" onClick={() => delCls(c.id, c.name)}>삭제</button>
                   </div>
@@ -619,7 +641,7 @@ export default function ClassesPage() {
               수업기록 작성
             </button>
             {canManageClassInfo && (
-              <button className="bgold" onClick={() => { setStuModal(true); setS2cSrch(''); setSelStu(null) }}>
+              <button className="bgold" onClick={() => { setStuModal(true); setS2cSrch(''); setSelStus(new Set()); setAgeFilter('') }}>
                 <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth={2} d="M12 5v14M5 12h14" /></svg>
                 학생 추가
               </button>
@@ -693,12 +715,9 @@ export default function ClassesPage() {
           <span onClick={() => setView('detail')}>{detailCls?.name}</span><span>›</span>
           <span>{curStu.name}</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-          <div><h1 style={{ fontSize: 21, fontWeight: 700, color: tx }}>{curStu.name}</h1><p style={{ fontSize: 13, color: tx2, marginTop: 4 }}>{curStu.school} · {curStu.birth_year}년생 ({ageOf(curStu.birth_year)}세)</p></div>
-          <button className="bgold" onClick={openAddRec}>
-            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth={2} d="M12 5v14M5 12h14" /></svg>
-            수업 기록 추가
-          </button>
+        <div style={{ marginBottom: 20 }}>
+          <h1 style={{ fontSize: 21, fontWeight: 700, color: tx }}>{curStu.name}</h1>
+          <p style={{ fontSize: 13, color: tx2, marginTop: 4 }}>{curStu.school} · {curStu.birth_year}년생 ({ageOf(curStu.birth_year)}세)</p>
         </div>
         {stuRecs.length === 0
           ? <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: '60px 0', textAlign: 'center', color: tx3, fontSize: 14 }}>수업 기록 없음</div>
@@ -714,10 +733,7 @@ export default function ClassesPage() {
                     {r.late ? <span className="badge" style={{ background: rbg, color: re }}>지각</span> : <span className="badge" style={{ background: gbg, color: gr }}>정시</span>}
                     {r.has_test && <span className="badge" style={{ background: navyM, color: navy }}>시험</span>}
                   </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button className="bout" onClick={() => openEditRec(r)}>수정</button>
-                    <button className="bdng" onClick={() => delRec(r.id)}>삭제</button>
-                  </div>
+                  <span style={{ fontSize: 11, color: tx3 }}>열람 전용</span>
                 </div>
 
                 {/* 이행률 / 정답률 / 태도 — 원형 게이지 */}
@@ -1153,26 +1169,33 @@ export default function ClassesPage() {
         <Modal title={(detailCls?.name ?? '') + '에 학생 추가'} onClose={() => setStuModal(false)}
           footer={<>
             <button onClick={() => setStuModal(false)} style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, border: `1px solid ${bd}`, background: '#fff', cursor: 'pointer', color: tx2, fontFamily: 'inherit' }}>취소</button>
-            <button className="bgold" onClick={addStuToCls} disabled={!selStu} style={{ opacity: !selStu ? 0.5 : 1 }}>추가</button>
+            <button className="bgold" onClick={addStuToCls} disabled={selStus.size === 0} style={{ opacity: selStus.size === 0 ? 0.5 : 1 }}>추가{selStus.size > 0 ? ` (${selStus.size}명)` : ''}</button>
           </>}
         >
           <p style={{ fontSize: 13, color: tx2, marginBottom: 12 }}>학생 관리에 등록된 학생만 추가 가능합니다.</p>
-          <div className="sbox" style={{ marginBottom: 10 }}>
-            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke={tx3}><circle cx="11" cy="11" r="8" strokeWidth={2} /><path strokeWidth={2} d="M21 21l-4.35-4.35" /></svg>
-            <input placeholder="이름 검색..." value={s2cSrch} onChange={e => setS2cSrch(e.target.value)} />
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+            <div className="sbox" style={{ flex: 1 }}>
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke={tx3}><circle cx="11" cy="11" r="8" strokeWidth={2} /><path strokeWidth={2} d="M21 21l-4.35-4.35" /></svg>
+              <input placeholder="이름 검색..." value={s2cSrch} onChange={e => setS2cSrch(e.target.value)} />
+            </div>
+            <select value={ageFilter} onChange={e => setAgeFilter(e.target.value)} style={{ padding: '7px 9px', border: `1.5px solid ${bd}`, borderRadius: 8, fontSize: 12, fontFamily: 'inherit', color: tx2, background: '#fff', outline: 'none', cursor: 'pointer' }}>
+              <option value="">전체 나이</option>
+              {availableAges.map(age => <option key={age} value={String(age)}>{age}세</option>)}
+            </select>
           </div>
           <div style={{ maxHeight: 260, overflowY: 'auto', border: `1.5px solid ${bd}`, borderRadius: 8 }}>
             {available.length === 0
               ? <div style={{ textAlign: 'center', padding: '20px', color: tx3, fontSize: 13 }}>추가 가능한 학생 없음</div>
               : available.map(s => (
-                <div key={s.id} className={`ssl-item${selStu === s.id ? ' sel' : ''}`} onClick={() => setSelStu(s.id)}>
+                <div key={s.id} className={`ssl-item${selStus.has(s.id) ? ' sel' : ''}`} onClick={() => setSelStus(p => { const n = new Set(p); if (n.has(s.id)) n.delete(s.id); else n.add(s.id); return n })}>
                   <div className="sav">{s.name[0]}</div>
-                  <div><p style={{ fontSize: 13, fontWeight: 600, color: tx }}>{s.name}</p><span style={{ fontSize: 12, color: tx3 }}>{s.school} · {ageOf(s.birth_year)}세</span></div>
+                  <div style={{ flex: 1 }}><p style={{ fontSize: 13, fontWeight: 600, color: tx }}>{s.name}</p><span style={{ fontSize: 12, color: tx3 }}>{s.school} · {ageOf(s.birth_year)}세</span></div>
+                  {selStus.has(s.id) && <svg width="14" height="14" viewBox="0 0 24 24" fill={navy}><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>}
                 </div>
               ))
             }
           </div>
-          <p style={{ fontSize: 12, color: tx3, marginTop: 8 }}>{available.length}명 표시 중</p>
+          <p style={{ fontSize: 12, color: tx3, marginTop: 8 }}>{available.length}명 표시 중{selStus.size > 0 ? ` · ${selStus.size}명 선택됨` : ''}</p>
         </Modal>
       )}
     </div>
