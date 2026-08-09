@@ -310,22 +310,11 @@ export default function ClassesPage() {
       }
       cnt++
 
-      // 푸시 알림 발송 — students 배열에서 직접 조회 (parent_phone 포함)
-      const stuFull = students.find(s => s.id === sid)
-      if (stuFull?.parent_phone) {
-        fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({
-            parent_phone: stuFull.parent_phone,
-            title: '티처스 수학학원',
-            body: `[${fmtKorDate(bulkDate)}] ${stuFull.name}학생의 수업기록이 등록됐습니다!`,
-          }),
-        }).catch(() => {})
-      }
+      // 푸시 알림은 수업기록 메뉴에서 반별로 일괄 발송
+      // const stuFull = students.find(s => s.id === sid)
+      // if (stuFull?.parent_phone) {
+      //   fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push`, { ... }).catch(() => {})
+      // }
     }
     if (detailCls) sessionStorage.removeItem('bulkDraft_' + detailCls.id)
     setSaving(false)
@@ -1018,21 +1007,10 @@ export default function ClassesPage() {
               recId = rec.id
               toast('수업 기록 저장됨')
 
-              // 푸시 알림 발송
-              if (curStu.parent_phone) {
-                fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
-                  },
-                  body: JSON.stringify({
-                    parent_phone: curStu.parent_phone,
-                    title: '티처스 수학학원',
-                    body: `[${fmtKorDate(date)}] ${curStu.name}학생의 수업기록이 등록됐습니다!`,
-                  }),
-                }).catch(() => {})
-              }
+              // 푸시 알림은 수업기록 메뉴에서 반별로 일괄 발송
+              // if (curStu.parent_phone) {
+              //   fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push`, { ... }).catch(() => {})
+              // }
             }
             if (recId && showT && form.testItems.length > 0) {
               for (const ti of form.testItems) {

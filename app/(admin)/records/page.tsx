@@ -13,7 +13,9 @@ type Rec = {
   content: string; homework: string
   hw_rate: number; hw_cor: number; attitude: number
   late: boolean; has_test: boolean; feedback: string
-  sms_sent: boolean; sms_sent_at: string | null; is_draft: boolean
+  // sms_sent: boolean; sms_sent_at: string | null;
+  push_sent: boolean; push_sent_at: string | null;
+  is_draft: boolean
   record_test_items?: {
     test_id: number; t_total: number; t_cor: number; t_score: number
     tests: { name: string } | null
@@ -159,6 +161,7 @@ export default function RecordsPage() {
   const [smsModal, setSmsModal] = useState(false)
   const [smsTarget,setSmsTarget]= useState<'all' | number>('all')
   const [sending,  setSending]  = useState(false)
+  const [pushing,  setPushing]  = useState(false)
   const [notif,    setNotif]    = useState<{ msg: string; ok: boolean } | null>(null)
 
   function toast(msg: string, ok = true) { setNotif({ msg, ok }); setTimeout(() => setNotif(null), 3000) }
@@ -360,6 +363,46 @@ export default function RecordsPage() {
     await fetchDayRecs(); await fetchMonthDates()
   }
 
+  async function sendPushByClass(clsId: number | null) {
+    if (pushing) return
+    setPushing(true)
+    const targets = dayRecs.filter(r =>
+      clsId === null
+        ? (csMap[r.student_id] ?? null) === null
+        : csMap[r.student_id] === clsId
+    )
+    let sent = 0
+    for (const r of targets) {
+      if (r.push_sent ?? false) continue
+      const stu = students.find(s => s.id === r.student_id)
+      if (!stu?.parent_phone) continue
+      const [, mm, dd] = r.date.split('-')
+      const kd = new Date(r.date + 'T12:00:00+09:00')
+      const dows = ['일', '월', '화', '수', '목', '금', '토']
+      const dateStr = `${parseInt(mm)}월 ${parseInt(dd)}일(${dows[kd.getUTCDay()]})`
+      try {
+        await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            parent_phone: stu.parent_phone,
+            title: '티처스 수학학원',
+            body: `[${dateStr}] ${stu.name}학생의 수업기록이 등록됐습니다!`,
+          }),
+        })
+        await supabase.from('records').update({ push_sent: true, push_sent_at: new Date().toISOString() }).eq('id', r.id)
+        sent++
+      } catch {}
+    }
+    setPushing(false)
+    toast(sent > 0 ? `${sent}명 푸시 발송 완료` : '발송할 학부모 연락처가 없습니다.', sent > 0)
+    if (sent > 0) await fetchDayRecs()
+  }
+
+  // ── 문자 발송 (주석처리 — 푸시 알림으로 대체됨) ──
   async function sendSms(target: 'all' | number) {
     setSending(true)
     const targets = target === 'all' ? dayRecs : dayRecs.filter(r => r.student_id === target)
@@ -397,7 +440,22 @@ export default function RecordsPage() {
   const pmd   = new Date(llYear, llMonth, 0).getDate()
   const trail = (7 - ((fd + dim) % 7)) % 7
   const today = todayStr()
-  const hasUnsent = dayRecs.some(r => !r.sms_sent)
+  // const hasUnsent = dayRecs.some(r => !r.sms_sent)
+
+  // 반별 그룹핑 (달력 날짜 기준)
+  const clsGroups = (() => {
+    const groups: { cls: Class_ | null; recs: Rec[] }[] = []
+    const seen = new Set<number | null>()
+    for (const r of dayRecs) {
+      const clsId = csMap[r.student_id] ?? null
+      if (!seen.has(clsId)) {
+        seen.add(clsId)
+        const cls = clsId !== null ? (classes.find(c => c.id === clsId) ?? null) : null
+        groups.push({ cls, recs: dayRecs.filter(rec => (csMap[rec.student_id] ?? null) === clsId) })
+      }
+    }
+    return groups
+  })()
 
   const css = `
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
@@ -451,13 +509,13 @@ export default function RecordsPage() {
           <h1 style={{ fontSize: 21, fontWeight: 700, color: tx }}>수업 기록</h1>
           <p style={{ fontSize: 13, color: tx2, marginTop: 4 }}>날짜를 선택하면 해당 날짜에 작성된 수업 기록을 확인할 수 있습니다</p>
         </div>
+        {/* 문자 발송 버튼 주석처리 — 반별 푸시 발송으로 대체
         {dayRecs.length > 0 && (
           <button className="bgrn" onClick={() => { setSmsTarget('all'); setSmsModal(true) }}>
-            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
             일괄 문자 발송
-            {hasUnsent && <span style={{ background: 'rgba(255,255,255,.3)', borderRadius: 10, padding: '0 6px', fontSize: 11 }}>미발송 있음</span>}
           </button>
         )}
+        */}
       </div>
 
       {/* 2단 레이아웃 */}
@@ -520,42 +578,68 @@ export default function RecordsPage() {
               <p style={{ fontSize: 14 }}>이 날짜에 작성된 수업 기록이 없습니다</p>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', gap: 14 }}>
-            {dayRecs.map(r => {
-            const stu = students.find(s => s.id === r.student_id)
-            const cls = classes.find(c => c.id === csMap[r.student_id])
-            const tItems = r.record_test_items ?? []
-            return (
-              <div key={r.id} className="rc">
-                {/* 카드 헤더 */}
-                <div className="rch">
+            <div>
+            {clsGroups.map(({ cls: clsG, recs: clsRecs }) => (
+              <div key={clsG?.id ?? 'none'} style={{ marginBottom: 20 }}>
+                {/* 반별 헤더 + 일괄 푸시 버튼 */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, padding: '8px 14px', background: bg, borderRadius: 8, border: `1px solid ${bd}` }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div className="sav">{stu?.name[0] ?? '?'}</div>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                        <b style={{ fontSize: 13, color: navy }}>{stu?.name ?? '알 수 없음'}</b>
-                        {cls && <span className="badge" style={{ background: navyM, color: navy }}>{cls.name}</span>}
-                        {r.late
-                          ? <span className="badge" style={{ background: rbg, color: re }}>지각</span>
-                          : <span className="badge" style={{ background: gbg, color: gr }}>정시</span>
-                        }
-                        {r.has_test && <span className="badge" style={{ background: navyM, color: navy }}>시험</span>}
-                        {r.sms_sent
-                          ? <span className="badge" style={{ background: gbg, color: gr }}>✓ 발송완료</span>
-                          : <span className="badge" style={{ background: bg, color: tx3, border: `1px solid ${bd}` }}>미발송</span>
-                        }
+                    <span style={{ fontSize: 13, fontWeight: 700, color: navy }}>{clsG?.name ?? '반 미지정'}</span>
+                    <span className="badge" style={{ background: navyM, color: navy }}>{clsRecs.length}명</span>
+                    {clsRecs.some(r => !(r.push_sent ?? false)) && (
+                      <span className="badge" style={{ background: '#FEF3E2', color: gold }}>
+                        미발송 {clsRecs.filter(r => !(r.push_sent ?? false)).length}건
+                      </span>
+                    )}
+                    {clsRecs.length > 0 && clsRecs.every(r => r.push_sent ?? false) && (
+                      <span className="badge" style={{ background: gbg, color: gr }}>전체 발송됨</span>
+                    )}
+                  </div>
+                  <button className="bgrn"
+                    onClick={() => sendPushByClass(clsG?.id ?? null)}
+                    disabled={pushing || !clsRecs.some(r => !(r.push_sent ?? false) && !!students.find(s => s.id === r.student_id)?.parent_phone)}
+                    style={{ opacity: clsRecs.some(r => !(r.push_sent ?? false) && !!students.find(s => s.id === r.student_id)?.parent_phone) ? 1 : 0.5 }}>
+                    {pushing ? '발송 중...' : '일괄 푸시 발송'}
+                  </button>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', gap: 14 }}>
+                {clsRecs.map(r => {
+                const stu = students.find(s => s.id === r.student_id)
+                const cls = classes.find(c => c.id === csMap[r.student_id])
+                const tItems = r.record_test_items ?? []
+                return (
+                  <div key={r.id} className="rc">
+                    {/* 카드 헤더 */}
+                    <div className="rch">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div className="sav">{stu?.name[0] ?? '?'}</div>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <b style={{ fontSize: 13, color: navy }}>{stu?.name ?? '알 수 없음'}</b>
+                            {cls && <span className="badge" style={{ background: navyM, color: navy }}>{cls.name}</span>}
+                            {r.late
+                              ? <span className="badge" style={{ background: rbg, color: re }}>지각</span>
+                              : <span className="badge" style={{ background: gbg, color: gr }}>정시</span>
+                            }
+                            {r.has_test && <span className="badge" style={{ background: navyM, color: navy }}>시험</span>}
+                            {(r.push_sent ?? false)
+                              ? <span className="badge" style={{ background: gbg, color: gr }}>푸시 발송됨</span>
+                              : <span className="badge" style={{ background: bg, color: tx3, border: `1px solid ${bd}` }}>미발송</span>
+                            }
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+                        {/* 개별 발송 주석처리 — 반별 일괄 발송으로 대체
+                        <button className="bout" style={{ color: gr, borderColor: gr + '66', whiteSpace: 'nowrap' }}
+                          onClick={() => { setSmsTarget(r.student_id); setSmsModal(true) }}>
+                          개별발송
+                        </button>
+                        */}
+                        <button className="bout" style={{ whiteSpace: 'nowrap' }} onClick={() => openEdit(r)}>수정</button>
+                        <button className="bdng" style={{ whiteSpace: 'nowrap' }} onClick={() => delRec(r.id)}>삭제</button>
                       </div>
                     </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
-                    <button className="bout" style={{ color: gr, borderColor: gr + '66', whiteSpace: 'nowrap' }}
-                      onClick={() => { setSmsTarget(r.student_id); setSmsModal(true) }}>
-                      개별발송
-                    </button>
-                    <button className="bout" style={{ whiteSpace: 'nowrap' }} onClick={() => openEdit(r)}>수정</button>
-                    <button className="bdng" style={{ whiteSpace: 'nowrap' }} onClick={() => delRec(r.id)}>삭제</button>
-                  </div>
-                </div>
 
                 {/* 이행률 / 정답률 / 태도 — 원형 게이지 */}
                 <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
@@ -641,9 +725,12 @@ export default function RecordsPage() {
                     <p style={{ fontSize: 14, color: tx, lineHeight: 1.6 }}>{r.feedback}</p>
                   </div>
                 )}
+                  </div>
+                )
+                })}
+                </div>
               </div>
-            )
-            })}
+            ))}
             </div>
           )}
         </div>
@@ -795,8 +882,8 @@ export default function RecordsPage() {
         </div>
       )}
 
-      {/* ══ 문자 발송 모달 ══ */}
-      {smsModal && (
+      {/* ══ 문자 발송 모달 (주석처리 — 푸시 알림으로 대체됨) ══ */}
+      {false && smsModal && (
         <div onClick={() => setSmsModal(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.42)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
           <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 12, width: 480, maxWidth: '100%', maxHeight: '80vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
             <div style={{ padding: '18px 22px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -813,14 +900,10 @@ export default function RecordsPage() {
                       <span style={{ fontSize: 13, fontWeight: 600, color: tx }}>{stu?.name}</span>
                       <span style={{ fontSize: 12, color: tx3, marginLeft: 8 }}>→ {stu?.parent_phone || '번호 없음'}</span>
                     </div>
-                    {r.sms_sent && <span className="badge" style={{ background: gbg, color: gr }}>발송완료</span>}
                     {!stu?.parent_phone && <span className="badge" style={{ background: rbg, color: re }}>번호없음</span>}
                   </div>
                 )
               })}
-              <div style={{ marginTop: 14, padding: '10px 14px', background: gbg, borderRadius: 8, fontSize: 12, color: gr }}>
-                💡 각 학생의 학부모 연락처로 개별 발송됩니다.
-              </div>
             </div>
             <div style={{ padding: '0 22px 18px', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button onClick={() => setSmsModal(false)} style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, border: `1px solid ${bd}`, background: '#fff', cursor: 'pointer', color: tx2, fontFamily: 'inherit' }}>취소</button>
