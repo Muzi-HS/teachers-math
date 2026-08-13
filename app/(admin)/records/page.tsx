@@ -3,13 +3,14 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { kstDateStr, kstNow } from '@/lib/kst'
+import ClassBulkRecordModal from '@/components/ClassBulkRecordModal'
 
 type Student = { id: number; name: string; parent_phone: string }
 type Class_ = { id: number; name: string }
 type TestItem = { testId: number | null; testName?: string; tTotal: number; tCor: number; tScore: number }
 type Test = { id: number; name: string; date: string; total: number }
 type Rec = {
-  id: number; student_id: number; date: string
+  id: number; student_id: number; date: string; class_id: number | null
   content: string; homework: string
   hw_rate: number; hw_cor: number; attitude: number
   late: boolean; has_test: boolean; feedback: string
@@ -147,6 +148,7 @@ export default function RecordsPage() {
   const [classes,  setClasses]  = useState<Class_[]>([])
   const [tests,    setTests]    = useState<Test[]>([])
   const [csMap,    setCsMap]    = useState<Record<number, number>>({})
+  const [clsStudentsMap, setClsStudentsMap] = useState<Record<number, number[]>>({}) // class_id → student_ids[]
   const [llYear,   setLlYear]   = useState(kstNow().getFullYear())
   const [llMonth,  setLlMonth]  = useState(kstNow().getMonth())
   const [selDate,  setSelDate]  = useState(todayStr())
@@ -163,9 +165,7 @@ export default function RecordsPage() {
   const [sending,  setSending]  = useState(false)
   const [pushing,  setPushing]  = useState(false)
   const [notif,    setNotif]    = useState<{ msg: string; ok: boolean } | null>(null)
-  const [bulkEditModal,  setBulkEditModal]  = useState(false)
-  const [bulkEditClsId,  setBulkEditClsId]  = useState<number | null | undefined>(undefined)
-  const [bulkEditForms,  setBulkEditForms]  = useState<Record<number, Partial<Rec>>>({}) // rec_id → form
+  const [bulkModalClsId, setBulkModalClsId] = useState<number | null>(null) // 일괄수정 대상 class_id (null = 닫힘)
 
   function toast(msg: string, ok = true) { setNotif({ msg, ok }); setTimeout(() => setNotif(null), 3000) }
 
@@ -184,8 +184,14 @@ export default function RecordsPage() {
     setClasses(c ?? [])
     setTests(t ?? [])
     const map: Record<number, number> = {}
-    for (const r of (cs ?? [])) map[r.student_id] = r.class_id
+    const clsMap: Record<number, number[]> = {}
+    for (const r of (cs ?? [])) {
+      map[r.student_id] = r.class_id
+      if (!clsMap[r.class_id]) clsMap[r.class_id] = []
+      clsMap[r.class_id].push(r.student_id)
+    }
     setCsMap(map)
+    setClsStudentsMap(clsMap)
   }
 
   async function fetchMonthDates() {
@@ -366,50 +372,13 @@ export default function RecordsPage() {
     await fetchDayRecs(); await fetchMonthDates()
   }
 
-  function openBulkEdit(clsId: number | null) {
-    const recs = dayRecs.filter(r => (csMap[r.student_id] ?? null) === clsId)
-    const forms: Record<number, Partial<Rec>> = {}
-    for (const r of recs) {
-      forms[r.id] = {
-        content: r.content, homework: r.homework,
-        hw_rate: r.hw_rate, hw_cor: r.hw_cor,
-        attitude: r.attitude ?? 10, late: r.late, feedback: r.feedback,
-      }
-    }
-    setBulkEditForms(forms)
-    setBulkEditClsId(clsId)
-    setBulkEditModal(true)
-  }
-
-  function setBEF(recId: number, key: keyof Partial<Rec>, val: any) {
-    setBulkEditForms(p => ({ ...p, [recId]: { ...p[recId], [key]: val } }))
-  }
-
-  async function saveBulkEdit() {
-    setSaving(true)
-    let cnt = 0
-    for (const [idStr, form] of Object.entries(bulkEditForms)) {
-      const id = Number(idStr)
-      const { error } = await supabase.from('records').update({
-        content: form.content ?? '', homework: form.homework ?? '',
-        hw_rate: form.hw_rate ?? 0, hw_cor: form.hw_cor ?? 0,
-        attitude: form.attitude ?? 10, late: form.late ?? false, feedback: form.feedback ?? '',
-      }).eq('id', id)
-      if (!error) cnt++
-    }
-    setSaving(false); setBulkEditModal(false)
-    toast(cnt + '건 수업기록 수정됨')
-    await fetchDayRecs()
-  }
-
   async function sendPushByClass(clsId: number | null) {
     if (pushing) return
     setPushing(true)
-    const targets = dayRecs.filter(r =>
-      clsId === null
-        ? (csMap[r.student_id] ?? null) === null
-        : csMap[r.student_id] === clsId
-    )
+    const targets = dayRecs.filter(r => {
+      const rClsId = r.class_id ?? (csMap[r.student_id] ?? null)
+      return clsId === null ? rClsId === null : rClsId === clsId
+    })
     let sent = 0
     for (const r of targets) {
       if (r.push_sent ?? false) continue
@@ -482,15 +451,16 @@ export default function RecordsPage() {
   // const hasUnsent = dayRecs.some(r => !r.sms_sent)
 
   // 반별 그룹핑 (달력 날짜 기준)
+  function recClsId(r: Rec) { return r.class_id ?? (csMap[r.student_id] ?? null) }
   const clsGroups = (() => {
     const groups: { cls: Class_ | null; recs: Rec[] }[] = []
     const seen = new Set<number | null>()
     for (const r of dayRecs) {
-      const clsId = csMap[r.student_id] ?? null
+      const clsId = recClsId(r)
       if (!seen.has(clsId)) {
         seen.add(clsId)
         const cls = clsId !== null ? (classes.find(c => c.id === clsId) ?? null) : null
-        groups.push({ cls, recs: dayRecs.filter(rec => (csMap[rec.student_id] ?? null) === clsId) })
+        groups.push({ cls, recs: dayRecs.filter(rec => recClsId(rec) === clsId) })
       }
     }
     return groups
@@ -635,7 +605,7 @@ export default function RecordsPage() {
                     )}
                   </div>
                   <div style={{ display: 'flex', gap: 6 }}>
-                    <button className="bout" onClick={() => openBulkEdit(clsG?.id ?? null)}>일괄 수정</button>
+                    {clsG && <button className="bout" onClick={() => setBulkModalClsId(clsG.id)}>일괄 수정</button>}
                     <button className="bgrn"
                       onClick={() => sendPushByClass(clsG?.id ?? null)}
                       disabled={pushing || !clsRecs.some(r => !(r.push_sent ?? false) && !!students.find(s => s.id === r.student_id)?.parent_phone)}
@@ -647,7 +617,7 @@ export default function RecordsPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', gap: 14 }}>
                 {clsRecs.map(r => {
                 const stu = students.find(s => s.id === r.student_id)
-                const cls = classes.find(c => c.id === csMap[r.student_id])
+                const cls = classes.find(c => c.id === recClsId(r))
                 const tItems = r.record_test_items ?? []
                 return (
                   <div key={r.id} className="rc">
@@ -924,109 +894,17 @@ export default function RecordsPage() {
         </div>
       )}
 
-      {/* ══ 반별 일괄 수정 모달 ══ */}
-      {bulkEditModal && bulkEditClsId !== undefined && (
-        <div onClick={() => setBulkEditModal(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.42)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 12, width: 680, maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
-            <div style={{ padding: '18px 22px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <span style={{ fontSize: 15, fontWeight: 600, color: tx }}>
-                  {classes.find(c => c.id === bulkEditClsId)?.name ?? '반 미지정'} 수업기록 일괄 수정
-                </span>
-                <p style={{ fontSize: 12, color: tx3, margin: '2px 0 0' }}>{fmtDate(selDate)}</p>
-              </div>
-              <button onClick={() => setBulkEditModal(false)} style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: bg, cursor: 'pointer', fontSize: 17, color: tx2 }}>×</button>
-            </div>
-            <div style={{ padding: '16px 22px' }}>
-              {Object.keys(bulkEditForms).length === 0 && (
-                <p style={{ color: tx3, fontSize: 13, textAlign: 'center', padding: '20px 0' }}>수정할 기록이 없습니다.</p>
-              )}
-              {Object.entries(bulkEditForms).map(([idStr, form], idx) => {
-                const recId = Number(idStr)
-                const stu = students.find(s => s.id === dayRecs.find(r => r.id === recId)?.student_id)
-                return (
-                  <div key={recId} style={{ border: `1px solid ${bd}`, borderRadius: 10, padding: 16, marginBottom: idx < Object.keys(bulkEditForms).length - 1 ? 14 : 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, paddingBottom: 10, borderBottom: `1px solid ${bd}` }}>
-                      <div style={{ width: 32, height: 32, borderRadius: '50%', background: navyM, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: navy, flexShrink: 0 }}>{stu?.name[0] ?? '?'}</div>
-                      <b style={{ fontSize: 13, color: navy }}>{stu?.name ?? '알 수 없음'}</b>
-                    </div>
-
-                    {/* 수업내용 + 숙제 */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-                      <div>
-                        <label className="lb">수업 내용</label>
-                        <textarea className="fi" rows={2} style={{ resize: 'vertical' }} value={form.content ?? ''} onChange={e => setBEF(recId, 'content', e.target.value)} placeholder="수업 진도" />
-                      </div>
-                      <div>
-                        <label className="lb">숙제</label>
-                        <textarea className="fi" rows={2} style={{ resize: 'vertical' }} value={form.homework ?? ''} onChange={e => setBEF(recId, 'homework', e.target.value)} placeholder="숙제 내용" />
-                      </div>
-                    </div>
-
-                    {/* 이행률 / 정답률 / 태도 */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
-                      <div>
-                        <label className="lb">
-                          이행률 (%)
-                          <label style={{ fontSize: 10, color: tx3, marginLeft: 6, cursor: 'pointer' }}>
-                            <input type="checkbox" checked={(form.hw_rate ?? 0) < 0} onChange={e => setBEF(recId, 'hw_rate', e.target.checked ? -1 : 80)} style={{ marginRight: 3 }} />숙제없음
-                          </label>
-                        </label>
-                        <input type="number" className="fi" min={0} max={100} disabled={(form.hw_rate ?? 0) < 0}
-                          value={(form.hw_rate ?? 0) < 0 ? '' : (form.hw_rate ?? 0)}
-                          onChange={e => setBEF(recId, 'hw_rate', Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
-                          style={{ textAlign: 'center', opacity: (form.hw_rate ?? 0) < 0 ? 0.4 : 1 }} placeholder="-" />
-                      </div>
-                      <div>
-                        <label className="lb">
-                          정답률 (%)
-                          <label style={{ fontSize: 10, color: tx3, marginLeft: 6, cursor: 'pointer' }}>
-                            <input type="checkbox" checked={(form.hw_cor ?? 0) < 0} onChange={e => setBEF(recId, 'hw_cor', e.target.checked ? -1 : 75)} style={{ marginRight: 3 }} />채점안함
-                          </label>
-                        </label>
-                        <input type="number" className="fi" min={0} max={100} disabled={(form.hw_cor ?? 0) < 0}
-                          value={(form.hw_cor ?? 0) < 0 ? '' : (form.hw_cor ?? 0)}
-                          onChange={e => setBEF(recId, 'hw_cor', Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
-                          style={{ textAlign: 'center', opacity: (form.hw_cor ?? 0) < 0 ? 0.4 : 1 }} placeholder="-" />
-                      </div>
-                      <div>
-                        <label className="lb">태도 (1~10)</label>
-                        <input type="number" className="fi" min={1} max={10}
-                          value={form.attitude ?? 10}
-                          onChange={e => setBEF(recId, 'attitude', Math.min(10, Math.max(1, parseInt(e.target.value) || 10)))}
-                          style={{ textAlign: 'center' }} />
-                      </div>
-                    </div>
-
-                    {/* 지각 여부 + 피드백 */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 12, alignItems: 'start' }}>
-                      <div>
-                        <label className="lb">지각</label>
-                        <div style={{ display: 'flex', gap: 10, marginTop: 2 }}>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, cursor: 'pointer' }}>
-                            <input type="radio" checked={!form.late} onChange={() => setBEF(recId, 'late', false)} />정시
-                          </label>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, cursor: 'pointer' }}>
-                            <input type="radio" checked={!!form.late} onChange={() => setBEF(recId, 'late', true)} />
-                            <span style={{ color: re, fontWeight: 500 }}>지각</span>
-                          </label>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="lb">피드백</label>
-                        <textarea className="fi" rows={1} style={{ resize: 'vertical' }} value={form.feedback ?? ''} onChange={e => setBEF(recId, 'feedback', e.target.value)} placeholder="이번 수업 특이사항 및 종합 의견" />
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-            <div style={{ padding: '0 22px 18px', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button onClick={() => setBulkEditModal(false)} style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, border: `1px solid ${bd}`, background: '#fff', cursor: 'pointer', color: tx2, fontFamily: 'inherit' }}>취소</button>
-              <button className="bgold" onClick={saveBulkEdit} disabled={saving} style={{ opacity: saving ? 0.7 : 1 }}>{saving ? '저장 중...' : '전체 저장'}</button>
-            </div>
-          </div>
-        </div>
+      {/* ══ 반별 일괄 수정 (반관리 > 수업기록 작성과 동일한 공용 컴포넌트) ══ */}
+      {bulkModalClsId != null && (
+        <ClassBulkRecordModal
+          classId={bulkModalClsId}
+          className={classes.find(c => c.id === bulkModalClsId)?.name ?? ''}
+          students={(clsStudentsMap[bulkModalClsId] ?? []).map(sid => students.find(s => s.id === sid)).filter(Boolean) as Student[]}
+          tests={tests}
+          initialDate={selDate}
+          onClose={() => setBulkModalClsId(null)}
+          onSaved={() => { fetchDayRecs(); fetchMonthDates() }}
+        />
       )}
 
       {/* ══ 문자 발송 모달 (주석처리 — 푸시 알림으로 대체됨) ══ */}
