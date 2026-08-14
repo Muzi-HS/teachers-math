@@ -10,7 +10,7 @@ type Student = {
   name: string
   birth_year: number
   school: string           // 현재(최상위) 학교 이름 - school_history 중 최상위 항목 캐시
-  school_type: string | null   // 현재(최상위) 학교 구분 '초등' | '중학' | '고등' | null
+  school_type: string | null   // 현재(최상위) 학교 구분 '초등' | '중등' | '고등' | null
   phone: string
   parent_phone: string
   reg_date: string
@@ -35,12 +35,14 @@ const re = '#C0392B', rbg = '#FDECEA'
 const gr = '#1A7F4E', gbg = '#E0F5EB'
 const pu = '#7C3AED', pubg = '#F3E8FF'
 
-const SCHOOL_TYPES = ['초등', '중학', '고등'] as const
+const SCHOOL_TYPES = ['초등', '중등', '고등'] as const
 type SchoolKey = typeof SCHOOL_TYPES[number]
-const SCHOOL_RANK: Record<SchoolKey, number> = { '초등': 1, '중학': 2, '고등': 3 }
+const SCHOOL_RANK: Record<SchoolKey, number> = { '초등': 1, '중등': 2, '고등': 3 }
+const SCHOOL_LABELS: Record<SchoolKey, string> = { '초등': '초등학교', '중등': '중학교', '고등': '고등학교' }
+const SCHOOL_MIN_AGE: Record<SchoolKey, number> = { '초등': 8, '중등': 14, '고등': 17 }
 const SCHOOL_COLORS: Record<SchoolKey | 'none', { bg: string; color: string }> = {
   '초등': { bg: gbg,   color: gr },
-  '중학': { bg: navyM, color: navy },
+  '중등': { bg: navyM, color: navy },
   '고등': { bg: pubg,  color: pu },
   'none': { bg: bg,    color: tx3 },
 }
@@ -67,9 +69,10 @@ export default function StudentsPage() {
   const [noPhone,  setNoPhone]  = useState(false)
   const [detailStu,setDetailStu]= useState<Student | null>(null)
   const [ssMap,    setSsMap]    = useState<Record<number, SchoolEntry[]>>({})
-  const [schoolEntries, setSchoolEntries] = useState<SchoolEntry[]>([])
-  const [newSchoolType, setNewSchoolType] = useState<SchoolKey>('초등')
-  const [newSchoolName, setNewSchoolName] = useState('')
+  const [schoolElementary, setSchoolElementary] = useState('')
+  const [schoolMiddle,     setSchoolMiddle]     = useState('')
+  const [schoolHigh,       setSchoolHigh]       = useState('')
+  const [noSchoolMap, setNoSchoolMap] = useState<Record<SchoolKey, boolean>>({ '초등': false, '중등': false, '고등': false })
 
   useEffect(() => { fetchAll() }, [])
 
@@ -116,9 +119,8 @@ export default function StudentsPage() {
   function openAdd() {
     setEditId(null)
     setForm({ ...BLANK })
-    setSchoolEntries([])
-    setNewSchoolType('초등')
-    setNewSchoolName('')
+    setSchoolElementary(''); setSchoolMiddle(''); setSchoolHigh('')
+    setNoSchoolMap({ '초등': false, '중등': false, '고등': false })
     setNoPhone(false)
     setModal(true)
   }
@@ -131,28 +133,27 @@ export default function StudentsPage() {
       phone: s.phone ?? '', parent_phone: s.parent_phone ?? '',
       reg_date: s.reg_date ?? kstDateStr(),
     })
-    setSchoolEntries([...(ssMap[s.id] ?? [])])
-    setNewSchoolType('초등')
-    setNewSchoolName('')
+    const entries = ssMap[s.id] ?? []
+    setSchoolElementary(entries.find(e => e.school_type === '초등')?.school_name ?? '')
+    setSchoolMiddle(entries.find(e => e.school_type === '중등')?.school_name ?? '')
+    setSchoolHigh(entries.find(e => e.school_type === '고등')?.school_name ?? '')
+    setNoSchoolMap({ '초등': false, '중등': false, '고등': false })
     setNoPhone(!s.phone)
     setModal(true)
-  }
-
-  function addSchoolEntry() {
-    if (!newSchoolName.trim()) return toast('학교명을 입력하세요.', false)
-    setSchoolEntries(list => [...list, { school_type: newSchoolType, school_name: newSchoolName.trim() }])
-    setNewSchoolName('')
-  }
-
-  function removeSchoolEntry(idx: number) {
-    setSchoolEntries(list => list.filter((_, i) => i !== idx))
   }
 
   async function save() {
     if (!form.name.trim())   return toast('이름을 입력하세요.', false)
     if (!form.birth_year)    return toast('출생연도를 입력하세요.', false)
     setSaving(true)
-    const current = highestSchoolEntry(schoolEntries)
+
+    const entries: SchoolEntry[] = ([
+      (!noSchoolMap['초등'] && schoolElementary.trim()) ? { school_type: '초등' as SchoolKey, school_name: schoolElementary.trim() } : null,
+      (!noSchoolMap['중등'] && schoolMiddle.trim())     ? { school_type: '중등' as SchoolKey, school_name: schoolMiddle.trim() } : null,
+      (!noSchoolMap['고등'] && schoolHigh.trim())       ? { school_type: '고등' as SchoolKey, school_name: schoolHigh.trim() } : null,
+    ].filter(Boolean) as SchoolEntry[])
+
+    const current = highestSchoolEntry(entries)
     const row: Record<string, any> = {
       name: form.name.trim(),
       birth_year: Number(form.birth_year),
@@ -163,6 +164,7 @@ export default function StudentsPage() {
       reg_date: form.reg_date,
     }
 
+    const isNew = !editId
     let studentId = editId
     if (editId) {
       const { error } = await supabase.from('students').update(row).eq('id', editId)
@@ -174,11 +176,15 @@ export default function StudentsPage() {
     }
 
     await supabase.from('student_schools').delete().eq('student_id', studentId)
-    if (schoolEntries.length > 0) {
+    if (entries.length > 0) {
       const { error: seErr } = await supabase.from('student_schools').insert(
-        schoolEntries.map(e => ({ student_id: studentId, school_type: e.school_type, school_name: e.school_name }))
+        entries.map(e => ({ student_id: studentId, school_type: e.school_type, school_name: e.school_name }))
       )
-      if (seErr) { toast('학교 이력 저장 실패: ' + seErr.message, false); setSaving(false); return }
+      if (seErr) {
+        // 새로 등록한 학생인데 학교 이력 저장에 실패하면 반쪽짜리(고아) 학생 레코드가 남지 않도록 롤백
+        if (isNew) await supabase.from('students').delete().eq('id', studentId!)
+        toast('학교 이력 저장 실패: ' + seErr.message, false); setSaving(false); return
+      }
     }
 
     toast(form.name + (editId ? ' 수정됨' : ' 등록됨'))
@@ -226,6 +232,7 @@ export default function StudentsPage() {
 
   const isAdmin = role === 'admin'
   const canFull = can.viewFullStudent(role!)
+  const formAge = form.birth_year ? ageOf(form.birth_year) : 0
 
   const filtered = students.filter(s => {
     const matchSearch = s.name.includes(search) || (s.school ?? '').includes(search)
@@ -412,42 +419,42 @@ export default function StudentsPage() {
                 </div>
               </div>
 
-              {/* 학교 정보 (여러 학교 이력 입력) */}
+              {/* 학교 정보 */}
               <div style={{ marginBottom:14 }}>
-                <label className="lb">학교 정보</label>
-                <div style={{ display:'flex',gap:8,marginBottom:8 }}>
-                  <select className="fsel" value={newSchoolType} onChange={e => setNewSchoolType(e.target.value as SchoolKey)}>
-                    {SCHOOL_TYPES.map(type => <option key={type} value={type}>{type}학교</option>)}
-                  </select>
-                  <input className="fi" value={newSchoolName} onChange={e => setNewSchoolName(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addSchoolEntry() } }}
-                    placeholder="예) 강남중학교"/>
-                  <button type="button" className="bout" style={{ flexShrink:0 }} onClick={addSchoolEntry}>학교추가</button>
+                <label className="lb">학교 정보 <span style={{ fontWeight:400,color:tx3 }}>(나이에 맞는 항목만 입력 가능)</span></label>
+                <div style={{ display:'flex',flexDirection:'column',gap:8 }}>
+                  {SCHOOL_TYPES.map(type => {
+                    const ageOk = formAge >= SCHOOL_MIN_AGE[type]
+                    const noInfo = noSchoolMap[type]
+                    const enabled = ageOk && !noInfo
+                    const val    = type === '초등' ? schoolElementary : type === '중등' ? schoolMiddle : schoolHigh
+                    const setVal = type === '초등' ? setSchoolElementary : type === '중등' ? setSchoolMiddle : setSchoolHigh
+                    const col = SCHOOL_COLORS[type]
+                    return (
+                      <div key={type} style={{ display:'flex',alignItems:'center',gap:8 }}>
+                        <span className="badge" style={{ background:enabled?col.bg:bg, color:enabled?col.color:tx3, flexShrink:0, width:52, justifyContent:'center' }}>
+                          {SCHOOL_LABELS[type]}
+                        </span>
+                        <input className="fi" value={val} disabled={!enabled}
+                          onChange={e => setVal(e.target.value)}
+                          placeholder={!ageOk ? '나이에 맞지 않아 입력할 수 없습니다' : noInfo ? '정보 없음으로 표시됨' : `${SCHOOL_LABELS[type]} 이름 (예: 강남${SCHOOL_LABELS[type]})`}
+                          style={{ flex:1, opacity:enabled?1:0.5, background:enabled?'#fff':bg }}
+                        />
+                        <label style={{ display:'flex',alignItems:'center',gap:4,fontSize:11,flexShrink:0,cursor:ageOk?'pointer':'default',color:noInfo?re:tx3,opacity:ageOk?1:0.4 }}>
+                          <input type="checkbox" checked={noInfo} disabled={!ageOk}
+                            onChange={e => {
+                              const checked = e.target.checked
+                              setNoSchoolMap(m => ({ ...m, [type]: checked }))
+                              if (checked) setVal('')
+                            }}
+                            style={{ cursor:'pointer' }}
+                          />
+                          정보없음
+                        </label>
+                      </div>
+                    )
+                  })}
                 </div>
-                {schoolEntries.length === 0 ? (
-                  <div style={{ background:bg,borderRadius:8,padding:'10px 14px',fontSize:12,color:tx3 }}>
-                    등록된 학교 정보가 없습니다.
-                  </div>
-                ) : (
-                  <div style={{ background:bg,borderRadius:8,padding:'4px 14px' }}>
-                    {(() => {
-                      const current = highestSchoolEntry(schoolEntries)
-                      return schoolEntries.map((e, i) => {
-                        const col = SCHOOL_COLORS[e.school_type]
-                        const isCurrent = e === current
-                        return (
-                          <div key={i} className="school-row">
-                            <span className="badge" style={{ background:col.bg, color:col.color, flexShrink:0 }}>{e.school_type}</span>
-                            <span style={{ fontSize:13,color:tx,fontWeight:isCurrent?600:400,flex:1 }}>{e.school_name}</span>
-                            {isCurrent && <span style={{ fontSize:11,color:gr,background:gbg,padding:'1px 6px',borderRadius:10 }}>현재</span>}
-                            <button type="button" onClick={() => removeSchoolEntry(i)}
-                              style={{ border:'none',background:'transparent',color:tx3,cursor:'pointer',fontSize:15,padding:'0 2px' }}>×</button>
-                          </div>
-                        )
-                      })
-                    })()}
-                  </div>
-                )}
               </div>
 
               {/* 연락처 */}
