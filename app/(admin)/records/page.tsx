@@ -499,6 +499,12 @@ export default function RecordsPage() {
     .fsel{width:100%;padding:9px 11px;border:1.5px solid ${bd};border-radius:8px;font-size:13px;font-family:inherit;color:${tx};outline:none;background:#fff;}
     .fsel:focus{border-color:${navy};}
     .tst-card{background:${bg};border:1px solid ${bd};border-radius:8px;padding:12px;margin-bottom:8px;}
+    .hwg{flex:1;min-width:0;background:${bg};border-radius:10px;padding:8px 10px;}
+    .hwg-lb{font-size:11px;color:${navy};font-weight:600;margin:0 0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    @media (max-width:420px){
+      .hwg-lb{font-size:10px;}
+      .hwg{padding:6px 7px;}
+    }
   `
 
   return (
@@ -614,7 +620,7 @@ export default function RecordsPage() {
                     </button>
                   </div>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', gap: 14 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
                 {clsRecs.map(r => {
                 const stu = students.find(s => s.id === r.student_id)
                 const cls = classes.find(c => c.id === recClsId(r))
@@ -631,7 +637,7 @@ export default function RecordsPage() {
                             {cls && <span className="badge" style={{ background: navyM, color: navy }}>{cls.name}</span>}
                             {r.late
                               ? <span className="badge" style={{ background: rbg, color: re }}>지각</span>
-                              : <span className="badge" style={{ background: gbg, color: gr }}>정시</span>
+                              : <span className="badge" style={{ background: gbg, color: gr }}>정시 등원</span>
                             }
                             {r.has_test && <span className="badge" style={{ background: navyM, color: navy }}>시험</span>}
                             {(r.push_sent ?? false)
@@ -655,45 +661,45 @@ export default function RecordsPage() {
 
                 {/* 이행률 / 정답률 / 태도 — 원형 게이지 */}
                 <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-                  <div style={{ flex: 1, background: bg, borderRadius: 10, padding: '8px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div>
-                      <p style={{ fontSize: 11, color: navy, fontWeight: 600, margin: '0 0 2px' }}>숙제 이행률</p>
+                  <div className="hwg">
+                    <p className="hwg-lb">숙제 이행률</p>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
                       {r.hw_rate < 0
-                        ? <p style={{ fontSize: 13, color: tx3, margin: 0 }}>숙제 없음</p>
-                        : <p style={{ fontSize: 18, fontWeight: 700, color: rateColor(r.hw_rate), margin: 0, lineHeight: 1 }}>{r.hw_rate}<span style={{ fontSize: 11, fontWeight: 400, color: tx2 }}>%</span></p>
+                        ? <p style={{ fontSize: 12, color: tx3, margin: 0, whiteSpace: 'nowrap' }}>숙제 없음</p>
+                        : <p style={{ fontSize: 18, fontWeight: 700, color: rateColor(r.hw_rate), margin: 0, lineHeight: 1, whiteSpace: 'nowrap' }}>{r.hw_rate}<span style={{ fontSize: 11, fontWeight: 400, color: tx2 }}>%</span></p>
                       }
+                      {r.hw_rate >= 0 && (
+                        <svg width="28" height="28" viewBox="0 0 32 32" style={{ flexShrink: 0 }}>
+                          <circle cx="16" cy="16" r="12.5" fill="none" stroke={bd} strokeWidth={3.2}/>
+                          <circle cx="16" cy="16" r="12.5" fill="none" stroke={rateColor(r.hw_rate)} strokeWidth={3.2}
+                            strokeDasharray={78.5} strokeDashoffset={78.5*(1-r.hw_rate/100)}
+                            strokeLinecap="round" transform="rotate(-90 16 16)"/>
+                        </svg>
+                      )}
                     </div>
-                    {r.hw_rate >= 0 && (
-                      <svg width="32" height="32" viewBox="0 0 32 32">
-                        <circle cx="16" cy="16" r="12.5" fill="none" stroke={bd} strokeWidth={3.2}/>
-                        <circle cx="16" cy="16" r="12.5" fill="none" stroke={rateColor(r.hw_rate)} strokeWidth={3.2}
-                          strokeDasharray={78.5} strokeDashoffset={78.5*(1-r.hw_rate/100)}
-                          strokeLinecap="round" transform="rotate(-90 16 16)"/>
-                      </svg>
-                    )}
                   </div>
-                  <div style={{ flex: 1, background: bg, borderRadius: 10, padding: '8px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div>
-                      <p style={{ fontSize: 11, color: navy, fontWeight: 600, margin: '0 0 2px' }}>숙제 정답률</p>
+                  <div className="hwg">
+                    <p className="hwg-lb">숙제 정답률</p>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
                       {r.hw_cor < 0
-                        ? <p style={{ fontSize: 13, color: tx3, margin: 0 }}>채점 안함</p>
-                        : <p style={{ fontSize: 18, fontWeight: 700, color: rateColor(r.hw_cor), margin: 0, lineHeight: 1 }}>{r.hw_cor}<span style={{ fontSize: 11, fontWeight: 400, color: tx2 }}>%</span></p>
+                        ? <p style={{ fontSize: 12, color: tx3, margin: 0, whiteSpace: 'nowrap' }}>채점 안함</p>
+                        : <p style={{ fontSize: 18, fontWeight: 700, color: rateColor(r.hw_cor), margin: 0, lineHeight: 1, whiteSpace: 'nowrap' }}>{r.hw_cor}<span style={{ fontSize: 11, fontWeight: 400, color: tx2 }}>%</span></p>
                       }
+                      {r.hw_cor >= 0 && (
+                        <svg width="28" height="28" viewBox="0 0 32 32" style={{ flexShrink: 0 }}>
+                          <circle cx="16" cy="16" r="12.5" fill="none" stroke={bd} strokeWidth={3.2}/>
+                          <circle cx="16" cy="16" r="12.5" fill="none" stroke={rateColor(r.hw_cor)} strokeWidth={3.2}
+                            strokeDasharray={78.5} strokeDashoffset={78.5*(1-r.hw_cor/100)}
+                            strokeLinecap="round" transform="rotate(-90 16 16)"/>
+                        </svg>
+                      )}
                     </div>
-                    {r.hw_cor >= 0 && (
-                      <svg width="32" height="32" viewBox="0 0 32 32">
-                        <circle cx="16" cy="16" r="12.5" fill="none" stroke={bd} strokeWidth={3.2}/>
-                        <circle cx="16" cy="16" r="12.5" fill="none" stroke={rateColor(r.hw_cor)} strokeWidth={3.2}
-                          strokeDasharray={78.5} strokeDashoffset={78.5*(1-r.hw_cor/100)}
-                          strokeLinecap="round" transform="rotate(-90 16 16)"/>
-                      </svg>
-                    )}
                   </div>
                   {r.attitude != null && (
-                    <div style={{ flex: 1, background: bg, borderRadius: 10, padding: '8px 10px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                      <p style={{ fontSize: 11, color: navy, fontWeight: 600, margin: '0 0 2px' }}>수업 태도</p>
-                      <p style={{ fontSize: 18, fontWeight: 700, color: attColor(r.attitude), margin: 0, lineHeight: 1 }}>{r.attitude}<span style={{ fontSize: 11, fontWeight: 400, color: tx2 }}>점</span></p>
-                      <span style={{ fontSize: 10, color: attColor(r.attitude), marginTop: 2 }}>{attLabel(r.attitude)}</span>
+                    <div className="hwg" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                      <p className="hwg-lb" style={{ margin: '0 0 2px' }}>수업 태도</p>
+                      <p style={{ fontSize: 18, fontWeight: 700, color: attColor(r.attitude), margin: 0, lineHeight: 1, whiteSpace: 'nowrap' }}>{r.attitude}<span style={{ fontSize: 11, fontWeight: 400, color: tx2 }}>점</span></p>
+                      <span style={{ fontSize: 10, color: attColor(r.attitude), marginTop: 2, whiteSpace: 'nowrap' }}>{attLabel(r.attitude)}</span>
                     </div>
                   )}
                 </div>
@@ -806,7 +812,7 @@ export default function RecordsPage() {
                   <label className="lb">지각 여부</label>
                   <div style={{ display: 'flex', gap: 16, marginTop: 6 }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, cursor: 'pointer' }}>
-                      <input type="radio" name="eLt" checked={!editRec.late} onChange={() => setEditRec(f => ({ ...f, late: false }))} />정시
+                      <input type="radio" name="eLt" checked={!editRec.late} onChange={() => setEditRec(f => ({ ...f, late: false }))} />정시 등원
                     </label>
                     <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, cursor: 'pointer' }}>
                       <input type="radio" name="eLt" checked={!!editRec.late} onChange={() => setEditRec(f => ({ ...f, late: true }))} /><span style={{ color: re, fontWeight: 500 }}>지각</span>
