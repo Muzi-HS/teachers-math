@@ -20,6 +20,10 @@ type AttLog = {
   work_minutes:number|null; memo:string
   slots:Slot[]; approved:boolean
 }
+type SchEvt = {
+  id:number; title:string; start_date:string; end_date:string|null
+  start_time:string|null; type:'normal'|'holiday'
+}
 
 const MONTHS = Array.from({length:12},(_,i)=>i+1)
 const DOW = ['일','월','화','수','목','금','토']
@@ -51,6 +55,7 @@ export default function TeachersPage(){
   const [attTabIdx,  setAttTabIdx]  = useState(0) // 0=달력 1=선생님별
   const [teachers,   setTeachers]   = useState<Teacher[]>([])
   const [attLogs,    setAttLogs]    = useState<AttLog[]>([])
+  const [schEvts,    setSchEvts]    = useState<SchEvt[]>([])
   const [loading,    setLoading]    = useState(true)
   const [selYear,    setSelYear]    = useState(kstNow().getFullYear())
   const [selMonth,   setSelMonth]   = useState(kstNow().getMonth()+1)
@@ -65,7 +70,7 @@ export default function TeachersPage(){
   const [calDay,     setCalDay]     = useState<string|null>(null)
 
   useEffect(()=>{ fetchTeachers() },[])
-  useEffect(()=>{ if(tabIdx===1) fetchAtt() },[tabIdx,selYear,selMonth])
+  useEffect(()=>{ if(tabIdx===1){ fetchAtt(); fetchSchEvts() } },[tabIdx,selYear,selMonth])
 
   async function fetchTeachers(){
     setLoading(true)
@@ -81,6 +86,20 @@ export default function TeachersPage(){
       .select('*').gte('date',from).lte('date',to).order('date')
     setAttLogs((data??[]).map(r=>({...r,slots:r.slots??[],approved:r.approved??false})))
     setLoading(false)
+  }
+  // 학원일정(학원일정 메뉴에서 등록한 일정)을 달력에 함께 표시 — 조회 전용, 출근부 내용은 반대로 반영되지 않음
+  async function fetchSchEvts(){
+    const from=`${selYear}-${String(selMonth).padStart(2,'0')}-01`
+    const lastDay=new Date(selYear,selMonth,0).getDate()
+    const to=`${selYear}-${String(selMonth).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`
+    const cols='id,title,start_date,end_date,start_time,type'
+    const [{data:A},{data:B}]=await Promise.all([
+      supabase.from('events').select(cols).gte('start_date',from).lte('start_date',to),
+      supabase.from('events').select(cols).lt('start_date',from).gte('end_date',from),
+    ])
+    const map=new Map<number,SchEvt>()
+    for(const e of [...(A??[]),...(B??[])]) map.set(e.id,e as SchEvt)
+    setSchEvts([...map.values()])
   }
 
   function toast(msg:string,ok=true){setNotif({msg,ok});setTimeout(()=>setNotif(null),3000)}
@@ -161,6 +180,12 @@ export default function TeachersPage(){
   const trail=(7-((fd+dim)%7))%7
 
   function dayLogs(ds:string){return attLogs.filter(l=>l.date===ds)}
+  function dayEvts(ds:string){
+    return schEvts.filter(e=>{
+      const end=e.end_date??e.start_date
+      return e.start_date<=ds && end>=ds
+    })
+  }
   function teacherName(uid:string){return teachers.find(t=>t.user_id===uid)?.name??uid.slice(0,8)}
 
   // 선생님별 집계
@@ -455,6 +480,15 @@ export default function TeachersPage(){
                           color:dow===0?re:dow===6?navy:tx2}}>
                           {d}
                         </div>
+                        {dayEvts(ds).map(e=>(
+                          <div key={'e'+e.id} title={e.title} style={{
+                            fontSize:9,padding:'2px 4px',borderRadius:3,marginBottom:2,
+                            background:e.type==='holiday'?'rgba(222,53,11,.15)':navyM,
+                            color:e.type==='holiday'?re:navy,
+                            whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                            {e.start_time&&`${e.start_time.slice(0,5)} `}{e.title}
+                          </div>
+                        ))}
                         {dLogs.map(l=>(
                           <div key={l.id} style={{
                             fontSize:9,padding:'2px 4px',borderRadius:3,marginBottom:2,
