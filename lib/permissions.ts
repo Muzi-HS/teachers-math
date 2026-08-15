@@ -56,6 +56,7 @@ export const menuAccess: Record<string, (role: Role) => boolean> = {
   stats:      (r) => r === 'admin' || r === 'teacher',
   teachers:   (r) => r === 'admin',                    // 선생님 관리 — admin만
   attendance: (r) => r === 'admin' || r === 'teacher', // 출근부 — admin+teacher
+  'app-qr':   (r) => r === 'admin',                    // 앱 설치 QR — admin만
   // 학부모 전용
   parent:     (r) => r === 'parent',
 }

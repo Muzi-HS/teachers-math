@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { AuthProvider } from '@/context/AuthContext'
+import InstallBanner from '@/components/InstallBanner'
 
 export const metadata: Metadata = {
   title: '티처스 수학학원',
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AuthProvider>
           {children}
         </AuthProvider>
+        <InstallBanner />
       </body>
     </html>
   )
