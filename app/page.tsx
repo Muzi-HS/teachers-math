@@ -18,7 +18,7 @@ export default function LoginPage() {
   useEffect(() => {
     if (authLoading) return
     if (role === 'admin' || role === 'teacher') router.replace('/dashboard')
-    else if (role === 'parent') router.replace('/parent/notices')
+    else if (role === 'parent') router.replace('/parent/records')
   }, [role, authLoading])
 
   // 자동로그인 복원

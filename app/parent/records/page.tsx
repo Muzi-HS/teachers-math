@@ -174,52 +174,52 @@ export default function ParentRecords() {
                   <b style={{ fontSize: 14, color: tx }}>{r.date}</b>
                   {r.late
                     ? <span style={{ background: rbg, color: re, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>지각</span>
-                    : <span style={{ background: gbg, color: gr, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>정시</span>
+                    : <span style={{ background: gbg, color: gr, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>정시 등원</span>
                   }
                   {r.has_test && <span style={{ background: '#E8EEF8', color: navy, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>시험</span>}
                 </div>
 
                 {/* 이행률/정답률/태도 — 원형 게이지 */}
                 <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-                  <div style={{ flex: 1, background: bg, borderRadius: 10, padding: '8px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div>
-                      <p style={{ fontSize: 11, color: navy, fontWeight: 600, margin: '0 0 2px' }}>숙제 이행률</p>
+                  <div style={{ flex: 1, minWidth: 0, background: bg, borderRadius: 10, padding: '8px 10px' }}>
+                    <p style={{ fontSize: 11, color: navy, fontWeight: 600, margin: '0 0 4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>숙제 이행률</p>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
                       {r.hw_rate < 0
-                        ? <p style={{ fontSize: 13, color: tx3, margin: 0 }}>숙제 없음</p>
-                        : <p style={{ fontSize: 18, fontWeight: 700, color: rateColor(r.hw_rate), margin: 0, lineHeight: 1 }}>{r.hw_rate}<span style={{ fontSize: 11, fontWeight: 400, color: tx2 }}>%</span></p>
+                        ? <p style={{ fontSize: 12, color: tx3, margin: 0, whiteSpace: 'nowrap' }}>숙제 없음</p>
+                        : <p style={{ fontSize: 18, fontWeight: 700, color: rateColor(r.hw_rate), margin: 0, lineHeight: 1, whiteSpace: 'nowrap' }}>{r.hw_rate}<span style={{ fontSize: 11, fontWeight: 400, color: tx2 }}>%</span></p>
                       }
+                      {r.hw_rate >= 0 && (
+                        <svg width="28" height="28" viewBox="0 0 32 32" style={{ flexShrink: 0 }}>
+                          <circle cx="16" cy="16" r="12.5" fill="none" stroke={bd} strokeWidth={3.2}/>
+                          <circle cx="16" cy="16" r="12.5" fill="none" stroke={rateColor(r.hw_rate)} strokeWidth={3.2}
+                            strokeDasharray={78.5} strokeDashoffset={78.5 * (1 - r.hw_rate / 100)}
+                            strokeLinecap="round" transform="rotate(-90 16 16)"/>
+                        </svg>
+                      )}
                     </div>
-                    {r.hw_rate >= 0 && (
-                      <svg width="32" height="32" viewBox="0 0 32 32">
-                        <circle cx="16" cy="16" r="12.5" fill="none" stroke={bd} strokeWidth={3.2}/>
-                        <circle cx="16" cy="16" r="12.5" fill="none" stroke={rateColor(r.hw_rate)} strokeWidth={3.2}
-                          strokeDasharray={78.5} strokeDashoffset={78.5 * (1 - r.hw_rate / 100)}
-                          strokeLinecap="round" transform="rotate(-90 16 16)"/>
-                      </svg>
-                    )}
                   </div>
-                  <div style={{ flex: 1, background: bg, borderRadius: 10, padding: '8px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div>
-                      <p style={{ fontSize: 11, color: navy, fontWeight: 600, margin: '0 0 2px' }}>숙제 정답률</p>
+                  <div style={{ flex: 1, minWidth: 0, background: bg, borderRadius: 10, padding: '8px 10px' }}>
+                    <p style={{ fontSize: 11, color: navy, fontWeight: 600, margin: '0 0 4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>숙제 정답률</p>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
                       {r.hw_cor < 0
-                        ? <p style={{ fontSize: 13, color: tx3, margin: 0 }}>채점 안함</p>
-                        : <p style={{ fontSize: 18, fontWeight: 700, color: rateColor(r.hw_cor), margin: 0, lineHeight: 1 }}>{r.hw_cor}<span style={{ fontSize: 11, fontWeight: 400, color: tx2 }}>%</span></p>
+                        ? <p style={{ fontSize: 12, color: tx3, margin: 0, whiteSpace: 'nowrap' }}>채점 안함</p>
+                        : <p style={{ fontSize: 18, fontWeight: 700, color: rateColor(r.hw_cor), margin: 0, lineHeight: 1, whiteSpace: 'nowrap' }}>{r.hw_cor}<span style={{ fontSize: 11, fontWeight: 400, color: tx2 }}>%</span></p>
                       }
+                      {r.hw_cor >= 0 && (
+                        <svg width="28" height="28" viewBox="0 0 32 32" style={{ flexShrink: 0 }}>
+                          <circle cx="16" cy="16" r="12.5" fill="none" stroke={bd} strokeWidth={3.2}/>
+                          <circle cx="16" cy="16" r="12.5" fill="none" stroke={rateColor(r.hw_cor)} strokeWidth={3.2}
+                            strokeDasharray={78.5} strokeDashoffset={78.5 * (1 - r.hw_cor / 100)}
+                            strokeLinecap="round" transform="rotate(-90 16 16)"/>
+                        </svg>
+                      )}
                     </div>
-                    {r.hw_cor >= 0 && (
-                      <svg width="32" height="32" viewBox="0 0 32 32">
-                        <circle cx="16" cy="16" r="12.5" fill="none" stroke={bd} strokeWidth={3.2}/>
-                        <circle cx="16" cy="16" r="12.5" fill="none" stroke={rateColor(r.hw_cor)} strokeWidth={3.2}
-                          strokeDasharray={78.5} strokeDashoffset={78.5 * (1 - r.hw_cor / 100)}
-                          strokeLinecap="round" transform="rotate(-90 16 16)"/>
-                      </svg>
-                    )}
                   </div>
                   {r.attitude != null && (
-                    <div style={{ flex: 1, background: bg, borderRadius: 10, padding: '8px 10px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                      <p style={{ fontSize: 11, color: navy, fontWeight: 600, margin: '0 0 2px' }}>수업 태도</p>
-                      <p style={{ fontSize: 18, fontWeight: 700, color: attColor(r.attitude), margin: 0, lineHeight: 1 }}>{r.attitude}<span style={{ fontSize: 11, fontWeight: 400, color: tx2 }}>점</span></p>
-                      <span style={{ fontSize: 10, color: attColor(r.attitude), marginTop: 2 }}>{attLabel(r.attitude)}</span>
+                    <div style={{ flex: 1, minWidth: 0, background: bg, borderRadius: 10, padding: '8px 10px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                      <p style={{ fontSize: 11, color: navy, fontWeight: 600, margin: '0 0 2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>수업 태도</p>
+                      <p style={{ fontSize: 18, fontWeight: 700, color: attColor(r.attitude), margin: 0, lineHeight: 1, whiteSpace: 'nowrap' }}>{r.attitude}<span style={{ fontSize: 11, fontWeight: 400, color: tx2 }}>점</span></p>
+                      <span style={{ fontSize: 10, color: attColor(r.attitude), marginTop: 2, whiteSpace: 'nowrap' }}>{attLabel(r.attitude)}</span>
                     </div>
                   )}
                 </div>
