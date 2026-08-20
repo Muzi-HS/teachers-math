@@ -20,7 +20,26 @@
       "Bash(npx supabase *)",
       "Bash(sed -i 's/detail\\\\.created_at\\\\.slice\\(0, 10\\)/kstDateOf\\(detail.created_at\\)/g;    s/notice\\\\.created_at\\\\.slice\\(0, 10\\)/kstDateOf\\(notice.created_at\\)/g' 'app/\\(admin\\)/notices/page.tsx')",
       "Bash(sed -i 's/detail\\\\.created_at\\\\.slice\\(0, 10\\)/kstDateOf\\(detail.created_at\\)/g;    s/n\\\\.created_at\\\\.slice\\(5, 10\\)/kstDateOf\\(n.created_at\\).slice\\(5, 10\\)/g' app/parent/notices/page.tsx)",
-      "Bash(grep -v \"//\")"
+      "Bash(grep -v \"//\")",
+      "Bash(curl -s -o /tmp/students_resp.html -w \"%{http_code}\\\\n\" http://localhost:3000/students)",
+      "Read(//tmp/**)",
+      "Bash(pkill -f \"next dev\")",
+      "Bash(curl -s -o /tmp/classes_resp.html -w \"%{http_code}\\\\n\" http://localhost:3000/classes)",
+      "Bash(curl -s -o /tmp/records_resp.html -w \"%{http_code}\\\\n\" http://localhost:3000/records)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(grep -n \"@media\\\\|className=\\\\\"rc\\\\\"\\\\|\\\\\\\\.rc{\\\\|\\\\\\\\.rch{\" \"app/\\(admin\\)/records/page.tsx\")",
+      "Bash(grep -i \"^sharp$\")",
+      "Bash(where magick *)",
+      "Bash(where convert *)",
+      "Bash(node -e \"console.log\\(require\\('fs'\\).existsSync\\('node_modules/sharp'\\)\\)\")",
+      "Bash(npm install *)",
+      "Bash(node -e \"console.log\\(require\\('./node_modules/qrcode.react/package.json'\\).version\\)\")",
+      "Bash(xargs -I{} sh -c 'echo ==={}===; cat {}')",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/app-qr)",
+      "Bash(grep -i \"warn\\\\|error\" /tmp/nextdev.log | head -40)"
     ],
     "additionalDirectories": [
       "c:\\Users\\hs991\\teachers-math\\supabase\\functions"

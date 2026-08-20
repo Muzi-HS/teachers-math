@@ -340,7 +340,7 @@ export default function StudentsPage() {
               <tbody>
                 {filtered.map(s => {
                   const activeClsIds = (csMap[s.id] ?? []).filter(cid => classes.find(c => c.id === cid)?.active !== false)
-                  const stColor = s.school_type && s.school_type !== 'none' ? SCHOOL_COLORS[s.school_type as SchoolKey] : null
+                  const stColor = s.school_type ? (SCHOOL_COLORS[s.school_type as SchoolKey] ?? SCHOOL_COLORS['none']) : null
                   return (
                     <tr key={s.id} onClick={() => setDetailStu(s)}>
                       <td>
@@ -527,7 +527,7 @@ export default function StudentsPage() {
                   <div style={{ display:'flex',alignItems:'center',gap:6 }}>
                     <p style={{ fontSize:15,fontWeight:700,color:tx,margin:0 }}>{detailStu.name}</p>
                     {detailStu.school_type && detailStu.school_type !== 'none' && (
-                      <span className="badge" style={{ background:SCHOOL_COLORS[detailStu.school_type as SchoolKey].bg, color:SCHOOL_COLORS[detailStu.school_type as SchoolKey].color }}>
+                      <span className="badge" style={{ background: (SCHOOL_COLORS[detailStu.school_type as SchoolKey] ?? SCHOOL_COLORS['none']).bg, color: (SCHOOL_COLORS[detailStu.school_type as SchoolKey] ?? SCHOOL_COLORS['none']).color }}>
                         {detailStu.school_type}학교
                       </span>
                     )}
@@ -565,7 +565,7 @@ export default function StudentsPage() {
                   return (
                     <div>
                       {sorted.map((e, i) => {
-                        const col = SCHOOL_COLORS[e.school_type]
+                        const col = SCHOOL_COLORS[e.school_type] ?? SCHOOL_COLORS['none']
                         const isCurrent = e === current
                         return (
                           <div key={i} className="school-row">
