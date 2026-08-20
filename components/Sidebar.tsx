@@ -69,7 +69,7 @@ export default function Sidebar() {
       border-radius: 0 3px 3px 0;
     }
     .toggle-btn {
-      position: absolute; right: -11px; top: 50%; transform: translateY(-50%);
+      position: absolute; right: -11px; top: 16px;
       width: 22px; height: 44px;
       background: #fff; border: 1px solid #EEF0F5; border-left: none;
       border-radius: 0 8px 8px 0;

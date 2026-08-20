@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { kstDateStr, kstNow } from '@/lib/kst'
+import TimeSlotInput from '@/components/TimeSlotInput'
 
 const navy='#0D2A5E', bg='#F5F7FA', bd='#DDE3EE'
 const tx='#0D1B36', tx2='#4B5C7E', tx3='#96A4BF'
@@ -206,13 +207,9 @@ export default function AttendancePage() {
           {slots.map((sl, i) => (
             <div key={i} style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
               <span style={{fontSize:12,color:tx3,minWidth:16,textAlign:'right'}}>{i+1}</span>
-              <input type="time" className="fi" value={sl.in}
-                onChange={e=>updateSlot(i,'in',e.target.value)}
-                style={{flex:1,padding:'8px 10px'}}/>
+              <TimeSlotInput value={sl.in} onChange={v=>updateSlot(i,'in',v)} />
               <span style={{color:tx3,fontSize:13}}>~</span>
-              <input type="time" className="fi" value={sl.out}
-                onChange={e=>updateSlot(i,'out',e.target.value)}
-                style={{flex:1,padding:'8px 10px'}}/>
+              <TimeSlotInput value={sl.out} onChange={v=>updateSlot(i,'out',v)} />
               {sl.in && sl.out && sl.in < sl.out && (
                 <span style={{fontSize:11,color:navy,minWidth:60,whiteSpace:'nowrap'}}>
                   {fmtHours(Math.round(calcMin([sl])))}

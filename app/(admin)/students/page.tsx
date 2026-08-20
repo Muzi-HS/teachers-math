@@ -247,6 +247,7 @@ export default function StudentsPage() {
 
   const ageOptions    = [...new Set(students.map(s => ageOf(s.birth_year)))].sort((a, b) => a - b)
   const schoolOptions = [...new Set(students.map(s => s.school).filter(Boolean))].sort()
+  const activeClasses = classes.filter(c => c.active !== false)
   const hasActiveFilter = search !== '' || ageFlt !== '' || schoolFlt !== '' || stageFlt !== '' || clsFlt !== ''
 
   function resetFilters() {
@@ -315,53 +316,12 @@ export default function StudentsPage() {
             전체 학생 <span style={{ fontSize:12,color:tx3,fontWeight:400 }}>{filtered.length}명</span>
           </span>
         </div>
-        <div className="sbox" style={{ maxWidth:320, marginBottom:14 }}>
-          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke={tx3}><circle cx="11" cy="11" r="8" strokeWidth={2}/><path strokeWidth={2} d="M21 21l-4.35-4.35"/></svg>
-          <input placeholder="이름 또는 학교 검색..." value={search} onChange={e => setSearch(e.target.value)} />
-        </div>
-
-        <div style={{ display:'flex',gap:20,alignItems:'flex-start',marginBottom:18,flexWrap:'wrap' }}>
-          {/* 학교급 */}
-          <div className="fgrp">
-            <p className="fgrp-lb">학교급</p>
-            <div style={{ display:'flex',gap:6,flexWrap:'wrap' }}>
-              <button type="button" className={`pill${stageFlt === '' ? ' active' : ''}`}
-                style={stageFlt === '' ? { background:navy, color:'#fff' } : undefined}
-                onClick={() => setStageFlt('')}>전체</button>
-              {SCHOOL_TYPES.map(type => {
-                const active = stageFlt === type
-                const col = SCHOOL_COLORS[type]
-                return (
-                  <button key={type} type="button" className={`pill${active ? ' active' : ''}`}
-                    style={active ? { background:col.bg, color:col.color, borderColor:col.color } : undefined}
-                    onClick={() => setStageFlt(f => f === type ? '' : type)}>
-                    {SCHOOL_LABELS[type]}
-                  </button>
-                )
-              })}
-            </div>
+        {/* 검색 + 학교 드롭다운 */}
+        <div style={{ display:'flex',gap:20,alignItems:'flex-end',marginBottom:12,flexWrap:'wrap' }}>
+          <div className="sbox" style={{ maxWidth:320 }}>
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke={tx3}><circle cx="11" cy="11" r="8" strokeWidth={2}/><path strokeWidth={2} d="M21 21l-4.35-4.35"/></svg>
+            <input placeholder="이름 또는 학교 검색..." value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-
-          {/* 나이 */}
-          <div className="fgrp">
-            <p className="fgrp-lb">나이</p>
-            <select className="fsel" value={ageFlt} onChange={e => setAgeFlt(e.target.value)}>
-              <option value="">전체 나이</option>
-              {ageOptions.map(age => <option key={age} value={String(age)}>{age}세</option>)}
-            </select>
-          </div>
-
-          {/* 소속 반 */}
-          <div className="fgrp">
-            <p className="fgrp-lb">소속 반</p>
-            <select className="fsel" value={clsFlt} onChange={e => setClsFlt(e.target.value)}>
-              <option value="">전체 반</option>
-              <option value="none">미배정</option>
-              {classes.map(c => <option key={c.id} value={String(c.id)}>{c.name}{c.active === false ? ' (비활성)' : ''}</option>)}
-            </select>
-          </div>
-
-          {/* 학교 */}
           <div className="fgrp">
             <p className="fgrp-lb">학교</p>
             <select className="fsel" value={schoolFlt} onChange={e => setSchoolFlt(e.target.value)}>
@@ -369,13 +329,73 @@ export default function StudentsPage() {
               {schoolOptions.map(sc => <option key={sc} value={sc}>{sc}</option>)}
             </select>
           </div>
-
           {hasActiveFilter && (
-            <div className="fgrp" style={{ justifyContent:'flex-end' }}>
-              <p className="fgrp-lb" style={{ visibility:'hidden' }}>초기화</p>
-              <button type="button" className="pill" onClick={resetFilters} style={{ color:re, borderColor:'transparent', background:rbg }}>필터 초기화</button>
-            </div>
+            <button type="button" className="pill" onClick={resetFilters} style={{ color:re, borderColor:'transparent', background:rbg }}>필터 초기화</button>
           )}
+        </div>
+
+        {/* 학교급 */}
+        <div className="fgrp" style={{ marginBottom:14 }}>
+          <p className="fgrp-lb">학교급</p>
+          <div style={{ display:'flex',gap:6,flexWrap:'wrap' }}>
+            <button type="button" className={`pill${stageFlt === '' ? ' active' : ''}`}
+              style={stageFlt === '' ? { background:navy, color:'#fff' } : undefined}
+              onClick={() => setStageFlt('')}>전체</button>
+            {SCHOOL_TYPES.map(type => {
+              const active = stageFlt === type
+              const col = SCHOOL_COLORS[type]
+              return (
+                <button key={type} type="button" className={`pill${active ? ' active' : ''}`}
+                  style={active ? { background:col.bg, color:col.color, borderColor:col.color } : undefined}
+                  onClick={() => setStageFlt(f => f === type ? '' : type)}>
+                  {SCHOOL_LABELS[type]}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* 나이 */}
+        <div className="fgrp" style={{ marginBottom:14 }}>
+          <p className="fgrp-lb">나이</p>
+          <div style={{ display:'flex',gap:6,flexWrap:'wrap' }}>
+            <button type="button" className={`pill${ageFlt === '' ? ' active' : ''}`}
+              style={ageFlt === '' ? { background:navy, color:'#fff' } : undefined}
+              onClick={() => setAgeFlt('')}>전체</button>
+            {ageOptions.map(age => {
+              const active = ageFlt === String(age)
+              return (
+                <button key={age} type="button" className={`pill${active ? ' active' : ''}`}
+                  style={active ? { background:navy, color:'#fff' } : undefined}
+                  onClick={() => setAgeFlt(f => f === String(age) ? '' : String(age))}>
+                  {age}세
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* 소속 반 (활성화된 반만) */}
+        <div className="fgrp" style={{ marginBottom:18 }}>
+          <p className="fgrp-lb">소속 반</p>
+          <div style={{ display:'flex',gap:6,flexWrap:'wrap' }}>
+            <button type="button" className={`pill${clsFlt === '' ? ' active' : ''}`}
+              style={clsFlt === '' ? { background:navy, color:'#fff' } : undefined}
+              onClick={() => setClsFlt('')}>전체</button>
+            <button type="button" className={`pill${clsFlt === 'none' ? ' active' : ''}`}
+              style={clsFlt === 'none' ? { background:tx3, color:'#fff' } : undefined}
+              onClick={() => setClsFlt(f => f === 'none' ? '' : 'none')}>미배정</button>
+            {activeClasses.map(c => {
+              const active = clsFlt === String(c.id)
+              return (
+                <button key={c.id} type="button" className={`pill${active ? ' active' : ''}`}
+                  style={active ? { background:gbg, color:gr, borderColor:gr } : undefined}
+                  onClick={() => setClsFlt(f => f === String(c.id) ? '' : String(c.id))}>
+                  {c.name}
+                </button>
+              )
+            })}
+          </div>
         </div>
 
         {loading ? (

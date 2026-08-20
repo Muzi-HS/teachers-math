@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { kstNow } from '@/lib/kst'
+import TimeSlotInput from '@/components/TimeSlotInput'
 
 const navy='#0D2A5E', navyDk='#071A3E', navyM='#E8EEF8'
 const gold='#D87E13', goldL='#F09830', bg='#F5F7FA', bd='#DDE3EE'
@@ -254,11 +255,9 @@ export default function TeachersPage(){
               {editSlots.map((sl,i)=>(
                 <div key={i} style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
                   <span style={{fontSize:12,color:tx3,minWidth:16}}>{i+1}</span>
-                  <input type="time" className="fi" value={sl.in}
-                    onChange={e=>updateEditSlot(i,'in',e.target.value)} style={{flex:1,padding:'8px 10px'}}/>
+                  <TimeSlotInput value={sl.in} onChange={v=>updateEditSlot(i,'in',v)} />
                   <span style={{color:tx3}}>~</span>
-                  <input type="time" className="fi" value={sl.out}
-                    onChange={e=>updateEditSlot(i,'out',e.target.value)} style={{flex:1,padding:'8px 10px'}}/>
+                  <TimeSlotInput value={sl.out} onChange={v=>updateEditSlot(i,'out',v)} />
                   {sl.in&&sl.out&&sl.in<sl.out&&(
                     <span style={{fontSize:11,color:navy,minWidth:56,whiteSpace:'nowrap'}}>
                       {fmtHours(Math.round(calcMin([sl])))}
