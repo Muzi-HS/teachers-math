@@ -170,7 +170,7 @@ export default function NoticesPage() {
         <div style={{ background: '#fff', border: `1px solid ${bd}`, borderRadius: 10, overflow: 'hidden' }}>
 
           {/* 헤더 행 */}
-          <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 90px 80px 60px', gap: 8, padding: '11px 16px', background: bg, borderBottom: `1px solid ${bd}`, fontSize: 11, fontWeight: 600, color: tx3 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 90px 80px 108px', gap: 8, padding: '11px 16px', background: bg, borderBottom: `1px solid ${bd}`, fontSize: 11, fontWeight: 600, color: tx3 }}>
             <div style={{ textAlign: 'center' }}>번호</div>
             <div>제목</div>
             <div style={{ textAlign: 'center' }}>공개여부</div>
@@ -331,7 +331,6 @@ function BoardRow({ notice, index, pinned, canWrite, onClick, onEdit, onDelete, 
   notice: Notice; index: number | string; pinned: boolean; canWrite: boolean
   onClick: () => void; onEdit: () => void; onDelete: () => void; isLast: boolean
 }) {
-  const [menuOpen, setMenuOpen] = useState(false)
   const navy = '#0D2A5E', gold = '#D87E13', bd = '#DDE3EE'
   const tx = '#0D1B36', tx2 = '#4B5C7E', tx3 = '#96A4BF'
   const re = '#C0392B', rbg = '#FDECEA', gr = '#1A7F4E', gbg = '#E0F5EB'
@@ -344,7 +343,7 @@ function BoardRow({ notice, index, pinned, canWrite, onClick, onEdit, onDelete, 
     <div
       onClick={onClick}
       style={{
-        display: 'grid', gridTemplateColumns: '60px 1fr 90px 80px 60px', gap: 8,
+        display: 'grid', gridTemplateColumns: '60px 1fr 90px 80px 108px', gap: 8,
         padding: '11px 16px', alignItems: 'center', cursor: 'pointer',
         background: pinned ? '#FEFAF3' : '#fff',
         borderBottom: isLast ? 'none' : `1px solid ${bd}`,
@@ -378,37 +377,20 @@ function BoardRow({ notice, index, pinned, canWrite, onClick, onEdit, onDelete, 
 
       <div style={{ textAlign: 'center', fontSize: 11, color: tx3 }}>{kstDateOf(notice.created_at)}</div>
 
-      <div style={{ textAlign: 'center', position: 'relative' }}>
+      <div style={{ textAlign: 'center' }}>
         {canWrite ? (
-          <>
+          <div style={{ display: 'flex', gap: 5, justifyContent: 'center' }}>
             <button
-              onClick={e => { e.stopPropagation(); setMenuOpen(p => !p) }}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: tx3, padding: '2px 6px' }}
-            >
-              ···
-            </button>
-            {menuOpen && (
-              <div
-                onClick={e => e.stopPropagation()}
-                style={{
-                  position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 50,
-                  background: '#fff', border: `1px solid ${bd}`, borderRadius: 8,
-                  boxShadow: '0 4px 14px rgba(0,0,0,.1)', overflow: 'hidden', minWidth: 80,
-                }}
-              >
-                <button
-                  onClick={() => { setMenuOpen(false); onEdit() }}
-                  style={{ display: 'block', width: '100%', padding: '8px 12px', border: 'none', background: 'none', textAlign: 'left', fontSize: 12, color: tx2, cursor: 'pointer', fontFamily: 'inherit' }}
-                >편집</button>
-                <button
-                  onClick={() => { setMenuOpen(false); onDelete() }}
-                  style={{ display: 'block', width: '100%', padding: '8px 12px', border: 'none', background: 'none', textAlign: 'left', fontSize: 12, color: re, cursor: 'pointer', fontFamily: 'inherit' }}
-                >삭제</button>
-              </div>
-            )}
-          </>
+              onClick={e => { e.stopPropagation(); onEdit() }}
+              style={{ padding: '4px 9px', borderRadius: 6, fontSize: 11, fontWeight: 500, cursor: 'pointer', border: `1px solid ${bd}`, background: 'transparent', color: tx2, fontFamily: 'inherit' }}
+            >수정</button>
+            <button
+              onClick={e => { e.stopPropagation(); onDelete() }}
+              style={{ padding: '4px 9px', borderRadius: 6, fontSize: 11, fontWeight: 500, cursor: 'pointer', border: 'none', background: rbg, color: re, fontFamily: 'inherit' }}
+            >삭제</button>
+          </div>
         ) : (
-          <span style={{ fontSize: 11, color: tx3 }}>···</span>
+          <span style={{ fontSize: 11, color: tx3 }}>-</span>
         )}
       </div>
     </div>

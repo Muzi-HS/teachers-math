@@ -17,7 +17,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (authLoading) return
-    if (role === 'admin' || role === 'teacher') router.replace('/dashboard')
+    if (role === 'admin' || role === 'teacher' || role === 'assistant') router.replace('/dashboard')
     else if (role === 'parent') router.replace('/parent/records')
   }, [role, authLoading])
 

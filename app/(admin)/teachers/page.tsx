@@ -383,6 +383,7 @@ export default function TeachersPage(){
                       <select className="fsel" value={t.role} onChange={e=>changeRole(t,e.target.value)}
                         style={{padding:'3px 8px',fontSize:11}}>
                         <option value="teacher">선생님</option>
+                        <option value="assistant">조교</option>
                         <option value="admin">관리자</option>
                       </select>
                     </td>

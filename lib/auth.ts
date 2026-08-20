@@ -25,7 +25,7 @@ export async function teacherLogin(email: string, password: string) {
     userId: data.user.id,
     email: data.user.email!,
     name: teacher.name,
-    role: teacher.role as 'admin' | 'teacher',
+    role: teacher.role as 'admin' | 'teacher' | 'assistant',
   }
 }
 
@@ -131,7 +131,7 @@ export async function getCurrentTeacher() {
     .single()
 
   if (!teacher) return null
-  return { userId: user.id, name: teacher.name, role: teacher.role as 'admin' | 'teacher' }
+  return { userId: user.id, name: teacher.name, role: teacher.role as 'admin' | 'teacher' | 'assistant' }
 }
 
 // ── 현재 학부모 세션 확인 ──

@@ -89,7 +89,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             TEACHERS MATH
           </span>
           <span style={{ fontSize: 9, color: 'rgba(255,255,255,.45)', background: 'rgba(255,255,255,.1)', padding: '2px 7px', borderRadius: 10 }}>
-            {role === 'admin' ? '관리자' : '선생님'}
+            {role === 'admin' ? '관리자' : role === 'assistant' ? '조교' : '선생님'}
           </span>
           <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,.85)' }}>
             {teacher?.name ?? ''}

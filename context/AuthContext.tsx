@@ -7,7 +7,7 @@ type TeacherSession = {
   userId: string
   email: string
   name: string
-  role: 'admin' | 'teacher'
+  role: 'admin' | 'teacher' | 'assistant'
 }
 
 type ParentSession = {
@@ -19,7 +19,7 @@ type ParentSession = {
 type AuthContextType = {
   teacher: TeacherSession | null
   parent: ParentSession | null
-  role: 'admin' | 'teacher' | 'parent' | null
+  role: 'admin' | 'teacher' | 'assistant' | 'parent' | null
   loading: boolean
   logout: () => Promise<void>
   loginAsTeacher: (t: TeacherSession) => void
