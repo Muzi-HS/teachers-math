@@ -256,10 +256,15 @@ export default function SchedulePage() {
                         let cls = 'cd'
                         if (isTod) cls += ' tod'
                         if (isHol) cls += ' hol'
-                        const nc = dow === 0 || isHol ? re : dow === 6 ? navy : tx
+                        const nc = dow === 0 ? re : dow === 6 ? navy : tx
                         return (
                             <div key={day} className={cls} onClick={() => canWrite && openAdd(ds)}>
-                                <div style={{ fontSize: 12, fontWeight: isTod ? 700 : 500, marginBottom: 2, color: nc }}>{day}</div>
+                                <div style={{
+                                    fontSize: 12, fontWeight: isTod || isHol ? 700 : 500, marginBottom: 2,
+                                    color: isHol ? '#fff' : nc,
+                                    width: 20, height: 20, lineHeight: '20px', textAlign: 'center',
+                                    borderRadius: '50%', background: isHol ? re : 'transparent',
+                                }}>{day}</div>
                                 {de.map(e => (
                                     <div key={e.id} className={`ce ${e.type}`}
                                         onClick={ev => { ev.stopPropagation(); canWrite && openEdit(e, ev) }}

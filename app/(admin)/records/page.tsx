@@ -14,6 +14,7 @@ type Rec = {
   content: string; homework: string
   hw_rate: number; hw_cor: number; attitude: number
   late: boolean; has_test: boolean; feedback: string
+  parent_comment: string | null; parent_comment_at: string | null
   // sms_sent: boolean; sms_sent_at: string | null;
   push_sent: boolean; push_sent_at: string | null;
   is_draft: boolean
@@ -62,8 +63,8 @@ async function buildSms(name: string, r: Rec, testItems?: TestItem[]) {
   const dows = ['일', '월', '화', '수', '목', '금', '토']
   const dateStr = `${d.getMonth() + 1}월 ${d.getDate()}일(${dows[d.getDay()]})`
 
-  // 숙제 이행률/정답률: -1(숙제없음/채점안함) 처리
-  const hwRateText = r.hw_rate < 0 ? '숙제 없음' : `${r.hw_rate}%`
+  // 숙제 이행률/정답률: -1(숙제없음)/-2(숙제 미제출)/채점안함 처리
+  const hwRateText = r.hw_rate === -1 ? '숙제 없음' : r.hw_rate === -2 ? '숙제 미제출' : `${r.hw_rate}%`
   const hwCorText  = r.hw_cor  < 0 ? '채점 안함' : `${r.hw_cor}%`
 
   // 구분선: 짧고 모든 폰트에서 너비가 일정한 대시 사용
@@ -164,6 +165,7 @@ export default function RecordsPage() {
   const [smsTarget,setSmsTarget]= useState<'all' | number>('all')
   const [sending,  setSending]  = useState(false)
   const [pushing,  setPushing]  = useState(false)
+  const [pushingOneId, setPushingOneId] = useState<number | null>(null)
   const [notif,    setNotif]    = useState<{ msg: string; ok: boolean } | null>(null)
   const [bulkModalClsId, setBulkModalClsId] = useState<number | null>(null) // 일괄수정 대상 class_id (null = 닫힘)
 
@@ -372,6 +374,33 @@ export default function RecordsPage() {
     await fetchDayRecs(); await fetchMonthDates()
   }
 
+  // 기록 1건에 대해 실제로 푸시를 보내고 push_sent를 true로 남긴다 (개별/일괄 발송 공용)
+  async function sendPushForRecord(r: Rec): Promise<boolean> {
+    const stu = students.find(s => s.id === r.student_id)
+    if (!stu?.parent_phone) return false
+    const [, mm, dd] = r.date.split('-')
+    const kd = new Date(r.date + 'T12:00:00+09:00')
+    const dows = ['일', '월', '화', '수', '목', '금', '토']
+    const dateStr = `${parseInt(mm)}월 ${parseInt(dd)}일(${dows[kd.getUTCDay()]})`
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({
+          parent_phone: stu.parent_phone,
+          title: '티처스 수학학원',
+          body: `[${dateStr}] ${stu.name}학생의 수업기록이 등록됐습니다!`,
+        }),
+      })
+      await supabase.from('records').update({ push_sent: true, push_sent_at: new Date().toISOString() }).eq('id', r.id)
+      return true
+    } catch { return false }
+  }
+
+  // 반별 일괄 발송 — 이미 개별 발송된(push_sent=true) 학생은 자동으로 건너뜀
   async function sendPushByClass(clsId: number | null) {
     if (pushing) return
     setPushing(true)
@@ -382,32 +411,25 @@ export default function RecordsPage() {
     let sent = 0
     for (const r of targets) {
       if (r.push_sent ?? false) continue
-      const stu = students.find(s => s.id === r.student_id)
-      if (!stu?.parent_phone) continue
-      const [, mm, dd] = r.date.split('-')
-      const kd = new Date(r.date + 'T12:00:00+09:00')
-      const dows = ['일', '월', '화', '수', '목', '금', '토']
-      const dateStr = `${parseInt(mm)}월 ${parseInt(dd)}일(${dows[kd.getUTCDay()]})`
-      try {
-        await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({
-            parent_phone: stu.parent_phone,
-            title: '티처스 수학학원',
-            body: `[${dateStr}] ${stu.name}학생의 수업기록이 등록됐습니다!`,
-          }),
-        })
-        await supabase.from('records').update({ push_sent: true, push_sent_at: new Date().toISOString() }).eq('id', r.id)
-        sent++
-      } catch {}
+      if (await sendPushForRecord(r)) sent++
     }
     setPushing(false)
     toast(sent > 0 ? `${sent}명 푸시 발송 완료` : '발송할 학부모 연락처가 없습니다.', sent > 0)
     if (sent > 0) await fetchDayRecs()
+  }
+
+  // 학생 1명 개별 발송
+  async function sendPushOne(recId: number) {
+    if (pushingOneId) return
+    const r = dayRecs.find(x => x.id === recId)
+    if (!r) return
+    const stu = students.find(s => s.id === r.student_id)
+    if (!stu?.parent_phone) return toast('학부모 연락처가 없습니다.', false)
+    setPushingOneId(recId)
+    const ok = await sendPushForRecord(r)
+    setPushingOneId(null)
+    toast(ok ? `${stu.name} 학부모에게 푸시 발송 완료` : '발송 실패', ok)
+    if (ok) await fetchDayRecs()
   }
 
   // ── 문자 발송 (주석처리 — 푸시 알림으로 대체됨) ──
@@ -484,6 +506,7 @@ export default function RecordsPage() {
     .pb{height:6px;background:${bd};border-radius:99px;flex:1;}
     .pf{height:100%;border-radius:99px;}
     .fb{background:rgba(13,42,94,.05);border-left:3px solid ${navy};border-radius:0 8px 8px 0;padding:10px 12px;margin-top:10px;}
+    .pc{background:rgba(216,126,19,.07);border-left:3px solid ${gold};border-radius:0 8px 8px 0;padding:10px 12px;margin-top:10px;}
     .sav{width:34px;height:34px;border-radius:50%;background:${navyM};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:${navy};flex-shrink:0;}
     .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;}
     .bgrn{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;background:${gr};color:#fff;font-family:inherit;}
@@ -648,12 +671,13 @@ export default function RecordsPage() {
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
-                        {/* 개별 발송 주석처리 — 반별 일괄 발송으로 대체
-                        <button className="bout" style={{ color: gr, borderColor: gr + '66', whiteSpace: 'nowrap' }}
-                          onClick={() => { setSmsTarget(r.student_id); setSmsModal(true) }}>
-                          개별발송
-                        </button>
-                        */}
+                        {!(r.push_sent ?? false) && (
+                          <button className="bout" style={{ color: gr, borderColor: gr + '66', whiteSpace: 'nowrap' }}
+                            disabled={pushingOneId === r.id || !students.find(s => s.id === r.student_id)?.parent_phone}
+                            onClick={() => sendPushOne(r.id)}>
+                            {pushingOneId === r.id ? '발송 중...' : '개별 발송'}
+                          </button>
+                        )}
                         <button className="bout" style={{ whiteSpace: 'nowrap' }} onClick={() => openEdit(r)}>수정</button>
                         <button className="bdng" style={{ whiteSpace: 'nowrap' }} onClick={() => delRec(r.id)}>삭제</button>
                       </div>
@@ -664,8 +688,10 @@ export default function RecordsPage() {
                   <div className="hwg">
                     <p className="hwg-lb">숙제 이행률</p>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
-                      {r.hw_rate < 0
+                      {r.hw_rate === -1
                         ? <p style={{ fontSize: 12, color: tx3, margin: 0, whiteSpace: 'nowrap' }}>숙제 없음</p>
+                        : r.hw_rate === -2
+                        ? <p style={{ fontSize: 12, color: re, margin: 0, whiteSpace: 'nowrap' }}>숙제 미제출</p>
                         : <p style={{ fontSize: 18, fontWeight: 700, color: rateColor(r.hw_rate), margin: 0, lineHeight: 1, whiteSpace: 'nowrap' }}>{r.hw_rate}<span style={{ fontSize: 11, fontWeight: 400, color: tx2 }}>%</span></p>
                       }
                       {r.hw_rate >= 0 && (
@@ -741,6 +767,18 @@ export default function RecordsPage() {
                       <span style={{ fontSize: 13, fontWeight: 600, color: navy }}>수업 피드백</span>
                     </div>
                     <p style={{ fontSize: 14, color: tx, lineHeight: 1.6 }}>{r.feedback}</p>
+                  </div>
+                )}
+
+                {/* 학부모 의견 */}
+                {r.parent_comment && (
+                  <div className="pc">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 5 }}>
+                      <div style={{ width: 3, height: 14, background: gold, borderRadius: 2 }} />
+                      <span style={{ fontSize: 13, fontWeight: 600, color: gold }}>학부모 의견</span>
+                      {r.parent_comment_at && <span style={{ fontSize: 11, color: tx3, marginLeft: 'auto' }}>{r.parent_comment_at.slice(0, 10)}</span>}
+                    </div>
+                    <p style={{ fontSize: 14, color: tx, lineHeight: 1.6 }}>{r.parent_comment}</p>
                   </div>
                 )}
                   </div>

@@ -3,8 +3,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
 const navy='#0D2A5E', tx='#0D1B36', tx2='#4B5C7E', tx3='#96A4BF'
-const bd='#DDE3EE', bg='#F5F7FA', re='#C0392B', rbg='#FDECEA'
-const gr='#1A7F4E', gbg='#E0F5EB', gold='#D87E13'
+const bd='#DDE3EE', re='#C0392B', rbg='#FDECEA'
 
 type Event_ = {
   id: number; title: string; start_date: string; end_date: string | null
@@ -12,13 +11,12 @@ type Event_ = {
   type: string | null; memo: string | null
 }
 
-const TYPE_COLOR: Record<string, { bg: string; color: string; dot: string }> = {
-  '휴원': { bg: rbg,        color: re,   dot: re   },
-  '시험': { bg: '#E8EEF8',  color: navy, dot: navy },
-  '특강': { bg: '#FEF3E2',  color: gold, dot: gold },
-  '행사': { bg: gbg,        color: gr,   dot: gr   },
+// 일정 구분은 '휴일' / '일반' 두 가지만 존재 (관리자 학원일정 메뉴 기준)
+function eventColor(e: Event_) {
+  return e.type === 'holiday'
+    ? { bg: rbg, color: re, dot: re }
+    : { bg: '#E8EEF8', color: navy, dot: navy }
 }
-const DEFAULT_TYPE = { bg: '#F0F0FF', color: '#5050C0', dot: '#5050C0' }
 
 const DOW = ['일','월','화','수','목','금','토']
 
@@ -139,23 +137,13 @@ export default function ParentEvents() {
                     {/* 이벤트 점 (최대 3개) */}
                     <div style={{ display: 'flex', gap: 2 }}>
                       {dayEvents.slice(0, 3).map(e => {
-                        const tc = TYPE_COLOR[e.type ?? ''] ?? DEFAULT_TYPE
+                        const tc = eventColor(e)
                         return <div key={e.id} style={{ width: 4, height: 4, borderRadius: '50%', background: isSel ? 'rgba(255,255,255,.7)' : tc.dot }} />
                       })}
                     </div>
                   </button>
                 )
               })}
-            </div>
-
-            {/* 범례 */}
-            <div style={{ display: 'flex', gap: 12, marginTop: 12, paddingTop: 10, borderTop: `1px solid ${bd}`, flexWrap: 'wrap' }}>
-              {Object.entries(TYPE_COLOR).map(([label, c]) => (
-                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: c.dot }} />
-                  <span style={{ fontSize: 11, color: tx3 }}>{label}</span>
-                </div>
-              ))}
             </div>
           </div>
 
@@ -170,12 +158,12 @@ export default function ParentEvents() {
                   이 날 예정된 일정이 없습니다
                 </div>
               ) : selEvents.map(e => {
-                const tc = TYPE_COLOR[e.type ?? ''] ?? DEFAULT_TYPE
+                const tc = eventColor(e)
                 return (
                   <div key={e.id} style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: '14px 16px', marginBottom: 10, borderLeft: `4px solid ${tc.dot}` }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                      {e.type && <span style={{ background: tc.bg, color: tc.color, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>{e.type}</span>}
-                      <p style={{ fontSize: 14, fontWeight: 700, color: tx, margin: 0 }}>{e.title}</p>
+                      {e.type === 'holiday' && <span style={{ background: tc.bg, color: tc.color, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>휴일</span>}
+                      <p style={{ fontSize: 14, fontWeight: 700, color: e.type === 'holiday' ? re : tx, margin: 0 }}>{e.title}</p>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: 12, color: tx2 }}>📅 {formatDateRange(e)}</span>
@@ -205,12 +193,12 @@ export default function ParentEvents() {
                   </div>
                 )
                 return monthEvents.map(e => {
-                  const tc = TYPE_COLOR[e.type ?? ''] ?? DEFAULT_TYPE
+                  const tc = eventColor(e)
                   return (
                     <div key={e.id} style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: '14px 16px', marginBottom: 10, borderLeft: `4px solid ${tc.dot}` }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                        {e.type && <span style={{ background: tc.bg, color: tc.color, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>{e.type}</span>}
-                        <p style={{ fontSize: 14, fontWeight: 700, color: tx, margin: 0 }}>{e.title}</p>
+                        {e.type === 'holiday' && <span style={{ background: tc.bg, color: tc.color, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>휴일</span>}
+                        <p style={{ fontSize: 14, fontWeight: 700, color: e.type === 'holiday' ? re : tx, margin: 0 }}>{e.title}</p>
                       </div>
                       <span style={{ fontSize: 12, color: tx2 }}>📅 {formatDateRange(e)}</span>
                       {e.memo && <p style={{ fontSize: 13, color: tx2, marginTop: 8, paddingTop: 8, borderTop: `1px solid ${bd}`, lineHeight: 1.5, whiteSpace: 'pre-wrap', marginBottom: 0 }}>{e.memo}</p>}

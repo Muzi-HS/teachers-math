@@ -10,6 +10,7 @@ type Rec = {
   id: number; date: string; content: string; homework: string
   hw_rate: number; hw_cor: number; attitude: number
   late: boolean; has_test: boolean; feedback: string
+  parent_comment: string | null; parent_comment_at: string | null
   record_test_items?: { test_id: number; t_total: number; t_cor: number; t_score: number; tests: { name: string } | null }[]
 }
 
@@ -91,6 +92,9 @@ export default function ParentRecords() {
   const { selChild, setSelChild, children } = useParentChild()
   const [recs,    setRecs]    = useState<Rec[]>([])
   const [loading, setLoading] = useState(false)
+  const [commentDrafts, setCommentDrafts] = useState<Record<number, string>>({})
+  const [savingId, setSavingId] = useState<number | null>(null)
+  const [commentErr, setCommentErr] = useState<Record<number, string>>({})
 
   useEffect(() => {
     if (!selChild) return
@@ -104,6 +108,7 @@ export default function ParentRecords() {
       .select('*')
       .eq('student_id', stuId)
       .eq('is_draft', false)
+      .eq('push_sent', true) // 알림 발송 전에는 학부모에게 노출되지 않음
       .order('date', { ascending: false })
 
     if (!recsData || recsData.length === 0) { setRecs([]); setLoading(false); return }
@@ -131,8 +136,23 @@ export default function ParentRecords() {
       })
     }
 
-    setRecs(recsData.map(r => ({ ...r, record_test_items: itemsByRecord[r.id] ?? [] })) as Rec[])
+    const merged = recsData.map(r => ({ ...r, record_test_items: itemsByRecord[r.id] ?? [] })) as Rec[]
+    setRecs(merged)
+    setCommentDrafts(Object.fromEntries(merged.map(r => [r.id, r.parent_comment ?? ''])))
     setLoading(false)
+  }
+
+  async function saveComment(recId: number) {
+    const text = (commentDrafts[recId] ?? '').trim()
+    setSavingId(recId)
+    setCommentErr(e => ({ ...e, [recId]: '' }))
+    const nowIso = new Date().toISOString()
+    const { error } = await supabase.from('records')
+      .update({ parent_comment: text, parent_comment_at: nowIso })
+      .eq('id', recId)
+    setSavingId(null)
+    if (error) { setCommentErr(e => ({ ...e, [recId]: '의견 저장에 실패했습니다.' })); return }
+    setRecs(rs => rs.map(r => r.id === recId ? { ...r, parent_comment: text, parent_comment_at: nowIso } : r))
   }
 
   const curChild = children.find(c => c.id === selChild)
@@ -184,8 +204,10 @@ export default function ParentRecords() {
                   <div style={{ flex: 1, minWidth: 0, background: bg, borderRadius: 10, padding: '8px 10px' }}>
                     <p style={{ fontSize: 11, color: navy, fontWeight: 600, margin: '0 0 4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>숙제 이행률</p>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
-                      {r.hw_rate < 0
+                      {r.hw_rate === -1
                         ? <p style={{ fontSize: 12, color: tx3, margin: 0, whiteSpace: 'nowrap' }}>숙제 없음</p>
+                        : r.hw_rate === -2
+                        ? <p style={{ fontSize: 12, color: re, margin: 0, whiteSpace: 'nowrap' }}>숙제 미제출</p>
                         : <p style={{ fontSize: 18, fontWeight: 700, color: rateColor(r.hw_rate), margin: 0, lineHeight: 1, whiteSpace: 'nowrap' }}>{r.hw_rate}<span style={{ fontSize: 11, fontWeight: 400, color: tx2 }}>%</span></p>
                       }
                       {r.hw_rate >= 0 && (
@@ -267,6 +289,31 @@ export default function ParentRecords() {
                     <p style={{ fontSize: 14, color: tx, lineHeight: 1.6, margin: 0 }}>{r.feedback}</p>
                   </div>
                 )}
+
+                {/* 학부모 의견 */}
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${bd}` }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6 }}>
+                    <div style={{ width: 3, height: 14, background: gold, borderRadius: 2 }} />
+                    <span style={{ fontSize: 13, fontWeight: 600, color: gold }}>학부모 의견</span>
+                  </div>
+                  <textarea
+                    value={commentDrafts[r.id] ?? ''}
+                    onChange={e => setCommentDrafts(d => ({ ...d, [r.id]: e.target.value }))}
+                    placeholder="선생님께 전달하고 싶은 의견을 남겨주세요"
+                    rows={2}
+                    style={{ width: '100%', padding: '8px 10px', border: `1.5px solid ${bd}`, borderRadius: 8, fontSize: 13, fontFamily: 'inherit', color: tx, outline: 'none', resize: 'vertical', boxSizing: 'border-box' }}
+                  />
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+                    <span style={{ fontSize: 11, color: re }}>{commentErr[r.id]}</span>
+                    <button onClick={() => saveComment(r.id)} disabled={savingId === r.id}
+                      style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: gold, color: '#fff', fontSize: 12, fontWeight: 700, cursor: savingId === r.id ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: savingId === r.id ? 0.7 : 1 }}>
+                      {savingId === r.id ? '저장 중...' : (r.parent_comment ? '의견 수정' : '의견 남기기')}
+                    </button>
+                  </div>
+                  {r.parent_comment_at && (
+                    <p style={{ fontSize: 10, color: tx3, margin: '4px 0 0', textAlign: 'right' }}>최종 전달: {r.parent_comment_at.slice(0, 10)}</p>
+                  )}
+                </div>
               </div>
             )
           })}

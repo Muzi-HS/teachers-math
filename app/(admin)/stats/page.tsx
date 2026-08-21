@@ -302,8 +302,10 @@ export default function StatsPage(){
                       <div style={{flex:1,background:bg,borderRadius:10,padding:'8px 10px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
                         <div>
                           <p style={{fontSize:11,color:navy,fontWeight:600,margin:'0 0 2px'}}>숙제 이행률</p>
-                          {r.hw_rate<0
+                          {r.hw_rate===-1
                             ?<p style={{fontSize:13,color:tx3,margin:0}}>숙제 없음</p>
+                            :r.hw_rate===-2
+                            ?<p style={{fontSize:13,color:re,margin:0}}>숙제 미제출</p>
                             :<p style={{fontSize:18,fontWeight:700,color:rateColor(r.hw_rate),margin:0,lineHeight:1}}>{r.hw_rate}<span style={{fontSize:11,fontWeight:400,color:tx2}}>%</span></p>
                           }
                         </div>

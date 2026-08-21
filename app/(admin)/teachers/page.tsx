@@ -161,6 +161,7 @@ export default function TeachersPage(){
   const [editSaving, setEditSaving] = useState(false)
   // 달력
   const [calDay,     setCalDay]     = useState<string|null>(null)
+  const [bulkApproving, setBulkApproving] = useState(false)
 
   useEffect(()=>{ fetchTeachers() },[])
   useEffect(()=>{ if(tabIdx===1){ fetchAtt(); fetchSchEvts() } },[tabIdx,selYear,selMonth])
@@ -308,6 +309,25 @@ export default function TeachersPage(){
     const json=await res.json()
     if(!res.ok||json.error) return toast('처리 실패: '+(json.error??'알 수 없는 오류'),false)
     toast(next?'승인됨':'승인 취소됨',next)
+    fetchAtt()
+  }
+
+  // 특정 날짜의 대기중인 출근 기록을 한 번에 승인
+  async function bulkApproveDay(date:string){
+    const pending=dayLogs(date).filter(l=>!l.approved)
+    if(pending.length===0) return
+    setBulkApproving(true)
+    const results=await Promise.all(pending.map(l=>
+      fetch('/api/attendance/approve',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({logId:l.id, approved:true, approvedBy:me?.userId??null}),
+      }).then(res=>res.json().then(json=>({res,json})))
+    ))
+    setBulkApproving(false)
+    const failCnt=results.filter(({res,json})=>!res.ok||json.error).length
+    if(failCnt>0) toast(`${pending.length-failCnt}건 승인됨, ${failCnt}건 실패`,false)
+    else toast(`${pending.length}건 일괄 승인됨`)
     fetchAtt()
   }
 
@@ -481,9 +501,17 @@ export default function TeachersPage(){
           onClick={()=>setCalDay(null)}>
           <div style={{background:'#fff',borderRadius:14,width:'100%',maxWidth:480,boxShadow:'0 8px 40px rgba(0,0,0,.2)',maxHeight:'80vh',overflow:'auto'}}
             onClick={e=>e.stopPropagation()}>
-            <div style={{padding:'16px 20px',borderBottom:`1px solid ${bd}`,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+            <div style={{padding:'16px 20px',borderBottom:`1px solid ${bd}`,display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
               <span style={{fontSize:14,fontWeight:700,color:tx}}>{calDay} 출근 현황</span>
-              <button onClick={()=>setCalDay(null)} style={{background:'none',border:'none',cursor:'pointer',fontSize:18,color:tx3}}>×</button>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                {dayLogs(calDay).some(l=>!l.approved)&&(
+                  <button className="bapv" disabled={bulkApproving} onClick={()=>bulkApproveDay(calDay)}
+                    style={{opacity:bulkApproving?0.6:1,cursor:bulkApproving?'not-allowed':'pointer'}}>
+                    {bulkApproving?'승인 중...':'일괄 승인'}
+                  </button>
+                )}
+                <button onClick={()=>setCalDay(null)} style={{background:'none',border:'none',cursor:'pointer',fontSize:18,color:tx3}}>×</button>
+              </div>
             </div>
             <div style={{padding:'16px 20px'}}>
               {dayLogs(calDay).length===0?(

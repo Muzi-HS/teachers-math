@@ -14,7 +14,7 @@ type TestItem = { testId: number | null; tTotal: number; tCor: number; tScore: n
 type RecForm = {
   student_id: number; content: string; homework: string
   hw_rate: number; hw_cor: number; attitude: number
-  hw_rate_na: boolean; hw_cor_na: boolean
+  hw_rate_na: boolean; hw_not_submitted: boolean; hw_cor_na: boolean
   late: boolean; has_test: boolean; testItems: TestItem[]; feedback: string
 }
 type Rec = RecForm & {
@@ -39,7 +39,7 @@ function attLabel(v: number) { return v >= 8 ? '우수' : v >= 5 ? '보통' : '�
 
 const BLANK_REC = (sid: number): RecForm => ({
   student_id: sid, content: '', homework: '', hw_rate: 80, hw_cor: 75, attitude: 10,
-  hw_rate_na: false, hw_cor_na: false,
+  hw_rate_na: false, hw_not_submitted: false, hw_cor_na: false,
   late: false, has_test: false, testItems: [], feedback: ''
 })
 
@@ -262,7 +262,8 @@ export default function ClassesPage() {
       homework: r.homework,
       hw_rate: r.hw_rate < 0 ? 0 : r.hw_rate,
       hw_cor: r.hw_cor < 0 ? 0 : r.hw_cor,
-      hw_rate_na: r.hw_rate < 0,
+      hw_rate_na: r.hw_rate === -1,
+      hw_not_submitted: r.hw_rate === -2,
       hw_cor_na: r.hw_cor < 0,
       attitude: r.attitude ?? 10,
       late: r.late,
@@ -284,7 +285,7 @@ export default function ClassesPage() {
     const row = {
       student_id: curStu.id, date: recDate, class_id: detailCls?.id ?? null,
       content: recF.content, homework: recF.homework,
-      hw_rate: recF.hw_rate_na ? -1 : recF.hw_rate,
+      hw_rate: recF.hw_rate_na ? -1 : recF.hw_not_submitted ? -2 : recF.hw_rate,
       hw_cor: recF.hw_cor_na ? -1 : recF.hw_cor,
       attitude: recF.attitude,
       late: recF.late, has_test: showTest, feedback: recF.feedback, is_draft: false,
@@ -605,8 +606,10 @@ export default function ClassesPage() {
                   <div style={{ flex: 1, background: bg, borderRadius: 10, padding: '8px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div>
                       <p style={{ fontSize: 11, color: navy, fontWeight: 600, margin: '0 0 2px' }}>숙제 이행률</p>
-                      {r.hw_rate < 0
+                      {r.hw_rate === -1
                         ? <p style={{ fontSize: 13, color: tx3, margin: 0 }}>숙제 없음</p>
+                        : r.hw_rate === -2
+                        ? <p style={{ fontSize: 13, color: re, margin: 0 }}>숙제 미제출</p>
                         : <p style={{ fontSize: 18, fontWeight: 700, color: rateColor(r.hw_rate), margin: 0, lineHeight: 1 }}>{r.hw_rate}<span style={{ fontSize: 11, fontWeight: 400, color: tx2 }}>%</span></p>
                       }
                     </div>
@@ -721,7 +724,7 @@ export default function ClassesPage() {
             const row = {
               student_id: curStu.id, date, class_id: detailCls?.id ?? null,
               content: form.content, homework: form.homework,
-              hw_rate: form.hw_rate_na ? -1 : form.hw_rate,
+              hw_rate: form.hw_rate_na ? -1 : form.hw_not_submitted ? -2 : form.hw_rate,
               hw_cor: form.hw_cor_na ? -1 : form.hw_cor,
               attitude: form.attitude,
               late: form.late, has_test: showT, feedback: form.feedback, is_draft: false,
@@ -1090,17 +1093,26 @@ function RecModal({ stuName, initDate, initRec, initShowTest, editRecId, tests, 
             <div className="fg">
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
                 <label className="lb" style={{ margin: 0 }}>숙제 이행률 (%)</label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, cursor: 'pointer', color: form.hw_rate_na ? re : tx3 }}>
-                  <input type="checkbox" checked={form.hw_rate_na} onChange={e => setF('hw_rate_na', e.target.checked)} style={{ cursor: 'pointer' }} />숙제 없음
-                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, cursor: 'pointer', color: form.hw_rate_na ? re : tx3 }}>
+                    <input type="checkbox" checked={form.hw_rate_na}
+                      onChange={e => { const c = e.target.checked; setF('hw_rate_na', c); if (c) setF('hw_not_submitted', false) }}
+                      style={{ cursor: 'pointer' }} />숙제 없음
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, cursor: 'pointer', color: form.hw_not_submitted ? re : tx3 }}>
+                    <input type="checkbox" checked={form.hw_not_submitted}
+                      onChange={e => { const c = e.target.checked; setF('hw_not_submitted', c); if (c) setF('hw_rate_na', false) }}
+                      style={{ cursor: 'pointer' }} />숙제 미제출
+                  </label>
+                </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <input type="number" className="fi" min={0} max={100}
-                  value={form.hw_rate_na ? '' : form.hw_rate} disabled={form.hw_rate_na}
+                  value={form.hw_rate_na || form.hw_not_submitted ? '' : form.hw_rate} disabled={form.hw_rate_na || form.hw_not_submitted}
                   onChange={e => setF('hw_rate', Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
-                  style={{ width: 80, textAlign: 'center', opacity: form.hw_rate_na ? 0.4 : 1, background: form.hw_rate_na ? bg : '#fff' }}
-                  placeholder={form.hw_rate_na ? '해당없음' : ''} />
-                <span style={{ color: form.hw_rate_na ? tx3 : tx2 }}>%</span>
+                  style={{ width: 80, textAlign: 'center', opacity: form.hw_rate_na || form.hw_not_submitted ? 0.4 : 1, background: form.hw_rate_na || form.hw_not_submitted ? bg : '#fff' }}
+                  placeholder={form.hw_rate_na ? '해당없음' : form.hw_not_submitted ? '미제출' : ''} />
+                <span style={{ color: form.hw_rate_na || form.hw_not_submitted ? tx3 : tx2 }}>%</span>
               </div>
             </div>
             <div className="fg">
