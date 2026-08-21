@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { kstNow } from '@/lib/kst'
 import TimeSlotInput from '@/components/TimeSlotInput'
+import * as XLSX from 'xlsx-js-style'
 
 const navy='#0D2A5E', navyDk='#071A3E', navyM='#E8EEF8'
 const gold='#D87E13', goldL='#F09830', bg='#F5F7FA', bd='#DDE3EE'
@@ -48,6 +49,97 @@ function calcMin(slots:Slot[]){
 function kstDateOf(utcStr:string){
   const s=/[Z+]/.test(utcStr.slice(10))?utcStr:utcStr+'Z'
   return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul'}).format(new Date(s))
+}
+function roleLabel(r:string){ return r==='admin'?'관리자':r==='assistant'?'조교':'선생님' }
+// 'H:MM' 형식 (엑셀 다운로드용 — 화면 표시용 fmtHours와는 별개)
+function minToHM(m:number){
+  const mm=Math.max(0,Math.round(m))
+  return `${Math.floor(mm/60)}:${String(mm%60).padStart(2,'0')}`
+}
+
+// ── 엑셀 스타일 상수 (앱 화면과 동일한 옅은 톤 팔레트 재사용) ──
+const XLSX_FONT_NAME='맑은 고딕'
+const XLSX_TXT={rgb:'1A1A1A'}
+const XLSX_NAVY={rgb:'0D2A5E'}
+const XLSX_BORDER_LINE={style:'thin' as const,color:{rgb:'CCCCCC'}}
+const XLSX_BORDER_ALL={top:XLSX_BORDER_LINE,bottom:XLSX_BORDER_LINE,left:XLSX_BORDER_LINE,right:XLSX_BORDER_LINE}
+const XLSX_TITLE_FILL={fgColor:{rgb:'E8EEF8'},patternType:'solid' as const}   // 옅은 네이비
+const XLSX_SUB_FILL={fgColor:{rgb:'FEF3E2'},patternType:'solid' as const}     // 옅은 골드
+const XLSX_HEADER_FILL={fgColor:{rgb:'E8EEF8'},patternType:'solid' as const}  // 옅은 네이비
+const XLSX_TOTAL_FILL={fgColor:{rgb:'FEF3E2'},patternType:'solid' as const}   // 옅은 골드
+const XLSX_APPROVED_FILL={fgColor:{rgb:'E0F5EB'},patternType:'solid' as const} // 옅은 초록
+const XLSX_APPROVED_TXT={rgb:'1A7F4E'}
+const XLSX_PENDING_FILL={fgColor:{rgb:'FEF3E2'},patternType:'solid' as const}  // 옅은 주황
+const XLSX_PENDING_TXT={rgb:'C05621'}
+function xlsxDataFill(rowIdxInData:number){
+  // 1번째(홀수) 데이터 행 = 흰색, 2번째(짝수) 데이터 행 = 아주 옅은 네이비 톤
+  return {fgColor:{rgb: rowIdxInData%2===1?'F5F7FA':'FFFFFF'},patternType:'solid' as const}
+}
+
+function xlsxSetCell(ws:XLSX.WorkSheet, r:number, c:number, style:XLSX.CellStyle){
+  const addr=XLSX.utils.encode_cell({r,c})
+  if(!ws[addr]) ws[addr]={t:'s',v:''}
+  ws[addr].s=style
+}
+
+// 시트 공통 스타일 적용 (제목 / 부제 / 헤더 / 데이터 / 합계 행)
+function xlsxStyleSheet(ws:XLSX.WorkSheet, opts:{
+  titleRow:number; subRow?:number; headerRow:number
+  dataStart:number; dataEnd:number; totalRow:number; colCount:number
+}){
+  const {titleRow,subRow,headerRow,dataStart,dataEnd,totalRow,colCount}=opts
+  xlsxSetCell(ws,titleRow,0,{font:{name:XLSX_FONT_NAME,sz:13,bold:true,color:XLSX_NAVY},fill:XLSX_TITLE_FILL,alignment:{horizontal:'left',vertical:'center'}})
+  if(subRow!=null) xlsxSetCell(ws,subRow,0,{font:{name:XLSX_FONT_NAME,sz:10,bold:true,color:{rgb:'D87E13'}},fill:XLSX_SUB_FILL,alignment:{horizontal:'left'}})
+  for(let c=0;c<colCount;c++){
+    xlsxSetCell(ws,headerRow,c,{
+      font:{name:XLSX_FONT_NAME,sz:10,bold:true,color:XLSX_NAVY},
+      fill:XLSX_HEADER_FILL, border:XLSX_BORDER_ALL,
+      alignment:{horizontal:'center',vertical:'center'},
+    })
+  }
+  for(let r=dataStart;r<=dataEnd;r++){
+    const fill=xlsxDataFill(r-dataStart)
+    for(let c=0;c<colCount;c++){
+      xlsxSetCell(ws,r,c,{
+        font:{name:XLSX_FONT_NAME,sz:10,color:XLSX_TXT},
+        fill, border:XLSX_BORDER_ALL,
+        alignment:{horizontal:c===0?'left':'center',vertical:'center'},
+      })
+    }
+  }
+  for(let c=0;c<colCount;c++){
+    xlsxSetCell(ws,totalRow,c,{
+      font:{name:XLSX_FONT_NAME,sz:10,bold:true,color:XLSX_NAVY},
+      fill:XLSX_TOTAL_FILL, border:XLSX_BORDER_ALL,
+      alignment:{horizontal:'center',vertical:'center'},
+    })
+  }
+}
+
+// 승인/대기 값에 따라 옅은 초록·주황으로 강조 (개별상세 시트의 '승인 상태' 열)
+function xlsxColorStatusColumn(ws:XLSX.WorkSheet, dataStart:number, dataEnd:number, col:number){
+  for(let r=dataStart;r<=dataEnd;r++){
+    const addr=XLSX.utils.encode_cell({r,c:col})
+    const cell=ws[addr]
+    if(!cell) continue
+    if(cell.v==='승인'){
+      xlsxSetCell(ws,r,col,{font:{name:XLSX_FONT_NAME,sz:10,bold:true,color:XLSX_APPROVED_TXT},fill:XLSX_APPROVED_FILL,border:XLSX_BORDER_ALL,alignment:{horizontal:'center',vertical:'center'}})
+    } else if(cell.v==='대기'){
+      xlsxSetCell(ws,r,col,{font:{name:XLSX_FONT_NAME,sz:10,bold:true,color:XLSX_PENDING_TXT},fill:XLSX_PENDING_FILL,border:XLSX_BORDER_ALL,alignment:{horizontal:'center',vertical:'center'}})
+    }
+  }
+}
+
+function xlsxSheetName(name:string, used:Set<string>){
+  const base=(name.replace(/[\\/?*[\]:]/g,'').trim()||'선생님').slice(0,31)
+  let candidate=base, n=2
+  while(used.has(candidate)){
+    const suffix='_'+n
+    candidate=base.slice(0,31-suffix.length)+suffix
+    n++
+  }
+  used.add(candidate)
+  return candidate
 }
 
 export default function TeachersPage(){
@@ -104,6 +196,85 @@ export default function TeachersPage(){
   }
 
   function toast(msg:string,ok=true){setNotif({msg,ok});setTimeout(()=>setNotif(null),3000)}
+
+  // 출근부 Excel 다운로드 (선택된 selYear/selMonth 기준)
+  function downloadAttendanceExcel(){
+    const approvedTeachers=teachers.filter(t=>t.approved)
+    if(approvedTeachers.length===0) return toast('승인된 선생님이 없습니다.',false)
+
+    const ymTitle=`${selYear}년 ${String(selMonth).padStart(2,'0')}월`
+    const wb=XLSX.utils.book_new()
+
+    // ── 시트 1: 월별 집계 요약 (근무시간은 승인된 기록만 반영, 근무시간이 없는 사람은 제외) ──
+    const perTeacherAll=approvedTeachers.map(t=>{
+      const logs=attLogs.filter(l=>l.teacher_id===t.user_id)
+      const approvedLogs=logs.filter(l=>l.approved)
+      const pendingCnt=logs.length-approvedLogs.length
+      const days=approvedLogs.length
+      const mins=approvedLogs.reduce((s,l)=>s+(l.work_minutes??0),0)
+      return {t,logs,pendingCnt,days,mins}
+    })
+    const perTeacher=perTeacherAll.filter(p=>p.mins>0)
+    if(perTeacher.length===0) return toast('승인된 근무시간이 있는 선생님이 없습니다.',false)
+
+    const sumDays=perTeacher.reduce((s,p)=>s+p.days,0)
+    const sumMins=perTeacher.reduce((s,p)=>s+p.mins,0)
+
+    const s1Header=['이름','역할','출근일수','총 근무시간(분)','총 근무시간(H:MM)','비고']
+    const s1Aoa=[
+      [`티처스 수학학원 출근부 — ${ymTitle}`],
+      s1Header,
+      ...perTeacher.map(({t,days,mins,pendingCnt})=>[t.name,roleLabel(t.role),days,mins,minToHM(mins),pendingCnt>0?`승인 대기 ${pendingCnt}건 제외`:'']),
+      ['합계','',sumDays,sumMins,minToHM(sumMins),''],
+    ]
+    const ws1=XLSX.utils.aoa_to_sheet(s1Aoa)
+    ws1['!merges']=[{s:{r:0,c:0},e:{r:0,c:5}}]
+    ws1['!cols']=[{wch:12},{wch:10},{wch:10},{wch:16},{wch:16},{wch:22}]
+    xlsxStyleSheet(ws1,{titleRow:0,headerRow:1,dataStart:2,dataEnd:2+perTeacher.length-1,totalRow:2+perTeacher.length,colCount:6})
+    XLSX.utils.book_append_sheet(wb,ws1,'월별 집계 요약')
+
+    // ── 시트 2~N: 선생님별 일별 상세 (평일만, 승인/대기 구분, 합계는 승인된 시간만) ──
+    const dim=new Date(selYear,selMonth,0).getDate()
+    const usedNames=new Set<string>()
+    for(const {t,logs} of perTeacher){
+      const rows:(string|number)[][]=[]
+      let mDays=0, mMins=0
+      for(let d=1;d<=dim;d++){
+        const dow=new Date(selYear,selMonth-1,d).getDay()
+        if(dow===0||dow===6) continue // 평일(월~금)만
+        const ds=`${selYear}-${String(selMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`
+        const log=logs.find(l=>l.date===ds)
+        if(log){
+          if(log.approved){ mDays++; mMins+=(log.work_minutes??0) }
+          rows.push([ds,DOW[dow],
+            log.clock_in?log.clock_in.slice(0,5):'-',
+            log.clock_out?log.clock_out.slice(0,5):'-',
+            log.work_minutes??'-',
+            log.work_minutes!=null?minToHM(log.work_minutes):'-',
+            log.approved?'승인':'대기',
+          ])
+        } else {
+          rows.push([ds,DOW[dow],'-','-','-','-','-'])
+        }
+      }
+      const avgMins=mDays>0?Math.round(mMins/mDays):0
+      const aoa=[
+        [`티처스 수학학원 출근부 — ${t.name}(${roleLabel(t.role)}) ${ymTitle}`],
+        [`출근일수(승인): ${mDays}일   총 근무시간(승인): ${minToHM(mMins)}   평균 근무시간: ${minToHM(avgMins)}`],
+        ['날짜','요일','출근 시간','퇴근 시간','근무시간(분)','근무시간(H:MM)','승인 상태'],
+        ...rows,
+        ['합계','','','',mMins,minToHM(mMins),''],
+      ]
+      const ws=XLSX.utils.aoa_to_sheet(aoa)
+      ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:6}},{s:{r:1,c:0},e:{r:1,c:6}}]
+      ws['!cols']=[{wch:12},{wch:6},{wch:12},{wch:12},{wch:14},{wch:16},{wch:12}]
+      xlsxStyleSheet(ws,{titleRow:0,subRow:1,headerRow:2,dataStart:3,dataEnd:3+rows.length-1,totalRow:3+rows.length,colCount:7})
+      xlsxColorStatusColumn(ws,3,3+rows.length-1,6)
+      XLSX.utils.book_append_sheet(wb,ws,xlsxSheetName(t.name,usedNames))
+    }
+
+    XLSX.writeFile(wb,`티처스 수학학원_출근부_${selYear}년${String(selMonth).padStart(2,'0')}월.xlsx`)
+  }
 
   async function toggleApprove(t:Teacher){
     const {error}=await supabase.from('teachers').update({approved:!t.approved}).eq('id',t.id)
@@ -189,6 +360,14 @@ export default function TeachersPage(){
   }
   function teacherName(uid:string){return teachers.find(t=>t.user_id===uid)?.name??uid.slice(0,8)}
 
+  // 선생님 목록 정렬 — 역할(관리자>선생님>조교) 순, 그다음 이름 순
+  const ROLE_ORDER:Record<string,number>={admin:0,teacher:1,assistant:2}
+  const sortedTeachers=[...teachers].sort((a,b)=>{
+    const ra=ROLE_ORDER[a.role]??99, rb=ROLE_ORDER[b.role]??99
+    if(ra!==rb) return ra-rb
+    return a.name.localeCompare(b.name,'ko')
+  })
+
   // 선생님별 집계
   const attSummary=teachers.filter(t=>t.approved).map(t=>{
     const logs=attLogs.filter(a=>a.teacher_id===t.user_id)
@@ -226,6 +405,8 @@ export default function TeachersPage(){
     .fi:focus{border-color:${navy};}
     .bnav{padding:7px 11px;border-radius:8px;font-size:12px;border:1px solid ${bd};background:#fff;cursor:pointer;color:${tx2};font-family:inherit;}
     .bnav:hover{border-color:${navy};color:${navy};}
+    .bxls{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:none;background:${gr};color:#fff;font-family:inherit;transition:background .15s;}
+    .bxls:hover{background:#156B40;}
   `
 
   return(
@@ -373,7 +554,7 @@ export default function TeachersPage(){
                 <tr><th>이름</th><th>이메일</th><th>연락처</th><th>역할</th><th>승인 상태</th><th>가입일</th><th>관리</th></tr>
               </thead>
               <tbody>
-                {teachers.map(t=>(
+                {sortedTeachers.map(t=>(
                   <tr key={t.id}>
                     <td style={{fontWeight:600}}>{t.name}</td>
                     <td style={{color:tx2}}>{t.email}</td>
@@ -431,13 +612,19 @@ export default function TeachersPage(){
                 setSelYear(y);setSelMonth(m+1)
               }}>›</button>
             </div>
-            <div style={{borderBottom:`1px solid ${bd}`,display:'flex',gap:2}}>
-              {['달력','선생님별'].map((t,i)=>(
-                <button key={i} className={`sub-tab${attTabIdx===i?' active':''}`}
-                  onClick={()=>{setAttTabIdx(i);setSelTeacher(null)}}>
-                  {t}
-                </button>
-              ))}
+            <div style={{display:'flex',alignItems:'center',gap:14}}>
+              <div style={{borderBottom:`1px solid ${bd}`,display:'flex',gap:2}}>
+                {['달력','선생님별'].map((t,i)=>(
+                  <button key={i} className={`sub-tab${attTabIdx===i?' active':''}`}
+                    onClick={()=>{setAttTabIdx(i);setSelTeacher(null)}}>
+                    {t}
+                  </button>
+                ))}
+              </div>
+              <button className="bxls" onClick={downloadAttendanceExcel}>
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg>
+                Excel 다운로드
+              </button>
             </div>
           </div>
 

@@ -63,10 +63,10 @@ export default function StudentsPage() {
   const [editId,   setEditId]   = useState<number | null>(null)
   const [saving,   setSaving]   = useState(false)
   const [search,   setSearch]   = useState('')
-  const [ageFlt,   setAgeFlt]   = useState('')
-  const [schoolFlt,setSchoolFlt]= useState('')
-  const [stageFlt, setStageFlt] = useState<SchoolKey | ''>('')
-  const [clsFlt,   setClsFlt]   = useState('')
+  const [ageFlt,   setAgeFlt]   = useState<string[]>([])
+  const [stageFlt, setStageFlt] = useState<SchoolKey[]>([])
+  const [clsFlt,   setClsFlt]   = useState<string[]>([])
+  const [schoolNameFlt, setSchoolNameFlt] = useState<string[]>([])
   const [notif,    setNotif]    = useState<{ msg: string; ok: boolean } | null>(null)
   const [noPhone,  setNoPhone]  = useState(false)
   const [detailStu,setDetailStu]= useState<Student | null>(null)
@@ -75,8 +75,18 @@ export default function StudentsPage() {
   const [schoolMiddle,     setSchoolMiddle]     = useState('')
   const [schoolHigh,       setSchoolHigh]       = useState('')
   const [noSchoolMap, setNoSchoolMap] = useState<Record<SchoolKey, boolean>>({ '초등': false, '중등': false, '고등': false })
+  const [parentPinMap, setParentPinMap] = useState<Record<string, string>>({})
 
   useEffect(() => { fetchAll() }, [])
+  useEffect(() => { if (role === 'admin') fetchParentPins() }, [role])
+
+  async function fetchParentPins() {
+    const { data: pp, error } = await supabase.from('parents').select('phone, pin')
+    if (error) { toast('학부모 PIN 조회 실패: ' + error.message, false); return }
+    const pmap: Record<string, string> = {}
+    for (const row of (pp ?? [])) pmap[row.phone] = row.pin ?? '0000'
+    setParentPinMap(pmap)
+  }
 
   async function fetchAll() {
     setLoading(true)
@@ -100,6 +110,7 @@ export default function StudentsPage() {
       smap[row.student_id].push({ school_type: row.school_type, school_name: row.school_name })
     }
     setSsMap(smap)
+
     setLoading(false)
   }
 
@@ -202,6 +213,7 @@ export default function StudentsPage() {
       .update({ pin: '0000' })
       .eq('phone', normalized)
     if (error) return toast('PIN 초기화 실패: ' + error.message, false)
+    setParentPinMap(m => ({ ...m, [normalized]: '0000' }))
     toast(`${studentName} 학부모 PIN이 초기화됐습니다`)
   }
 
@@ -238,20 +250,37 @@ export default function StudentsPage() {
 
   const filtered = students.filter(s => {
     const matchSearch = s.name.includes(search) || (s.school ?? '').includes(search)
-    const matchAge    = ageFlt === '' || String(ageOf(s.birth_year)) === ageFlt
-    const matchSchool = schoolFlt === '' || s.school === schoolFlt
-    const matchStage  = stageFlt === '' || s.school_type === stageFlt
-    const matchClass  = clsFlt === '' || (clsFlt === 'none' ? (csMap[s.id] ?? []).length === 0 : (csMap[s.id] ?? []).includes(Number(clsFlt)))
+    const matchAge    = ageFlt.length === 0 || ageFlt.includes(String(ageOf(s.birth_year)))
+    const matchStage  = stageFlt.length === 0 || (!!s.school_type && stageFlt.includes(s.school_type as SchoolKey))
+    const matchSchool = schoolNameFlt.length === 0 || schoolNameFlt.includes(s.school)
+    const matchClass  = clsFlt.length === 0 || clsFlt.some(f => f === 'none' ? (csMap[s.id] ?? []).length === 0 : (csMap[s.id] ?? []).includes(Number(f)))
     return matchSearch && matchAge && matchSchool && matchStage && matchClass
   })
 
-  const ageOptions    = [...new Set(students.map(s => ageOf(s.birth_year)))].sort((a, b) => a - b)
-  const schoolOptions = [...new Set(students.map(s => s.school).filter(Boolean))].sort()
-  const activeClasses = classes.filter(c => c.active !== false)
-  const hasActiveFilter = search !== '' || ageFlt !== '' || schoolFlt !== '' || stageFlt !== '' || clsFlt !== ''
+  const ageOptions       = [...new Set(students.map(s => ageOf(s.birth_year)))].sort((a, b) => a - b)
+  const activeClasses    = classes.filter(c => c.active !== false)
+  const schoolNameOptions = stageFlt.length === 0 ? [] : SCHOOL_TYPES
+    .filter(type => stageFlt.includes(type))
+    .flatMap(type => [...new Set(
+      students.filter(s => s.school_type === type && s.school).map(s => s.school)
+    )].sort())
+  const hasActiveFilter = search !== '' || ageFlt.length > 0 || schoolNameFlt.length > 0 || stageFlt.length > 0 || clsFlt.length > 0
+
+  function toggleIn<T>(setFn: (fn: (arr: T[]) => T[]) => void, val: T) {
+    setFn(arr => arr.includes(val) ? arr.filter(v => v !== val) : [...arr, val])
+  }
+
+  function toggleStage(type: SchoolKey) {
+    const next = stageFlt.includes(type) ? stageFlt.filter(v => v !== type) : [...stageFlt, type]
+    setStageFlt(next)
+    const validSchools = new Set(
+      students.filter(s => s.school_type && next.includes(s.school_type as SchoolKey) && s.school).map(s => s.school)
+    )
+    setSchoolNameFlt(sf => sf.filter(name => validSchools.has(name)))
+  }
 
   function resetFilters() {
-    setSearch(''); setAgeFlt(''); setSchoolFlt(''); setStageFlt(''); setClsFlt('')
+    setSearch(''); setAgeFlt([]); setSchoolNameFlt([]); setStageFlt([]); setClsFlt([])
   }
 
   function getStudentClasses(stuId: number) {
@@ -316,38 +345,31 @@ export default function StudentsPage() {
             전체 학생 <span style={{ fontSize:12,color:tx3,fontWeight:400 }}>{filtered.length}명</span>
           </span>
         </div>
-        {/* 검색 + 학교 드롭다운 */}
-        <div style={{ display:'flex',gap:20,alignItems:'flex-end',marginBottom:12,flexWrap:'wrap' }}>
+        {/* 검색 */}
+        <div style={{ display:'flex',gap:20,alignItems:'center',marginBottom:12,flexWrap:'wrap' }}>
           <div className="sbox" style={{ maxWidth:320 }}>
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke={tx3}><circle cx="11" cy="11" r="8" strokeWidth={2}/><path strokeWidth={2} d="M21 21l-4.35-4.35"/></svg>
             <input placeholder="이름 또는 학교 검색..." value={search} onChange={e => setSearch(e.target.value)} />
-          </div>
-          <div className="fgrp">
-            <p className="fgrp-lb">학교</p>
-            <select className="fsel" value={schoolFlt} onChange={e => setSchoolFlt(e.target.value)}>
-              <option value="">전체 학교</option>
-              {schoolOptions.map(sc => <option key={sc} value={sc}>{sc}</option>)}
-            </select>
           </div>
           {hasActiveFilter && (
             <button type="button" className="pill" onClick={resetFilters} style={{ color:re, borderColor:'transparent', background:rbg }}>필터 초기화</button>
           )}
         </div>
 
-        {/* 학교급 */}
+        {/* 학교급 (중복 선택 가능) */}
         <div className="fgrp" style={{ marginBottom:14 }}>
           <p className="fgrp-lb">학교급</p>
           <div style={{ display:'flex',gap:6,flexWrap:'wrap' }}>
-            <button type="button" className={`pill${stageFlt === '' ? ' active' : ''}`}
-              style={stageFlt === '' ? { background:navy, color:'#fff' } : undefined}
-              onClick={() => setStageFlt('')}>전체</button>
+            <button type="button" className={`pill${stageFlt.length === 0 ? ' active' : ''}`}
+              style={stageFlt.length === 0 ? { background:navy, color:'#fff' } : undefined}
+              onClick={() => { setStageFlt([]); setSchoolNameFlt([]) }}>전체</button>
             {SCHOOL_TYPES.map(type => {
-              const active = stageFlt === type
+              const active = stageFlt.includes(type)
               const col = SCHOOL_COLORS[type]
               return (
                 <button key={type} type="button" className={`pill${active ? ' active' : ''}`}
                   style={active ? { background:col.bg, color:col.color, borderColor:col.color } : undefined}
-                  onClick={() => setStageFlt(f => f === type ? '' : type)}>
+                  onClick={() => toggleStage(type)}>
                   {SCHOOL_LABELS[type]}
                 </button>
               )
@@ -355,19 +377,45 @@ export default function StudentsPage() {
           </div>
         </div>
 
-        {/* 나이 */}
+        {/* 학교 (학교급을 선택하면 해당 급의 학교만 버튼으로 노출, 중복 선택 가능) */}
+        {stageFlt.length > 0 && (
+          <div className="fgrp" style={{ marginBottom:14 }}>
+            <p className="fgrp-lb">학교</p>
+            {schoolNameOptions.length === 0 ? (
+              <p style={{ fontSize:12, color:tx3, margin:0 }}>선택한 학교급에 등록된 학교 정보가 없습니다</p>
+            ) : (
+              <div style={{ display:'flex',gap:6,flexWrap:'wrap' }}>
+                <button type="button" className={`pill${schoolNameFlt.length === 0 ? ' active' : ''}`}
+                  style={schoolNameFlt.length === 0 ? { background:navy, color:'#fff' } : undefined}
+                  onClick={() => setSchoolNameFlt([])}>전체</button>
+                {schoolNameOptions.map(sc => {
+                  const active = schoolNameFlt.includes(sc)
+                  return (
+                    <button key={sc} type="button" className={`pill${active ? ' active' : ''}`}
+                      style={active ? { background:navy, color:'#fff' } : undefined}
+                      onClick={() => toggleIn(setSchoolNameFlt, sc)}>
+                      {sc}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 나이 (중복 선택 가능) */}
         <div className="fgrp" style={{ marginBottom:14 }}>
           <p className="fgrp-lb">나이</p>
           <div style={{ display:'flex',gap:6,flexWrap:'wrap' }}>
-            <button type="button" className={`pill${ageFlt === '' ? ' active' : ''}`}
-              style={ageFlt === '' ? { background:navy, color:'#fff' } : undefined}
-              onClick={() => setAgeFlt('')}>전체</button>
+            <button type="button" className={`pill${ageFlt.length === 0 ? ' active' : ''}`}
+              style={ageFlt.length === 0 ? { background:navy, color:'#fff' } : undefined}
+              onClick={() => setAgeFlt([])}>전체</button>
             {ageOptions.map(age => {
-              const active = ageFlt === String(age)
+              const active = ageFlt.includes(String(age))
               return (
                 <button key={age} type="button" className={`pill${active ? ' active' : ''}`}
                   style={active ? { background:navy, color:'#fff' } : undefined}
-                  onClick={() => setAgeFlt(f => f === String(age) ? '' : String(age))}>
+                  onClick={() => toggleIn(setAgeFlt, String(age))}>
                   {age}세
                 </button>
               )
@@ -375,22 +423,22 @@ export default function StudentsPage() {
           </div>
         </div>
 
-        {/* 소속 반 (활성화된 반만) */}
+        {/* 소속 반 (활성화된 반만, 중복 선택 가능) */}
         <div className="fgrp" style={{ marginBottom:18 }}>
           <p className="fgrp-lb">소속 반</p>
           <div style={{ display:'flex',gap:6,flexWrap:'wrap' }}>
-            <button type="button" className={`pill${clsFlt === '' ? ' active' : ''}`}
-              style={clsFlt === '' ? { background:navy, color:'#fff' } : undefined}
-              onClick={() => setClsFlt('')}>전체</button>
-            <button type="button" className={`pill${clsFlt === 'none' ? ' active' : ''}`}
-              style={clsFlt === 'none' ? { background:tx3, color:'#fff' } : undefined}
-              onClick={() => setClsFlt(f => f === 'none' ? '' : 'none')}>미배정</button>
+            <button type="button" className={`pill${clsFlt.length === 0 ? ' active' : ''}`}
+              style={clsFlt.length === 0 ? { background:navy, color:'#fff' } : undefined}
+              onClick={() => setClsFlt([])}>전체</button>
+            <button type="button" className={`pill${clsFlt.includes('none') ? ' active' : ''}`}
+              style={clsFlt.includes('none') ? { background:tx3, color:'#fff' } : undefined}
+              onClick={() => toggleIn(setClsFlt, 'none')}>미배정</button>
             {activeClasses.map(c => {
-              const active = clsFlt === String(c.id)
+              const active = clsFlt.includes(String(c.id))
               return (
                 <button key={c.id} type="button" className={`pill${active ? ' active' : ''}`}
                   style={active ? { background:gbg, color:gr, borderColor:gr } : undefined}
-                  onClick={() => setClsFlt(f => f === String(c.id) ? '' : String(c.id))}>
+                  onClick={() => toggleIn(setClsFlt, String(c.id))}>
                   {c.name}
                 </button>
               )
@@ -436,19 +484,7 @@ export default function StudentsPage() {
                       <td style={{ color:tx2 }}>{ageOf(s.birth_year)}세</td>
                       <td style={{ color:tx2 }}>{s.school || '-'}</td>
                       {canFull && <td style={{ color:tx2 }}>{fmtPhone(s.phone)}</td>}
-                      {canFull && (
-                        <td>
-                          <div style={{ display:'flex',alignItems:'center',gap:6 }}>
-                            <span style={{ color:tx2 }}>{fmtPhone(s.parent_phone)}</span>
-                            {isAdmin && s.parent_phone && (
-                              <button className="bdng" style={{ padding:'2px 7px',fontSize:10 }}
-                                onClick={e => { e.stopPropagation(); resetParentPin(s.parent_phone, s.name) }}>
-                                PIN초기화
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      )}
+                      {canFull && <td style={{ color:tx2 }}>{fmtPhone(s.parent_phone)}</td>}
                       <td onClick={e => e.stopPropagation()}>
                         <div style={{ display:'flex',gap:4,flexWrap:'wrap' }}>
                           {activeClsIds.length > 0
@@ -705,7 +741,7 @@ export default function StudentsPage() {
 
               {/* 연락처 (admin만) */}
               {canFull && (
-                <div style={{ background:bg,borderRadius:10,padding:'14px 16px' }}>
+                <div style={{ background:bg,borderRadius:10,padding:'14px 16px',marginBottom: detailStu.parent_phone ? 14 : 0 }}>
                   <p style={{ fontSize:11,fontWeight:700,color:tx3,letterSpacing:1,margin:'0 0 10px' }}>연락처</p>
                   <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:10 }}>
                     <div>
@@ -716,6 +752,23 @@ export default function StudentsPage() {
                       <p style={{ fontSize:11,color:tx3,margin:'0 0 2px' }}>학부모</p>
                       <p style={{ fontSize:13,fontWeight:600,color:tx,margin:0 }}>{fmtPhone(detailStu.parent_phone)}</p>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 학부모 PIN (admin만) */}
+              {canFull && detailStu.parent_phone && (
+                <div style={{ background:bg,borderRadius:10,padding:'14px 16px' }}>
+                  <p style={{ fontSize:11,fontWeight:700,color:tx3,letterSpacing:1,margin:'0 0 10px' }}>학부모 PIN</p>
+                  <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between' }}>
+                    <p style={{ fontSize:18,fontWeight:700,color:tx,margin:0,letterSpacing:2 }}>
+                      {parentPinMap[detailStu.parent_phone.replace(/-/g,'')] ?? '0000'}
+                    </p>
+                    {isAdmin && (
+                      <button className="bdng" onClick={() => resetParentPin(detailStu.parent_phone, detailStu.name)}>
+                        PIN 초기화
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
