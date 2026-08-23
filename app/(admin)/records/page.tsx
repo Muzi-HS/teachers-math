@@ -30,7 +30,7 @@ type Rec = {
 
 const navy = '#0D2A5E', navyDk = '#071A3E', navyM = '#E8EEF8'
 const gold = '#D87E13', goldL = '#F09830'
-const hlYellow = '#F2B705', hlYellowBg = '#FFFBEA' // 안읽은 학부모 의견 카드 강조색
+const hlYellow = '#F2B705' // 학부모 의견 카드 강조 테두리색
 const bg = '#F5F7FA', bd = '#DDE3EE'
 const tx = '#0D1B36', tx2 = '#4B5C7E', tx3 = '#96A4BF'
 const re = '#C0392B', rbg = '#FDECEA', gr = '#1A7F4E', gbg = '#E0F5EB'
@@ -701,7 +701,7 @@ export default function RecordsPage() {
                 const cls = classes.find(c => c.id === recClsId(r))
                 const tItems = r.record_test_items ?? []
                 return (
-                  <div key={r.id} className="rc" style={isHighlighted(r) ? { border: `2px solid ${hlYellow}`, background: hlYellowBg } : undefined}>
+                  <div key={r.id} className="rc" style={isHighlighted(r) ? { border: `2px solid ${hlYellow}` } : undefined}>
                     {/* 카드 헤더 */}
                     <div className="rch">
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
