@@ -6,6 +6,7 @@ import { kstNow } from '@/lib/kst'
 import TimeSlotInput from '@/components/TimeSlotInput'
 import * as XLSX from 'xlsx-js-style'
 import { IconX } from '@/components/icons'
+import { useMobileMode } from '@/context/MobileModeContext'
 
 const navy='#0D2A5E', navyDk='#071A3E', navyM='#E8EEF8'
 const gold='#D87E13', goldL='#F09830', bg='#F5F7FA', bd='#DDE3EE'
@@ -145,6 +146,7 @@ function xlsxSheetName(name:string, used:Set<string>){
 
 export default function TeachersPage(){
   const { teacher: me } = useAuth()
+  const { mobileMode } = useMobileMode()
   const [tabIdx,     setTabIdx]     = useState(0)
   const [attTabIdx,  setAttTabIdx]  = useState(0) // 0=달력 1=선생님별
   const [teachers,   setTeachers]   = useState<Teacher[]>([])
@@ -431,7 +433,7 @@ export default function TeachersPage(){
   `
 
   return(
-    <div style={{padding:'28px 32px',fontFamily:"'Noto Sans KR',sans-serif"}}>
+    <div style={{padding:mobileMode?'16px 14px 88px':'28px 32px',fontFamily:"'Noto Sans KR',sans-serif"}}>
       <style>{css}</style>
 
       {notif&&(
@@ -557,13 +559,13 @@ export default function TeachersPage(){
         </div>
       )}
 
-      <div style={{marginBottom:20}}>
-        <h1 style={{fontSize:21,fontWeight:700,color:tx}}>선생님 관리</h1>
-        <p style={{fontSize:13,color:tx2,marginTop:4}}>선생님 승인, 역할 변경, 출근 현황을 관리합니다</p>
+      <div style={{marginBottom:mobileMode?14:20}}>
+        <h1 style={{fontSize:mobileMode?17:21,fontWeight:700,color:tx}}>선생님 관리</h1>
+        {!mobileMode && <p style={{fontSize:13,color:tx2,marginTop:4}}>선생님 승인, 역할 변경, 출근 현황을 관리합니다</p>}
       </div>
 
       {/* 메인 탭 */}
-      <div style={{borderBottom:`1px solid ${bd}`,marginBottom:20,display:'flex',gap:4}}>
+      <div style={{borderBottom:`1px solid ${bd}`,marginBottom:mobileMode?14:20,display:'flex',gap:4}}>
         {['선생님 목록','출근부'].map((t,i)=>(
           <button key={i} className={`tab-btn${tabIdx===i?' active':''}`}
             onClick={()=>{setTabIdx(i);setSelTeacher(null)}}>
@@ -578,6 +580,7 @@ export default function TeachersPage(){
           {loading?(
             <p style={{padding:24,color:tx3}}>불러오는 중...</p>
           ):(
+            <div style={{overflowX:'auto'}}>
             <table>
               <thead>
                 <tr><th>이름</th><th>이메일</th><th>연락처</th><th>역할</th><th>승인 상태</th><th>가입일</th><th>관리</th></tr>
@@ -614,6 +617,7 @@ export default function TeachersPage(){
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       )}
@@ -731,9 +735,10 @@ export default function TeachersPage(){
 
           {/* ── 선생님별 뷰 ── */}
           {attTabIdx===1&&(
-            <div style={{display:'grid',gridTemplateColumns:selTeacher?'1fr 1fr':'1fr',gap:16}}>
+            <div style={{display:'grid',gridTemplateColumns:mobileMode?'1fr':(selTeacher?'1fr 1fr':'1fr'),gap:16}}>
               {/* 선생님별 집계 */}
               <div style={{background:'#fff',borderRadius:12,border:`1px solid ${bd}`,boxShadow:'0 1px 4px rgba(0,0,0,.06)',overflow:'hidden'}}>
+                <div style={{overflowX:'auto'}}>
                 <table>
                   <thead>
                     <tr><th>이름</th><th>출근일</th><th>승인</th><th>대기</th><th>총 근무(승인)</th></tr>
@@ -754,6 +759,7 @@ export default function TeachersPage(){
                     )}
                   </tbody>
                 </table>
+                </div>
               </div>
 
               {/* 선택된 선생님 일별 상세 */}
@@ -763,6 +769,7 @@ export default function TeachersPage(){
                     <span style={{fontSize:13,fontWeight:700,color:tx}}>{selTeacher.name} — 일별 상세</span>
                     <button onClick={()=>setSelTeacher(null)} style={{background:'none',border:'none',cursor:'pointer',color:tx3,fontSize:16}}>×</button>
                   </div>
+                  <div style={{overflowX:'auto'}}>
                   <table>
                     <thead>
                       <tr><th>날짜</th><th>시간대</th><th>근무시간</th><th>승인</th><th>관리</th></tr>
@@ -800,6 +807,7 @@ export default function TeachersPage(){
                       })}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               )}
             </div>

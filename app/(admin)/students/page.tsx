@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { can } from '@/lib/permissions'
 import { kstDateStr, kstNow } from '@/lib/kst'
 import { IconUsers, IconLightbulb } from '@/components/icons'
+import { useMobileMode } from '@/context/MobileModeContext'
 
 type Student = {
   id: number
@@ -55,6 +56,7 @@ function highestSchoolEntry(entries: SchoolEntry[]): SchoolEntry | null {
 
 export default function StudentsPage() {
   const { role } = useAuth()
+  const { mobileMode } = useMobileMode()
   const [students, setStudents] = useState<Student[]>([])
   const [classes,  setClasses]  = useState<Class[]>([])
   const [csMap,    setCsMap]    = useState<Record<number, number[]>>({})
@@ -289,7 +291,7 @@ export default function StudentsPage() {
   }
 
   return (
-    <div style={{ padding: '28px 32px', fontFamily: "'Noto Sans KR',sans-serif" }}>
+    <div style={{ padding: mobileMode ? '16px 14px 88px' : '28px 32px', fontFamily: "'Noto Sans KR',sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
         table{width:100%;border-collapse:collapse;}
@@ -326,10 +328,10 @@ export default function StudentsPage() {
       )}
 
       {/* 헤더 */}
-      <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20 }}>
+      <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:mobileMode?14:20 }}>
         <div>
-          <h1 style={{ fontSize:21,fontWeight:700,color:tx }}>학생 관리</h1>
-          <p style={{ fontSize:13,color:tx2,marginTop:4 }}>학원에 등록된 전체 학생</p>
+          <h1 style={{ fontSize:mobileMode?17:21,fontWeight:700,color:tx }}>학생 관리</h1>
+          {!mobileMode && <p style={{ fontSize:13,color:tx2,marginTop:4 }}>학원에 등록된 전체 학생</p>}
         </div>
         {isAdmin && (
           <button className="bgold" onClick={openAdd}>
@@ -340,7 +342,7 @@ export default function StudentsPage() {
       </div>
 
       {/* 카드 */}
-      <div style={{ background:'#fff',borderRadius:12,border:`1px solid ${bd}`,padding:22,boxShadow:'0 1px 4px rgba(0,0,0,.06)' }}>
+      <div style={{ background:'#fff',borderRadius:12,border:`1px solid ${bd}`,padding:mobileMode?14:22,boxShadow:'0 1px 4px rgba(0,0,0,.06)' }}>
         <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16 }}>
           <span style={{ fontSize:14,fontWeight:600,color:tx }}>
             전체 학생 <span style={{ fontSize:12,color:tx3,fontWeight:400 }}>{filtered.length}명</span>
@@ -525,7 +527,7 @@ export default function StudentsPage() {
 
             <div style={{ padding:'18px 22px' }}>
               {/* 이름 + 출생연도 */}
-              <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:14 }}>
+              <div style={{ display:'grid',gridTemplateColumns:mobileMode?'1fr':'1fr 1fr',gap:12,marginBottom:14 }}>
                 <div>
                   <label className="lb">이름</label>
                   <input className="fi" value={form.name} onChange={e => setForm(f => ({...f, name:e.target.value}))} placeholder="학생 이름"/>
@@ -577,7 +579,7 @@ export default function StudentsPage() {
               </div>
 
               {/* 연락처 */}
-              <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:14 }}>
+              <div style={{ display:'grid',gridTemplateColumns:mobileMode?'1fr':'1fr 1fr',gap:12,marginBottom:14 }}>
                 <div>
                   <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:5 }}>
                     <label className="lb" style={{ margin:0 }}>학생 전화번호</label>
@@ -661,7 +663,7 @@ export default function StudentsPage() {
               {/* 기본 정보 */}
               <div style={{ background:bg,borderRadius:10,padding:'14px 16px',marginBottom:14 }}>
                 <p style={{ fontSize:11,fontWeight:700,color:tx3,letterSpacing:1,margin:'0 0 10px' }}>기본 정보</p>
-                <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:10 }}>
+                <div style={{ display:'grid',gridTemplateColumns:mobileMode?'1fr':'1fr 1fr',gap:10 }}>
                   <div>
                     <p style={{ fontSize:11,color:tx3,margin:'0 0 2px' }}>출생연도</p>
                     <p style={{ fontSize:13,fontWeight:600,color:tx,margin:0 }}>{detailStu.birth_year}년생</p>
@@ -744,7 +746,7 @@ export default function StudentsPage() {
               {canFull && (
                 <div style={{ background:bg,borderRadius:10,padding:'14px 16px',marginBottom: detailStu.parent_phone ? 14 : 0 }}>
                   <p style={{ fontSize:11,fontWeight:700,color:tx3,letterSpacing:1,margin:'0 0 10px' }}>연락처</p>
-                  <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:10 }}>
+                  <div style={{ display:'grid',gridTemplateColumns:mobileMode?'1fr':'1fr 1fr',gap:10 }}>
                     <div>
                       <p style={{ fontSize:11,color:tx3,margin:'0 0 2px' }}>학생</p>
                       <p style={{ fontSize:13,fontWeight:600,color:tx,margin:0 }}>{fmtPhone(detailStu.phone)}</p>

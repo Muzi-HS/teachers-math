@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { can, Role } from '@/lib/permissions'
 import { kstDateStr, kstNow } from '@/lib/kst'
 import { IconClock, IconLock } from '@/components/icons'
+import { useMobileMode } from '@/context/MobileModeContext'
 
 type Evt = {
     id: number
@@ -60,6 +61,7 @@ const DOW = ['일', '월', '화', '수', '목', '금', '토']
 
 export default function SchedulePage() {
     const { teacher, role } = useAuth()
+    const { mobileMode } = useMobileMode()
     const [evts, setEvts] = useState<Evt[]>([])
     const [loading, setLoading] = useState(true)
     const [modal, setModal] = useState(false)
@@ -205,10 +207,10 @@ export default function SchedulePage() {
     }
 
     return (
-        <div style={{ padding: '28px 32px', fontFamily: "'Noto Sans KR',sans-serif" }}>
+        <div style={{ padding: mobileMode ? '16px 14px 88px' : '28px 32px', fontFamily: "'Noto Sans KR',sans-serif" }}>
             <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
-        .cd{min-height:72px;background:#fff;border:1px solid ${bd};border-radius:8px;padding:6px;cursor:pointer;transition:background .15s;}
+        .cd{min-height:${mobileMode ? 46 : 72}px;background:#fff;border:1px solid ${bd};border-radius:8px;padding:${mobileMode ? '3px' : '6px'};cursor:pointer;transition:background .15s;}
         .cd:hover{background:rgba(13,42,94,.03);}
         .cd.tod{border-color:${navy};background:${navyM};}
         .cd.om{opacity:.4;cursor:default;}
@@ -241,10 +243,10 @@ export default function SchedulePage() {
             )}
 
             {/* 헤더 */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: mobileMode ? 14 : 20, flexWrap: 'wrap', gap: 10 }}>
                 <div>
-                    <h1 style={{ fontSize: 21, fontWeight: 700, color: tx }}>학원 일정</h1>
-                    <p style={{ fontSize: 13, color: tx2, marginTop: 4 }}>달력에서 일정을 확인하고 추가하세요</p>
+                    <h1 style={{ fontSize: mobileMode ? 17 : 21, fontWeight: 700, color: tx }}>학원 일정</h1>
+                    {!mobileMode && <p style={{ fontSize: 13, color: tx2, marginTop: 4 }}>달력에서 일정을 확인하고 추가하세요</p>}
                 </div>
                 {canWrite && (
                     <button className="bgold" onClick={() => openAdd()}>
@@ -255,7 +257,7 @@ export default function SchedulePage() {
             </div>
 
             {/* 달력 */}
-            <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: 22, boxShadow: '0 1px 4px rgba(0,0,0,.06)', marginBottom: 18 }}>
+            <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: mobileMode ? 12 : 22, boxShadow: '0 1px 4px rgba(0,0,0,.06)', marginBottom: mobileMode ? 12 : 18 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                     <button className="bnav" onClick={() => moveMo(-1)}>◀</button>
                     <span style={{ fontSize: 16, fontWeight: 700, color: tx }}>{yr}년 {mo + 1}월</span>
@@ -327,7 +329,7 @@ export default function SchedulePage() {
             </div>
 
             {/* 이번달 목록 */}
-            <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: 22, boxShadow: '0 1px 4px rgba(0,0,0,.06)' }}>
+            <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: mobileMode ? 14 : 22, boxShadow: '0 1px 4px rgba(0,0,0,.06)' }}>
                 <h2 style={{ fontSize: 14, fontWeight: 600, color: tx, marginBottom: 14 }}>{mo + 1}월 일정 목록</h2>
                 {loading ? (
                     <p style={{ color: tx3, fontSize: 13 }}>불러오는 중...</p>
@@ -336,7 +338,7 @@ export default function SchedulePage() {
                         <p style={{ fontSize: 14 }}>이번달 일정이 없습니다</p>
                     </div>
                 ) : evts.map(e => (
-                    <div key={e.id} style={{ padding: '10px 0', borderBottom: `1px solid ${bd}`, display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div key={e.id} style={{ padding: '10px 0', borderBottom: `1px solid ${bd}`, display: 'flex', alignItems: 'center', gap: 10, flexWrap: mobileMode ? 'wrap' : 'nowrap' }}>
                         <span style={{
                             fontSize: 10, padding: '2px 7px', borderRadius: 3, flexShrink: 0,
                             background: e.type === 'holiday' ? 'rgba(222,53,11,.15)' : navyM,
@@ -378,7 +380,7 @@ export default function SchedulePage() {
                                 <input className="fi" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="일정 제목" />
                             </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: mobileMode ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 14 }}>
                                 <div>
                                     <label className="lb">시작 날짜</label>
                                     <input type="date" className="fi" value={form.start_date} onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))} />
@@ -404,7 +406,7 @@ export default function SchedulePage() {
                             </div>
 
                             {form.useTime && (
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: mobileMode ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 14 }}>
                                     <div>
                                         <label className="lb">시작 시간</label>
                                         <input type="time" className="fi" value={form.start_time} onChange={e => setForm(f => ({ ...f, start_time: e.target.value }))} />
@@ -416,7 +418,7 @@ export default function SchedulePage() {
                                 </div>
                             )}
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: mobileMode ? '1fr' : '1fr 1fr', gap: 14, marginBottom: 14 }}>
                                 <div>
                                     <label className="lb">종류</label>
                                     <div className="rr">

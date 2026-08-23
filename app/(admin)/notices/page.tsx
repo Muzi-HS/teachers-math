@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { can, Role } from '@/lib/permissions'
 import { kstDateOf, kstDateStr } from '@/lib/kst'
 import { IconBell, IconPin } from '@/components/icons'
+import { useMobileMode } from '@/context/MobileModeContext'
 
 type Notice = {
   id: number
@@ -39,6 +40,7 @@ const gr      = '#1A7F4E'
 
 export default function NoticesPage() {
   const { teacher, role } = useAuth()
+  const { mobileMode } = useMobileMode()
   const [notices, setNotices] = useState<Notice[]>([])
   const [loading, setLoading] = useState(true)
   const [modal,   setModal]   = useState(false)
@@ -107,7 +109,7 @@ export default function NoticesPage() {
   }
 
   return (
-    <div style={{ padding: '28px 32px', fontFamily: "'Noto Sans KR', sans-serif" }}>
+    <div style={{ padding: mobileMode ? '16px 14px 88px' : '28px 32px', fontFamily: "'Noto Sans KR', sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
         .btn-outline { display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:8px; font-size:12px; font-weight:500; cursor:pointer; border:1px solid ${bd}; background:transparent; color:${tx2}; transition:all .15s; font-family:inherit; }
@@ -140,10 +142,10 @@ export default function NoticesPage() {
       )}
 
       {/* 헤더 */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: mobileMode ? 14 : 20 }}>
         <div>
-          <h1 style={{ fontSize: 21, fontWeight: 700, color: tx }}>학원 공지사항</h1>
-          <p style={{ fontSize: 13, color: tx2, marginTop: 4 }}>전체 공지사항 관리</p>
+          <h1 style={{ fontSize: mobileMode ? 17 : 21, fontWeight: 700, color: tx }}>학원 공지사항</h1>
+          {!mobileMode && <p style={{ fontSize: 13, color: tx2, marginTop: 4 }}>전체 공지사항 관리</p>}
         </div>
         {canWrite && (
           <button className="btn-gold" onClick={openAdd}>
@@ -170,17 +172,19 @@ export default function NoticesPage() {
       ) : (
         <div style={{ background: '#fff', border: `1px solid ${bd}`, borderRadius: 10, overflow: 'hidden' }}>
 
-          {/* 헤더 행 */}
-          <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 90px 80px 108px', gap: 8, padding: '11px 16px', background: bg, borderBottom: `1px solid ${bd}`, fontSize: 11, fontWeight: 600, color: tx3 }}>
-            <div style={{ textAlign: 'center' }}>번호</div>
-            <div>제목</div>
-            <div style={{ textAlign: 'center' }}>공개여부</div>
-            <div style={{ textAlign: 'center' }}>등록일</div>
-            <div style={{ textAlign: 'center' }}>관리</div>
-          </div>
+          {/* 헤더 행 (모바일에서는 카드형으로 바뀌므로 생략) */}
+          {!mobileMode && (
+            <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 90px 80px 108px', gap: 8, padding: '11px 16px', background: bg, borderBottom: `1px solid ${bd}`, fontSize: 11, fontWeight: 600, color: tx3 }}>
+              <div style={{ textAlign: 'center' }}>번호</div>
+              <div>제목</div>
+              <div style={{ textAlign: 'center' }}>공개여부</div>
+              <div style={{ textAlign: 'center' }}>등록일</div>
+              <div style={{ textAlign: 'center' }}>관리</div>
+            </div>
+          )}
 
           {pinnedList.map((n, i) => (
-            <BoardRow key={n.id} notice={n} index="공지" pinned canWrite={canWrite}
+            <BoardRow key={n.id} notice={n} index="공지" pinned canWrite={canWrite} mobile={mobileMode}
               onClick={() => setDetail(n)} onEdit={() => openEdit(n)} onDelete={() => remove(n.id)}
               isLast={i === pinnedList.length - 1 && normalList.length === 0} />
           ))}
@@ -190,7 +194,7 @@ export default function NoticesPage() {
           )}
 
           {normalList.map((n, i) => (
-            <BoardRow key={n.id} notice={n} index={normalList.length - i} pinned={false} canWrite={canWrite}
+            <BoardRow key={n.id} notice={n} index={normalList.length - i} pinned={false} canWrite={canWrite} mobile={mobileMode}
               onClick={() => setDetail(n)} onEdit={() => openEdit(n)} onDelete={() => remove(n.id)}
               isLast={i === normalList.length - 1} />
           ))}
@@ -273,7 +277,7 @@ export default function NoticesPage() {
               </div>
 
               {/* 고정 여부 + 학부모 열람 — 2칸 그리드 */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: mobileMode ? '1fr' : '1fr 1fr', gap: 14, marginBottom: 14 }}>
                 <div>
                   <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: tx2, marginBottom: 5 }}>고정 여부</label>
                   <div className="radio-row">
@@ -328,8 +332,8 @@ export default function NoticesPage() {
 }
 
 // ── 게시판 행 (네이버카페 스타일) ──
-function BoardRow({ notice, index, pinned, canWrite, onClick, onEdit, onDelete, isLast }: {
-  notice: Notice; index: number | string; pinned: boolean; canWrite: boolean
+function BoardRow({ notice, index, pinned, canWrite, mobile, onClick, onEdit, onDelete, isLast }: {
+  notice: Notice; index: number | string; pinned: boolean; canWrite: boolean; mobile?: boolean
   onClick: () => void; onEdit: () => void; onDelete: () => void; isLast: boolean
 }) {
   const navy = '#0D2A5E', gold = '#D87E13', bd = '#DDE3EE'
@@ -338,6 +342,48 @@ function BoardRow({ notice, index, pinned, canWrite, onClick, onEdit, onDelete, 
 
   function isNew(createdAt: string) {
     return Date.now() - new Date(createdAt).getTime() < 24 * 60 * 60 * 1000
+  }
+
+  const visBadge = notice.parent_visible
+    ? <span style={{ background: gbg, color: gr, fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 4 }}>학부모공개</span>
+    : <span style={{ background: rbg, color: re, fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 4 }}>비공개</span>
+
+  if (mobile) {
+    return (
+      <div
+        onClick={onClick}
+        style={{
+          padding: '12px 14px', cursor: 'pointer',
+          background: pinned ? '#FEFAF3' : '#fff',
+          borderBottom: isLast ? 'none' : `1px solid ${bd}`,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+          {pinned
+            ? <span style={{ background: gold, color: '#fff', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, flexShrink: 0 }}>공지</span>
+            : <span style={{ fontSize: 11, color: tx3, flexShrink: 0 }}>{index}</span>
+          }
+          <span style={{ fontSize: 13, fontWeight: pinned ? 700 : 500, color: tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{notice.title}</span>
+          {isNew(notice.created_at) && <span style={{ color: re, fontSize: 11, fontWeight: 700, flexShrink: 0 }}>N</span>}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          {visBadge}
+          <span style={{ fontSize: 11, color: tx3 }}>{kstDateOf(notice.created_at)}</span>
+          {canWrite && (
+            <div style={{ display: 'flex', gap: 5, marginLeft: 'auto' }}>
+              <button
+                onClick={e => { e.stopPropagation(); onEdit() }}
+                style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 500, cursor: 'pointer', border: `1px solid ${bd}`, background: 'transparent', color: tx2, fontFamily: 'inherit' }}
+              >수정</button>
+              <button
+                onClick={e => { e.stopPropagation(); onDelete() }}
+                style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 500, cursor: 'pointer', border: 'none', background: rbg, color: re, fontFamily: 'inherit' }}
+              >삭제</button>
+            </div>
+          )}
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -369,12 +415,7 @@ function BoardRow({ notice, index, pinned, canWrite, onClick, onEdit, onDelete, 
         )}
       </div>
 
-      <div style={{ textAlign: 'center' }}>
-        {notice.parent_visible
-          ? <span style={{ background: gbg, color: gr, fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 4 }}>학부모공개</span>
-          : <span style={{ background: rbg, color: re, fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 4 }}>비공개</span>
-        }
-      </div>
+      <div style={{ textAlign: 'center' }}>{visBadge}</div>
 
       <div style={{ textAlign: 'center', fontSize: 11, color: tx3 }}>{kstDateOf(notice.created_at)}</div>
 

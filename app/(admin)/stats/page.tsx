@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { IconArrowLeft, IconInbox, IconClipboard } from '@/components/icons'
+import { useMobileMode } from '@/context/MobileModeContext'
 
 type Student = { id:number; name:string; birth_year:number; school:string }
 type Class_  = { id:number; name:string }
@@ -25,6 +26,7 @@ function rateBg(v:number){    return v>=80?'#E0F5EB':v>=60?'#FEF3E2':'#FDECEA' }
 function ageOf(b:number){ return new Date().getFullYear()-b+1 }
 
 export default function StatsPage(){
+  const { mobileMode } = useMobileMode()
   const [students, setStudents] = useState<Student[]>([])
   const [classes,  setClasses]  = useState<Class_[]>([])
   const [csMap,    setCsMap]    = useState<Record<number,number>>({})
@@ -138,19 +140,22 @@ export default function StatsPage(){
   `
 
   return (
-    <div style={{padding:'28px 32px',fontFamily:"'Noto Sans KR',sans-serif"}}>
+    <div style={{padding:mobileMode?'16px 14px 88px':'28px 32px',fontFamily:"'Noto Sans KR',sans-serif"}}>
       <style>{css}</style>
 
-      <div style={{marginBottom:20}}>
-        <h1 style={{fontSize:21,fontWeight:700,color:tx}}>통계</h1>
-        <p style={{fontSize:13,color:tx2,marginTop:4}}>학생별 성취도 분석</p>
-      </div>
+      {(!mobileMode || !selStu) && (
+        <div style={{marginBottom:mobileMode?14:20}}>
+          <h1 style={{fontSize:mobileMode?17:21,fontWeight:700,color:tx}}>통계</h1>
+          {!mobileMode && <p style={{fontSize:13,color:tx2,marginTop:4}}>학생별 성취도 분석</p>}
+        </div>
+      )}
 
       {/* ════ 좌측 고정 사이드바 + 우측 본문 ════ */}
-      <div style={{display:'grid',gridTemplateColumns:'280px 1fr',gap:16,alignItems:'start'}}>
+      <div style={{display:'grid',gridTemplateColumns:mobileMode?'1fr':'280px 1fr',gap:16,alignItems:'start'}}>
 
-        {/* 좌측: 학생 검색 + 목록 (항상 고정) */}
-        <div style={{background:'#fff',borderRadius:12,border:`1px solid ${bd}`,padding:16,boxShadow:'0 1px 4px rgba(0,0,0,.06)',position:'sticky',top:16}}>
+        {/* 좌측: 학생 검색 + 목록 (항상 고정, 모바일은 학생 선택 전에만) */}
+        {(!mobileMode || !selStu) && (
+        <div style={{background:'#fff',borderRadius:12,border:`1px solid ${bd}`,padding:16,boxShadow:'0 1px 4px rgba(0,0,0,.06)',position:mobileMode?undefined:'sticky',top:16}}>
           <div className="sbox" style={{marginBottom:12}}>
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke={tx3}><circle cx="11" cy="11" r="8" strokeWidth={2}/><path strokeWidth={2} d="M21 21l-4.35-4.35"/></svg>
             <input placeholder="학생 이름 검색..." value={search} onChange={e=>setSearch(e.target.value)}/>
@@ -174,8 +179,10 @@ export default function StatsPage(){
             })}
           </div>
         </div>
+        )}
 
         {/* 우측: 선택된 학생 본문 */}
+        {(!mobileMode || selStu) && (
         <div>
           {!selStu?(
             <div style={{background:'#fff',borderRadius:12,border:`1px solid ${bd}`,padding:'80px 0',textAlign:'center',color:tx3}}>
@@ -184,6 +191,11 @@ export default function StatsPage(){
             </div>
           ):(
             <>
+              {mobileMode && (
+                <button onClick={clearStu} style={{ display:'flex', alignItems:'center', gap:5, border:'none', background:'none', cursor:'pointer', color:tx2, fontSize:12, padding:0, marginBottom:10, fontFamily:'inherit' }}>
+                  <IconArrowLeft size={13} /> 목록으로
+                </button>
+              )}
               {/* 헤더 카드 */}
               <div style={{background:'#fff',borderRadius:12,border:`1px solid ${bd}`,padding:18,marginBottom:14,boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
                 <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16}}>
@@ -198,7 +210,7 @@ export default function StatsPage(){
                 </div>
 
                 {/* 통계 요약 4칸 */}
-                <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12}}>
+                <div style={{display:'grid',gridTemplateColumns:mobileMode?'repeat(2,1fr)':'repeat(4,1fr)',gap:12}}>
                   <div className="stat-card" style={{background:'#fff'}}>
                     <p style={{fontSize:11,color:tx3,marginBottom:8}}>숙제 이행률 평균</p>
                     <p style={{fontSize:22,fontWeight:700,color:avgHwRate!=null?rateColor(avgHwRate):tx3,marginBottom:8}}>
@@ -234,7 +246,7 @@ export default function StatsPage(){
               ):(
                 <>
                   {/* 꺾은선 그래프 2개 */}
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:16}}>
+                  <div style={{display:'grid',gridTemplateColumns:mobileMode?'1fr':'1fr 1fr',gap:16,marginBottom:16}}>
                     <div style={{background:'#fff',borderRadius:12,border:`1px solid ${bd}`,padding:18,boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
                       <div style={{fontSize:13,fontWeight:600,color:tx,marginBottom:12}}>숙제 이행률 추이</div>
                       <ResponsiveContainer width="100%" height={180}>
@@ -275,7 +287,7 @@ export default function StatsPage(){
                     {testRecs.length===0?(
                       <p style={{textAlign:'center',color:tx3,fontSize:13,padding:'20px 0'}}>응시한 테스트가 없습니다</p>
                     ):(
-                      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(380px, 1fr))',gap:10}}>
+                      <div style={{display:'grid',gridTemplateColumns:mobileMode?'1fr':'repeat(auto-fill, minmax(380px, 1fr))',gap:10}}>
                         <TestList recs={testRecs} studentId={selStu.id}/>
                       </div>
                     )}
@@ -284,7 +296,7 @@ export default function StatsPage(){
                   {/* 전체 수업 기록 목록 */}
                   <div style={{background:'#fff',borderRadius:12,border:`1px solid ${bd}`,padding:18,boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
                     <div style={{fontSize:14,fontWeight:600,color:tx,marginBottom:14}}>수업 기록 목록</div>
-                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(420px, 1fr))',gap:14}}>
+                    <div style={{display:'grid',gridTemplateColumns:mobileMode?'1fr':'repeat(auto-fill, minmax(420px, 1fr))',gap:14}}>
                     {sortedRecs.map(r=>(
                       <div key={r.id} className="rc">
                     <div className="rch">
@@ -384,6 +396,7 @@ export default function StatsPage(){
             </>
           )}
         </div>
+        )}
       </div>
     </div>
   )

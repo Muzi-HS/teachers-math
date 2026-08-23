@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext'
 import { menuAccess, Role } from '@/lib/permissions'
 import { supabase } from '@/lib/supabase'
 import { isUnreadParentComment } from '@/lib/records'
+import { useMobileMode } from '@/context/MobileModeContext'
 
 const NAV = [
   { key: 'dashboard', href: '/dashboard', label: '대시보드',
@@ -37,11 +38,17 @@ const NAV = [
     icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM14 20h3M20 14v3M20 20v.01M17 17h.01"/></svg> },
 ]
 
+const NAV_ORDER_KEY = 'admin_mobile_nav_order'
+
 export default function Sidebar() {
   const [expanded, setExpanded] = useState(true)
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [editMode, setEditMode] = useState(false)
+  const [navOrder, setNavOrderState] = useState<string[]>([])
   const pathname = usePathname()
   const router   = useRouter()
   const { teacher, role, logout } = useAuth()
+  const { mobileMode } = useMobileMode()
   const [unreadInquiries, setUnreadInquiries] = useState(0)
   const [unreadComments, setUnreadComments] = useState(0)
 
@@ -73,6 +80,9 @@ export default function Sidebar() {
     return () => { cancelled = true; clearInterval(iv) }
   }, [role, pathname])
 
+  // 모바일 모드에서는 메뉴 이동 시 자동으로 드로어/편집모드를 닫는다
+  useEffect(() => { setDrawerOpen(false); setEditMode(false) }, [pathname])
+
   const W = expanded ? 130 : 58
 
   const visibleNav = role
@@ -81,6 +91,43 @@ export default function Sidebar() {
         (menuAccess[item.key]?.(role as Role) ?? false)
       )
     : []
+
+  // 모바일 하단바 순서 — 기기에 저장된 순서를 불러오고, 새로 추가되거나 권한이 바뀌어
+  // 새로 보이는 메뉴는 뒤쪽에 자동으로 붙여준다
+  useEffect(() => {
+    if (!role) return
+    const navOnly = visibleNav.filter(item => !item.key.startsWith('divider'))
+    const defaultOrder = navOnly.map(i => i.key)
+    let saved: string[] = []
+    try { saved = JSON.parse(localStorage.getItem(NAV_ORDER_KEY) ?? '[]') } catch {}
+    const savedValid = saved.filter(k => defaultOrder.includes(k))
+    const merged = [...savedValid, ...defaultOrder.filter(k => !savedValid.includes(k))]
+    setNavOrderState(merged)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role])
+
+  function setNavOrder(updater: (prev: string[]) => string[]) {
+    setNavOrderState(prev => {
+      const next = updater(prev)
+      try { localStorage.setItem(NAV_ORDER_KEY, JSON.stringify(next)) } catch {}
+      return next
+    })
+  }
+
+  function moveNav(key: string, dir: -1 | 1) {
+    setNavOrder(order => {
+      const idx = order.indexOf(key)
+      const newIdx = idx + dir
+      if (idx < 0 || newIdx < 0 || newIdx >= order.length) return order
+      const copy = [...order]
+      ;[copy[idx], copy[newIdx]] = [copy[newIdx], copy[idx]]
+      return copy
+    })
+  }
+
+  function unreadCountOf(key: string) {
+    return key === 'inquiries' ? unreadInquiries : key === 'records' ? unreadComments : 0
+  }
 
   const css = `
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Montserrat:wght@700;800&display=swap');
@@ -111,7 +158,167 @@ export default function Sidebar() {
       box-shadow: 3px 0 6px rgba(0,0,0,.07); z-index: 10; color: #B0B8CC;
     }
     .toggle-btn:hover { color: #0D2A5E; }
+    .mnav-bar {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 200;
+      background: #fff; border-top: 1px solid #EEF0F5;
+      box-shadow: 0 -2px 10px rgba(0,0,0,.06);
+      display: flex; padding-bottom: env(safe-area-inset-bottom);
+    }
+    .mnav-tab {
+      flex: 1; border: none; background: none; cursor: pointer;
+      font-family: 'Noto Sans KR', sans-serif;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 3px; padding: 8px 2px 7px; color: #96A4BF; position: relative;
+    }
+    .mnav-tab.active { color: #0D2A5E; }
+    .mnav-backdrop {
+      position: fixed; inset: 0; background: rgba(13,27,54,.45); z-index: 199;
+    }
+    .mnav-sheet {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 200;
+      max-height: 70vh; background: #fff;
+      border-radius: 16px 16px 0 0;
+      display: flex; flex-direction: column;
+      box-shadow: 0 -8px 30px rgba(0,0,0,.15);
+      overflow-y: auto;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    .mnav-edit-btn {
+      border: none; background: #F5F7FA; color: #4B5C7E; cursor: pointer;
+      font-family: 'Noto Sans KR', sans-serif; font-size: 12px; font-weight: 600;
+      padding: 5px 12px; border-radius: 20px;
+    }
+    .mnav-edit-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 18px; color: #0D1B36;
+    }
+    .mnav-move-btn {
+      border: 1px solid #DDE3EE; background: #fff; color: #4B5C7E; cursor: pointer;
+      width: 26px; height: 26px; border-radius: 6px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .mnav-move-btn:disabled { opacity: .3; cursor: default; }
+    .mnav-section-lb {
+      padding: 10px 18px 4px; font-size: 11px; font-weight: 600; color: #96A4BF; letter-spacing: .3px;
+    }
   `
+
+  function NavButton({ item, big }: { item: typeof NAV[number]; big?: boolean }) {
+    const active = pathname === item.href || pathname.startsWith(item.href + '/')
+    const unreadCount = unreadCountOf(item.key)
+    return (
+      <button
+        className={`sb-tab${active ? ' active' : ''}`}
+        onClick={() => router.push(item.href)}
+        title={!expanded && !big ? item.label : ''}
+        style={
+          big
+            ? { height: 46, padding: '0 18px', gap: 12, justifyContent: 'flex-start' }
+            : expanded
+              ? { height: 42, padding: '0 16px', gap: 10, justifyContent: 'flex-start' }
+              : { height: 48, justifyContent: 'center', flexDirection: 'column', gap: 3 }
+        }
+      >
+        <span style={{ flexShrink: 0, display: 'flex', position: 'relative' }}>
+          {item.icon}
+          {unreadCount > 0 && (
+            <span style={{
+              position: 'absolute', top: -3, right: -5,
+              width: 8, height: 8, borderRadius: '50%',
+              background: '#C0392B', border: '1.5px solid #fff',
+            }} />
+          )}
+        </span>
+        {(big || expanded)
+          ? <span style={{ fontSize: big ? 13 : 12, display: 'flex', alignItems: 'center', gap: 5 }}>
+              {item.label}
+              {unreadCount > 0 && (
+                <span style={{ fontSize: 10, fontWeight: 700, color: '#C0392B' }}>{unreadCount}</span>
+              )}
+            </span>
+          : <span style={{ fontSize: 8, fontWeight: 600 }}>{item.label}</span>
+        }
+      </button>
+    )
+  }
+
+  if (mobileMode) {
+    const navOnly = visibleNav.filter(item => !item.key.startsWith('divider'))
+    const navByKey: Record<string, typeof NAV[number]> = {}
+    for (const item of navOnly) navByKey[item.key] = item
+    const orderedNav = navOrder.map(k => navByKey[k]).filter(Boolean)
+    const primary = orderedNav.slice(0, 4)
+    const rest = orderedNav.slice(4)
+    const restActive = rest.some(item => pathname === item.href || pathname.startsWith(item.href + '/'))
+
+    return (
+      <>
+        <style>{css}</style>
+        <nav className="mnav-bar">
+          {primary.map(item => {
+            const active = pathname === item.href || pathname.startsWith(item.href + '/')
+            const unreadCount = unreadCountOf(item.key)
+            return (
+              <button key={item.key} className={`mnav-tab${active ? ' active' : ''}`} onClick={() => router.push(item.href)}>
+                <span style={{ display: 'flex', position: 'relative' }}>
+                  {item.icon}
+                  {unreadCount > 0 && (
+                    <span style={{ position: 'absolute', top: -3, right: -5, width: 8, height: 8, borderRadius: '50%', background: '#C0392B', border: '1.5px solid #fff' }} />
+                  )}
+                </span>
+                <span style={{ fontSize: 10, fontWeight: active ? 700 : 500 }}>{item.label}</span>
+              </button>
+            )
+          })}
+          {rest.length > 0 && (
+            <button className={`mnav-tab${restActive ? ' active' : ''}`} onClick={() => setDrawerOpen(o => !o)}>
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" />
+              </svg>
+              <span style={{ fontSize: 10, fontWeight: restActive ? 700 : 500 }}>더보기</span>
+            </button>
+          )}
+        </nav>
+        {drawerOpen && (
+          <>
+            <div className="mnav-backdrop" onClick={() => { setDrawerOpen(false); setEditMode(false) }} />
+            <nav className="mnav-sheet">
+              <div style={{ padding: '14px 18px 4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#0D1B36' }}>전체 메뉴</span>
+                <button className="mnav-edit-btn" onClick={() => setEditMode(e => !e)}>{editMode ? '완료' : '편집'}</button>
+              </div>
+
+              {editMode ? (
+                <>
+                  <p style={{ padding: '4px 18px 8px', fontSize: 11, color: '#96A4BF' }}>
+                    화살표로 순서를 바꾸면 위 4개가 하단 메뉴바에 표시됩니다
+                  </p>
+                  {orderedNav.map((item, idx) => (
+                    <div key={item.key}>
+                      {idx === 0 && <div className="mnav-section-lb">하단 메뉴바</div>}
+                      {idx === 4 && <div className="mnav-section-lb">더보기 목록</div>}
+                      <div className="mnav-edit-row">
+                        <span style={{ display: 'flex', flexShrink: 0 }}>{item.icon}</span>
+                        <span style={{ flex: 1, fontSize: 13 }}>{item.label}</span>
+                        <button className="mnav-move-btn" disabled={idx === 0} onClick={() => moveNav(item.key, -1)} aria-label="위로">
+                          <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path d="M18 15l-6-6-6 6" /></svg>
+                        </button>
+                        <button className="mnav-move-btn" disabled={idx === orderedNav.length - 1} onClick={() => moveNav(item.key, 1)} aria-label="아래로">
+                          <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path d="M6 9l6 6 6-6" /></svg>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              ) : (
+                rest.map(item => <NavButton key={item.key} item={item} big />)
+              )}
+            </nav>
+          </>
+        )}
+      </>
+    )
+  }
 
   return (
     <>
@@ -131,50 +338,11 @@ export default function Sidebar() {
 
         {/* 메뉴 목록 */}
         <nav style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          {visibleNav.map((item, idx) => {
-            // 구분선
-            if (item.key.startsWith('divider')) {
-              return expanded
-                ? <div key={idx} style={{ height: 1, background: '#F5F5F8', margin: '6px 0' }} />
-                : null
-            }
-
-            const active = pathname === item.href || pathname.startsWith(item.href + '/')
-            const unreadCount = item.key === 'inquiries' ? unreadInquiries : item.key === 'records' ? unreadComments : 0
-            return (
-              <button
-                key={item.key}
-                className={`sb-tab${active ? ' active' : ''}`}
-                onClick={() => router.push(item.href)}
-                title={!expanded ? item.label : ''}
-                style={
-                  expanded
-                    ? { height: 42, padding: '0 16px', gap: 10, justifyContent: 'flex-start' }
-                    : { height: 48, justifyContent: 'center', flexDirection: 'column', gap: 3 }
-                }
-              >
-                <span style={{ flexShrink: 0, display: 'flex', position: 'relative' }}>
-                  {item.icon}
-                  {unreadCount > 0 && (
-                    <span style={{
-                      position: 'absolute', top: -3, right: -5,
-                      width: 8, height: 8, borderRadius: '50%',
-                      background: '#C0392B', border: '1.5px solid #fff',
-                    }} />
-                  )}
-                </span>
-                {expanded
-                  ? <span style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 5 }}>
-                      {item.label}
-                      {unreadCount > 0 && (
-                        <span style={{ fontSize: 10, fontWeight: 700, color: '#C0392B' }}>{unreadCount}</span>
-                      )}
-                    </span>
-                  : <span style={{ fontSize: 8, fontWeight: 600 }}>{item.label}</span>
-                }
-              </button>
-            )
-          })}
+          {visibleNav.map((item, idx) => (
+            item.key.startsWith('divider')
+              ? (expanded ? <div key={idx} style={{ height: 1, background: '#F5F5F8', margin: '6px 0' }} /> : null)
+              : <NavButton key={item.key} item={item} />
+          ))}
         </nav>
 
         {/* 접기/펼치기 버튼 */}

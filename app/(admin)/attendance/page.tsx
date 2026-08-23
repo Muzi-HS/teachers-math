@@ -5,6 +5,7 @@ import { useAuth } from '@/context/AuthContext'
 import { kstDateStr, kstNow } from '@/lib/kst'
 import TimeSlotInput from '@/components/TimeSlotInput'
 import { IconX } from '@/components/icons'
+import { useMobileMode } from '@/context/MobileModeContext'
 
 const navy='#0D2A5E', bg='#F5F7FA', bd='#DDE3EE'
 const tx='#0D1B36', tx2='#4B5C7E', tx3='#96A4BF'
@@ -36,6 +37,7 @@ function fmtHours(m: number|null) {
 
 export default function AttendancePage() {
   const { teacher } = useAuth()
+  const { mobileMode } = useMobileMode()
   const [logs,     setLogs]     = useState<Log[]>([])
   const [selYear,  setSelYear]  = useState(kstNow().getFullYear())
   const [selMonth, setSelMonth] = useState(kstNow().getMonth()+1)
@@ -151,7 +153,7 @@ export default function AttendancePage() {
   `
 
   return (
-    <div style={{padding:'28px 32px',fontFamily:"'Noto Sans KR',sans-serif"}}>
+    <div style={{padding:mobileMode?'16px 14px 88px':'28px 32px',fontFamily:"'Noto Sans KR',sans-serif"}}>
       <style>{css}</style>
 
       {notif && (
@@ -161,13 +163,13 @@ export default function AttendancePage() {
         </div>
       )}
 
-      <div style={{marginBottom:20}}>
-        <h1 style={{fontSize:21,fontWeight:700,color:tx}}>출근부</h1>
-        <p style={{fontSize:13,color:tx2,marginTop:4}}>근무 시간대를 입력하고 관리자 승인을 받으세요</p>
+      <div style={{marginBottom:mobileMode?14:20}}>
+        <h1 style={{fontSize:mobileMode?17:21,fontWeight:700,color:tx}}>출근부</h1>
+        {!mobileMode && <p style={{fontSize:13,color:tx2,marginTop:4}}>근무 시간대를 입력하고 관리자 승인을 받으세요</p>}
       </div>
 
       {/* 이번 달 통계 */}
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:16}}>
+      <div style={{display:'grid',gridTemplateColumns:mobileMode?'1fr 1fr':'1fr 1fr 1fr',gap:12,marginBottom:16}}>
         {[
           {label:'승인된 출근일수', val:`${totalDays}일`},
           {label:'승인된 총 근무시간', val:fmtHours(totalMin||null)},
@@ -260,6 +262,7 @@ export default function AttendancePage() {
         {logs.length === 0 ? (
           <p style={{textAlign:'center',color:tx3,padding:'40px 0',fontSize:13}}>출근 기록이 없습니다</p>
         ) : (
+          <div style={{overflowX:'auto'}}>
           <table>
             <thead>
               <tr><th>날짜</th><th>시간대</th><th>근무시간</th><th>메모</th><th>승인</th><th>관리</th></tr>
@@ -298,6 +301,7 @@ export default function AttendancePage() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </div>

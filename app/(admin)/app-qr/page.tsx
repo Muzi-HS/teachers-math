@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { QRCodeCanvas } from 'qrcode.react'
 import { IconSmartphone, IconShare } from '@/components/icons'
+import { useMobileMode } from '@/context/MobileModeContext'
 
 const navy = '#0D2A5E', navyDk = '#071A3E', navyM = '#E8EEF8'
 const gold = '#D87E13'
@@ -9,6 +10,7 @@ const bg = '#F5F7FA', bd = '#DDE3EE'
 const tx = '#0D1B36', tx2 = '#4B5C7E', tx3 = '#96A4BF'
 
 export default function AppQrPage() {
+  const { mobileMode } = useMobileMode()
   const [url, setUrl] = useState('')
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
@@ -24,12 +26,12 @@ export default function AppQrPage() {
   }
 
   return (
-    <div style={{ padding: '28px 32px', fontFamily: "'Noto Sans KR',sans-serif" }}>
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 21, fontWeight: 700, color: tx }}>앱 설치 QR</h1>
-        <p style={{ fontSize: 13, color: tx2, marginTop: 4 }}>
+    <div style={{ padding: mobileMode ? '16px 14px 88px' : '28px 32px', fontFamily: "'Noto Sans KR',sans-serif" }}>
+      <div style={{ marginBottom: mobileMode ? 14 : 20 }}>
+        <h1 style={{ fontSize: mobileMode ? 17 : 21, fontWeight: 700, color: tx }}>앱 설치 QR</h1>
+        {!mobileMode && <p style={{ fontSize: 13, color: tx2, marginTop: 4 }}>
           학부모/선생님께 이 QR코드를 보여주면 스캔 후 홈 화면에 앱처럼 설치할 수 있습니다
-        </p>
+        </p>}
       </div>
 
       <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
@@ -38,7 +40,7 @@ export default function AppQrPage() {
           background: '#fff', borderRadius: 12, border: `1px solid ${bd}`,
           boxShadow: '0 1px 4px rgba(0,0,0,.06)', padding: 28,
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16,
-          width: 300,
+          width: mobileMode ? '100%' : 300,
         }}>
           {url ? (
             <QRCodeCanvas ref={canvasRef} value={url} size={220} level="M" marginSize={2}

@@ -3,7 +3,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { kstDateOf, kstTimeOf } from '@/lib/kst'
-import { IconChat, IconPencil, IconTrash } from '@/components/icons'
+import { IconChat, IconPencil, IconTrash, IconArrowLeft } from '@/components/icons'
+import { useMobileMode } from '@/context/MobileModeContext'
 
 const navy = '#0D2A5E', navyDk = '#071A3E', navyM = '#E8EEF8'
 const gold = '#D87E13', goldL = '#F09830'
@@ -26,6 +27,7 @@ function fmtPhone(p: string) {
 
 export default function AdminInquiriesPage() {
   const { teacher } = useAuth()
+  const { mobileMode } = useMobileMode()
   const [msgs, setMsgs] = useState<Msg[]>([])
   const [parentsMap, setParentsMap] = useState<Record<number, ParentRow>>({})
   const [childrenMap, setChildrenMap] = useState<Record<number, string[]>>({})
@@ -158,8 +160,11 @@ export default function AdminInquiriesPage() {
     .iq-sbox input{border:none;outline:none;font-size:13px;font-family:inherit;color:${tx};background:transparent;width:100%;}
   `
 
+  const showList = !mobileMode || !selParentId
+  const showThread = !mobileMode || !!selParentId
+
   return (
-    <div style={{ padding: '28px 32px', fontFamily: "'Noto Sans KR',sans-serif", height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ padding: mobileMode ? '16px 14px 88px' : '28px 32px', fontFamily: "'Noto Sans KR',sans-serif", height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column' }}>
       <style>{css}</style>
 
       {notif && (
@@ -169,16 +174,19 @@ export default function AdminInquiriesPage() {
         </div>
       )}
 
-      <div style={{ marginBottom: 16, flexShrink: 0 }}>
-        <h1 style={{ fontSize: 21, fontWeight: 700, color: tx }}>문의하기</h1>
-        <p style={{ fontSize: 13, color: tx2, marginTop: 4 }}>
-          학부모 문의 및 답변 {totalUnread > 0 && <span style={{ color: re, fontWeight: 600 }}>· 안읽음 {totalUnread}건</span>}
-        </p>
-      </div>
+      {(!mobileMode || !selParentId) && (
+        <div style={{ marginBottom: mobileMode ? 12 : 16, flexShrink: 0 }}>
+          <h1 style={{ fontSize: mobileMode ? 17 : 21, fontWeight: 700, color: tx }}>문의하기</h1>
+          <p style={{ fontSize: 13, color: tx2, marginTop: 4 }}>
+            학부모 문의 및 답변 {totalUnread > 0 && <span style={{ color: re, fontWeight: 600 }}>· 안읽음 {totalUnread}건</span>}
+          </p>
+        </div>
+      )}
 
       <div style={{ flex: 1, minHeight: 0, display: 'flex', background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, boxShadow: '0 1px 4px rgba(0,0,0,.06)', overflow: 'hidden' }}>
         {/* 좌측: 대화 목록 */}
-        <div style={{ width: 300, flexShrink: 0, borderRight: `1px solid ${bd}`, display: 'flex', flexDirection: 'column' }}>
+        {showList && (
+        <div style={{ width: mobileMode ? '100%' : 300, flexShrink: 0, borderRight: mobileMode ? 'none' : `1px solid ${bd}`, display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: 12, borderBottom: `1px solid ${bd}` }}>
             <div className="iq-sbox">
               <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke={tx3}><circle cx="11" cy="11" r="8" strokeWidth={2} /><path strokeWidth={2} d="M21 21l-4.35-4.35" /></svg>
@@ -216,8 +224,10 @@ export default function AdminInquiriesPage() {
             })}
           </div>
         </div>
+        )}
 
         {/* 우측: 채팅창 */}
+        {showThread && (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           {!selParentId ? (
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', color: tx3 }}>
@@ -226,11 +236,18 @@ export default function AdminInquiriesPage() {
             </div>
           ) : (
             <>
-              <div style={{ padding: '14px 18px', borderBottom: `1px solid ${bd}`, flexShrink: 0 }}>
-                <span style={{ fontSize: 14, fontWeight: 700, color: tx }}>
-                  {(childrenMap[selParentId]?.length ?? 0) > 0 ? childrenMap[selParentId].join(', ') + ' 학부모' : '학부모'}
-                </span>
-                <span style={{ fontSize: 12, color: tx3, marginLeft: 8 }}>{fmtPhone(selParent?.phone ?? '')}</span>
+              <div style={{ padding: '14px 18px', borderBottom: `1px solid ${bd}`, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+                {mobileMode && (
+                  <button onClick={() => setSelParentId(null)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: tx2, display: 'flex', padding: 2, flexShrink: 0 }}>
+                    <IconArrowLeft size={16} />
+                  </button>
+                )}
+                <div>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: tx }}>
+                    {(childrenMap[selParentId]?.length ?? 0) > 0 ? childrenMap[selParentId].join(', ') + ' 학부모' : '학부모'}
+                  </span>
+                  <span style={{ fontSize: 12, color: tx3, marginLeft: 8 }}>{fmtPhone(selParent?.phone ?? '')}</span>
+                </div>
               </div>
 
               <div style={{ flex: 1, overflowY: 'auto', padding: '18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -272,7 +289,7 @@ export default function AdminInquiriesPage() {
                 <div ref={bottomRef} />
               </div>
 
-              <div style={{ padding: 14, borderTop: `1px solid ${bd}`, display: 'flex', gap: 8, flexShrink: 0 }}>
+              <div style={{ padding: mobileMode ? '14px 14px 14px 64px' : 14, borderTop: `1px solid ${bd}`, display: 'flex', gap: 8, flexShrink: 0 }}>
                 <textarea className="iq-fi" rows={1} style={{ resize: 'none' }} placeholder="답변을 입력하세요 (Enter 전송, Shift+Enter 줄바꿈)"
                   value={input} onChange={e => setInput(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply() } }} />
@@ -284,6 +301,7 @@ export default function AdminInquiriesPage() {
             </>
           )}
         </div>
+        )}
       </div>
     </div>
   )

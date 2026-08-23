@@ -7,6 +7,7 @@ import { useSearchParams } from 'next/navigation'
 import { kstDateStr } from '@/lib/kst'
 import ClassBulkRecordModal from '@/components/ClassBulkRecordModal'
 import { IconBook, IconPencil, IconChat, IconSave, IconX } from '@/components/icons'
+import { useMobileMode } from '@/context/MobileModeContext'
 
 type Class = { id: number; name: string; days: string; time: string; mode?: string; active?: boolean }
 type Student = { id: number; name: string; birth_year: number; school: string; parent_phone?: string }
@@ -47,6 +48,7 @@ const BLANK_REC = (sid: number): RecForm => ({
 
 export default function ClassesPage() {
   const { role } = useAuth()
+  const { mobileMode } = useMobileMode()
   // view: list | detail | sturec
   const [view, setView] = useState<'list' | 'detail' | 'sturec'>('list')
   const [classes, setClasses] = useState<Class[]>([])
@@ -408,7 +410,7 @@ export default function ClassesPage() {
   `
 
   return (
-    <div style={{ padding: '28px 32px', fontFamily: "'Noto Sans KR',sans-serif" }}>
+    <div style={{ padding: mobileMode ? '16px 14px 88px' : '28px 32px', fontFamily: "'Noto Sans KR',sans-serif" }}>
       <style>{css}</style>
 
       {notif && (
@@ -420,25 +422,25 @@ export default function ClassesPage() {
 
       {/* ════ 반 목록 ════ */}
       {view === 'list' && <>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-          <div><h1 style={{ fontSize: 21, fontWeight: 700, color: tx }}>반 관리</h1><p style={{ fontSize: 13, color: tx2, marginTop: 4 }}>반을 클릭하면 학생 목록을 확인합니다</p></div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: mobileMode ? 12 : 16 }}>
+          <div><h1 style={{ fontSize: mobileMode ? 17 : 21, fontWeight: 700, color: tx }}>반 관리</h1>{!mobileMode && <p style={{ fontSize: 13, color: tx2, marginTop: 4 }}>반을 클릭하면 학생 목록을 확인합니다</p>}</div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: mobileMode ? 14 : 18, flexWrap: mobileMode ? 'wrap' : 'nowrap' }}>
           <div style={{ display: 'flex', gap: 4 }}>
             {['월','화','수','목','금','토','일'].map(d => (
               <button key={d} type="button"
                 onClick={() => setDayFlt(p => p === d ? '' : d)}
-                style={{ width: 36, height: 36, borderRadius: 8, cursor: 'pointer', border: `1.5px solid ${dayFlt === d ? navy : bd}`, background: dayFlt === d ? navy : '#fff', color: dayFlt === d ? '#fff' : tx2, fontSize: 13, fontWeight: 600, fontFamily: 'inherit', transition: 'all .15s' }}
+                style={{ width: mobileMode ? 30 : 36, height: mobileMode ? 30 : 36, borderRadius: 8, cursor: 'pointer', border: `1.5px solid ${dayFlt === d ? navy : bd}`, background: dayFlt === d ? navy : '#fff', color: dayFlt === d ? '#fff' : tx2, fontSize: mobileMode ? 12 : 13, fontWeight: 600, fontFamily: 'inherit', transition: 'all .15s' }}
               >{d}</button>
             ))}
           </div>
-          <div className="sbox" style={{ width: 200 }}>
+          <div className="sbox" style={{ width: mobileMode ? '100%' : 200 }}>
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke={tx3}><circle cx="11" cy="11" r="8" strokeWidth={2} /><path strokeWidth={2} d="M21 21l-4.35-4.35" /></svg>
             <input placeholder="반 이름 검색..." value={search} onChange={e => setSearch(e.target.value)} />
           </div>
         </div>
         {/* 대시보드 스타일 목록 */}
-        <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: 16, boxShadow: '0 1px 6px rgba(0,0,0,.06)' }}>
+        <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: mobileMode ? 12 : 16, boxShadow: '0 1px 6px rgba(0,0,0,.06)' }}>
 
           {filtered.length === 0 && (
             <p style={{ textAlign: 'center', padding: '30px 0', color: tx3, fontSize: 13 }}>검색 결과가 없습니다</p>
@@ -498,7 +500,7 @@ export default function ClassesPage() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <h1 style={{ fontSize: 21, fontWeight: 700, color: tx }}>{detailCls.name}</h1>
+              <h1 style={{ fontSize: mobileMode ? 17 : 21, fontWeight: 700, color: tx }}>{detailCls.name}</h1>
               {detailCls.mode && <span style={{ fontSize: 12, padding: '3px 9px', borderRadius: 20, background: navyM, color: navy, fontWeight: 500 }}>{detailCls.mode}</span>}
             </div>
             <p style={{ fontSize: 13, color: tx2, marginTop: 4 }}>{detailCls.days} | {detailCls.time}</p>
@@ -585,12 +587,12 @@ export default function ClassesPage() {
           <span>{curStu.name}</span>
         </div>
         <div style={{ marginBottom: 20 }}>
-          <h1 style={{ fontSize: 21, fontWeight: 700, color: tx }}>{curStu.name}</h1>
+          <h1 style={{ fontSize: mobileMode ? 17 : 21, fontWeight: 700, color: tx }}>{curStu.name}</h1>
           <p style={{ fontSize: 13, color: tx2, marginTop: 4 }}>{curStu.school} · {curStu.birth_year}년생 ({ageOf(curStu.birth_year)}세)</p>
         </div>
         {stuRecs.length === 0
           ? <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: '60px 0', textAlign: 'center', color: tx3, fontSize: 14 }}>수업 기록 없음</div>
-          : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: 12 }}>
+          : <div style={{ display: 'grid', gridTemplateColumns: mobileMode ? '1fr' : 'repeat(auto-fill, minmax(400px, 1fr))', gap: 12 }}>
             {stuRecs.map(r => {
             const tItems = (r.record_test_items ?? [])
             return (

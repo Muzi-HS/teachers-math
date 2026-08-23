@@ -4,7 +4,8 @@ import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { can } from '@/lib/permissions'
 import { kstDateStr, kstNow } from '@/lib/kst'
-import { IconClipboard, IconBarChart, IconTrophy } from '@/components/icons'
+import { IconClipboard, IconBarChart, IconTrophy, IconArrowLeft } from '@/components/icons'
+import { useMobileMode } from '@/context/MobileModeContext'
 
 type Test = { id:number; name:string; date:string; total:number }
 type ScoreRow = {
@@ -21,6 +22,7 @@ const re='#C0392B', rbg='#FDECEA', gr='#1A7F4E', gbg='#E0F5EB'
 
 export default function TestsPage() {
   const { role } = useAuth()
+  const { mobileMode } = useMobileMode()
   const [view,      setView]      = useState<'list'|'detail'>('list')
   const [tests,     setTests]     = useState<Test[]>([])
   const [scores,    setScores]    = useState<ScoreRow[]>([])
@@ -283,7 +285,7 @@ export default function TestsPage() {
   `
 
   return (
-    <div style={{padding:'28px 32px',fontFamily:"'Noto Sans KR',sans-serif"}}>
+    <div style={{padding:mobileMode?'16px 14px 88px':'28px 32px',fontFamily:"'Noto Sans KR',sans-serif"}}>
       <style>{css}</style>
 
       {notif&&(
@@ -295,17 +297,17 @@ export default function TestsPage() {
 
       {/* ════ 테스트 목록 ════ */}
       {view==='list'&&<>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:mobileMode?14:20}}>
           <div>
-            <h1 style={{fontSize:21,fontWeight:700,color:tx}}>테스트 관리</h1>
-            <p style={{fontSize:13,color:tx2,marginTop:4}}>날짜를 클릭하면 해당일 테스트를 확인합니다</p>
+            <h1 style={{fontSize:mobileMode?17:21,fontWeight:700,color:tx}}>테스트 관리</h1>
+            {!mobileMode && <p style={{fontSize:13,color:tx2,marginTop:4}}>날짜를 클릭하면 해당일 테스트를 확인합니다</p>}
           </div>
         </div>
 
-        <div style={{display:'grid',gridTemplateColumns:'280px 1fr',gap:16,alignItems:'start'}}>
+        <div style={{display:'grid',gridTemplateColumns:mobileMode?'1fr':'280px 1fr',gap:16,alignItems:'start'}}>
 
           {/* 달력 */}
-          <div style={{background:'#fff',borderRadius:12,border:`1px solid ${bd}`,padding:16,boxShadow:'0 1px 4px rgba(0,0,0,.06)',position:'sticky',top:16}}>
+          <div style={{background:'#fff',borderRadius:12,border:`1px solid ${bd}`,padding:16,boxShadow:'0 1px 4px rgba(0,0,0,.06)',position:mobileMode?undefined:'sticky',top:16}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
               <button onClick={prevCal} style={{background:'none',border:'none',cursor:'pointer',color:tx3,fontSize:18,padding:'2px 8px'}}>‹</button>
               <span style={{fontSize:14,fontWeight:700,color:tx}}>{calYear}년 {calMonth+1}월</span>
@@ -427,10 +429,10 @@ export default function TestsPage() {
           <span>{curTest.name}</span>
         </div>
 
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:mobileMode?14:20}}>
           <div>
-            <h1 style={{fontSize:21,fontWeight:700,color:tx}}>{curTest.name}</h1>
-            <p style={{fontSize:13,color:tx2,marginTop:4}}>{curTest.date} · 총 {curTest.total}문항 · 응시 {scores.length}명</p>
+            <h1 style={{fontSize:mobileMode?17:21,fontWeight:700,color:tx}}>{curTest.name}</h1>
+            <p style={{fontSize:12,color:tx2,marginTop:4}}>{curTest.date} · 총 {curTest.total}문항 · 응시 {scores.length}명</p>
           </div>
           <div/>
         </div>
@@ -445,7 +447,7 @@ export default function TestsPage() {
         {scores.length>0&&(()=>{
           const freqRows = buildFreqTable(scores.map(s=>s.score))
           return(
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+            <div style={{display:'grid',gridTemplateColumns:mobileMode?'1fr':'1fr 1fr',gap:16}}>
 
               {/* 왼쪽: 요약 + 도수분포표 */}
               <div style={{background:'#fff',borderRadius:12,border:`1px solid ${bd}`,padding:18,boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
@@ -562,7 +564,7 @@ export default function TestsPage() {
                 <label className="lb">테스트명</label>
                 <input className="fi" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="예) 2학년 1학기 중간 단원평가"/>
               </div>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+              <div style={{display:'grid',gridTemplateColumns:mobileMode?'1fr':'1fr 1fr',gap:12}}>
                 <div>
                   <label className="lb">날짜</label>
                   <input type="date" className="fi" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))}/>
@@ -593,7 +595,7 @@ export default function TestsPage() {
               <button onClick={()=>setEditSc(null)} style={{width:28,height:28,borderRadius:'50%',border:'none',background:bg,cursor:'pointer',fontSize:17,color:tx2}}>×</button>
             </div>
             <div style={{padding:'18px 22px'}}>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+              <div style={{display:'grid',gridTemplateColumns:mobileMode?'1fr':'1fr 1fr',gap:12}}>
                 <div>
                   <label className="lb">정답 수</label>
                   <input type="number" className="fi" min={0} max={curTest.total}

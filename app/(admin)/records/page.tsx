@@ -7,6 +7,7 @@ import { kstDateStr, kstNow, kstTimeOf } from '@/lib/kst'
 import ClassBulkRecordModal from '@/components/ClassBulkRecordModal'
 import { IconBook, IconX } from '@/components/icons'
 import { isUnreadParentComment } from '@/lib/records'
+import { useMobileMode } from '@/context/MobileModeContext'
 
 type Student = { id: number; name: string; parent_phone: string }
 type Class_ = { id: number; name: string }
@@ -156,6 +157,7 @@ ${footer}`
 
 export default function RecordsPage() {
   const { teacher } = useAuth()
+  const { mobileMode } = useMobileMode()
   const [students, setStudents] = useState<Student[]>([])
   const [classes,  setClasses]  = useState<Class_[]>([])
   const [tests,    setTests]    = useState<Test[]>([])
@@ -578,10 +580,14 @@ export default function RecordsPage() {
       .hwg-lb{font-size:10px;}
       .hwg{padding:6px 7px;}
     }
+    ${mobileMode ? `
+    .rch{flex-wrap:wrap;row-gap:8px;}
+    .rc{padding:13px;}
+    ` : ''}
   `
 
   return (
-    <div style={{ padding: '28px 32px', fontFamily: "'Noto Sans KR',sans-serif" }}>
+    <div style={{ padding: mobileMode ? '16px 14px 88px' : '28px 32px', fontFamily: "'Noto Sans KR',sans-serif" }}>
       <style>{css}</style>
 
       {notif && (
@@ -592,10 +598,10 @@ export default function RecordsPage() {
       )}
 
       {/* 헤더 */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: mobileMode ? 14 : 20 }}>
         <div>
-          <h1 style={{ fontSize: 21, fontWeight: 700, color: tx }}>수업 기록</h1>
-          <p style={{ fontSize: 13, color: tx2, marginTop: 4 }}>날짜를 선택하면 해당 날짜에 작성된 수업 기록을 확인할 수 있습니다</p>
+          <h1 style={{ fontSize: mobileMode ? 17 : 21, fontWeight: 700, color: tx }}>수업 기록</h1>
+          {!mobileMode && <p style={{ fontSize: 13, color: tx2, marginTop: 4 }}>날짜를 선택하면 해당 날짜에 작성된 수업 기록을 확인할 수 있습니다</p>}
         </div>
         {/* 문자 발송 버튼 주석처리 — 반별 푸시 발송으로 대체
         {dayRecs.length > 0 && (
@@ -606,8 +612,8 @@ export default function RecordsPage() {
         */}
       </div>
 
-      {/* 2단 레이아웃 */}
-      <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 16, alignItems: 'start' }}>
+      {/* 2단 레이아웃 (모바일에서는 위아래로) */}
+      <div style={{ display: 'grid', gridTemplateColumns: mobileMode ? '1fr' : '320px 1fr', gap: mobileMode ? 12 : 16, alignItems: 'start' }}>
 
         {/* 달력 */}
         <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: 18, boxShadow: '0 1px 4px rgba(0,0,0,.06)' }}>
@@ -672,8 +678,8 @@ export default function RecordsPage() {
             {clsGroups.map(({ cls: clsG, recs: clsRecs }) => (
               <div key={clsG?.id ?? 'none'} style={{ marginBottom: 20 }}>
                 {/* 반별 헤더 + 일괄 푸시 버튼 */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, padding: '8px 14px', background: bg, borderRadius: 8, border: `1px solid ${bd}` }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: mobileMode ? 'wrap' : 'nowrap', gap: mobileMode ? 8 : 0, marginBottom: 12, padding: '8px 14px', background: bg, borderRadius: 8, border: `1px solid ${bd}` }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 13, fontWeight: 700, color: navy }}>{clsG?.name ?? '반 미지정'}</span>
                     <span className="badge" style={{ background: navyM, color: navy }}>{clsRecs.length}명</span>
                     {clsRecs.some(r => !(r.push_sent ?? false)) && (
@@ -695,7 +701,7 @@ export default function RecordsPage() {
                     </button>
                   </div>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: mobileMode ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))', gap: mobileMode ? 10 : 14 }}>
                 {clsRecs.map(r => {
                 const stu = students.find(s => s.id === r.student_id)
                 const cls = classes.find(c => c.id === recClsId(r))

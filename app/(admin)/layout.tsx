@@ -7,6 +7,8 @@ import { supabase } from '@/lib/supabase'
 import { requestFCMToken } from '@/lib/firebase'
 import Sidebar from '@/components/Sidebar'
 import { menuAccess, Role } from '@/lib/permissions'
+import { MobileModeProvider, useMobileMode } from '@/context/MobileModeContext'
+import { IconSmartphone } from '@/components/icons'
 
 // 관리자용 FCM 토큰 등록 — 학부모(register-fcm-token 엣지함수)와 달리 관리자는 Supabase Auth
 // 세션이 있어 RLS(본인 user_id만)로 바로 보호되므로 클라이언트에서 직접 upsert한다.
@@ -46,8 +48,54 @@ function LogoutButton() {
   )
 }
 
+function MobileModeToggle() {
+  const { mobileMode, setMobileMode } = useMobileMode()
+  if (mobileMode) {
+    return (
+      <button
+        onClick={() => setMobileMode(false)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 4,
+          background: 'rgba(255,255,255,.14)', border: 'none', borderRadius: 20,
+          cursor: 'pointer', padding: '4px 10px',
+          fontSize: 11, fontWeight: 600, color: '#fff',
+          fontFamily: "'Noto Sans KR',sans-serif",
+        }}
+      >
+        <IconSmartphone size={12} /> PC 화면으로 보기
+      </button>
+    )
+  }
+  return (
+    <button
+      onClick={() => setMobileMode(true)}
+      title="모바일에서 보기"
+      style={{
+        display: 'flex', alignItems: 'center', gap: 4,
+        background: 'none', border: 'none', cursor: 'pointer',
+        fontSize: 11, color: 'rgba(255,255,255,.35)',
+        fontFamily: "'Noto Sans KR',sans-serif",
+        padding: 0, transition: 'color .15s',
+      }}
+      onMouseEnter={e => (e.currentTarget.style.color = 'rgba(255,255,255,.85)')}
+      onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,.35)')}
+    >
+      <IconSmartphone size={12} /> 모바일에서 보기
+    </button>
+  )
+}
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <MobileModeProvider>
+      <AdminLayoutInner>{children}</AdminLayoutInner>
+    </MobileModeProvider>
+  )
+}
+
+function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const { teacher, role, loading } = useAuth()
+  const { mobileMode } = useMobileMode()
   const router   = useRouter()
   const pathname = usePathname()
 
@@ -101,30 +149,36 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         boxShadow: '0 2px 8px rgba(0,0,0,.2)', flexShrink: 0,
       }}>
         {/* 왼쪽: 로고 · 학원명 · 배지 · 이름 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, overflow: 'hidden' }}>
           <Image src="/logo.png" alt="로고" width={30} height={30} style={{ objectFit: 'contain', flexShrink: 0 }} />
-          <span style={{ fontFamily: 'Montserrat,sans-serif', fontSize: 12, fontWeight: 800, color: '#fff', letterSpacing: .5 }}>
-            TEACHERS MATH
-          </span>
-          <span style={{ fontSize: 9, color: 'rgba(255,255,255,.45)', background: 'rgba(255,255,255,.1)', padding: '2px 7px', borderRadius: 10 }}>
+          {!mobileMode && (
+            <span style={{ fontFamily: 'Montserrat,sans-serif', fontSize: 12, fontWeight: 800, color: '#fff', letterSpacing: .5 }}>
+              TEACHERS MATH
+            </span>
+          )}
+          <span style={{ fontSize: 9, color: 'rgba(255,255,255,.45)', background: 'rgba(255,255,255,.1)', padding: '2px 7px', borderRadius: 10, flexShrink: 0 }}>
             {role === 'admin' ? '관리자' : role === 'assistant' ? '조교' : '선생님'}
           </span>
-          <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,.85)' }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,.85)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {teacher?.name ?? ''}
           </span>
         </div>
 
-        {/* 오른쪽: 로그아웃 */}
-        <LogoutButton />
+        {/* 오른쪽: 모바일 전환 · 로그아웃 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
+          <MobileModeToggle />
+          <LogoutButton />
+        </div>
       </header>
 
       {/* 사이드바 + 본문 */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        <Sidebar />
+        {!mobileMode && <Sidebar />}
         <main style={{ flex: 1, background: '#F5F7FA', overflowY: 'auto', minHeight: 0 }}>
           {children}
         </main>
       </div>
+      {mobileMode && <Sidebar />}
     </div>
   )
 }

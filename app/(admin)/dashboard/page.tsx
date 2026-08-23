@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { kstNow } from '@/lib/kst'
 import { IconCalendar, IconBell, IconChat, IconCheck } from '@/components/icons'
 import { isUnreadParentComment } from '@/lib/records'
+import { useMobileMode } from '@/context/MobileModeContext'
 
 type Class_   = { id:number; name:string; days:string; time:string }
 type Student  = { id:number; name:string }
@@ -23,6 +24,7 @@ const DOW = ['일','월','화','수','목','금','토']
 export default function DashboardPage(){
   const router = useRouter()
   const { teacher } = useAuth()
+  const { mobileMode } = useMobileMode()
 
   const [classes,    setClasses]    = useState<Class_[]>([])
   const [csMap,      setCsMap]      = useState<Record<number, number[]>>({}) // class_id -> student_ids
@@ -105,16 +107,16 @@ export default function DashboardPage(){
   `
 
   return (
-    <div style={{ padding: '28px 32px', fontFamily: "'Noto Sans KR',sans-serif" }}>
+    <div style={{ padding: mobileMode ? '16px 14px 88px' : '28px 32px', fontFamily: "'Noto Sans KR',sans-serif" }}>
       <style>{css}</style>
 
       {/* 헤더 */}
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: 20 }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: mobileMode ? 14 : 20 }}>
         <div>
-          <p style={{ fontSize: 20, fontWeight: 700, color: tx, margin: 0 }}>
+          <p style={{ fontSize: mobileMode ? 17 : 20, fontWeight: 700, color: tx, margin: 0 }}>
             안녕하세요, {teacher?.name ?? '선생님'}님
           </p>
-          <p style={{ fontSize: 13, color: tx2, margin: '4px 0 0' }}>
+          <p style={{ fontSize: 12, color: tx2, margin: '4px 0 0' }}>
             {kstNow().toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric', weekday:'long' })}
             {' · '}오늘 수업 {todayClasses.length}개 예정
           </p>
@@ -122,7 +124,7 @@ export default function DashboardPage(){
       </div>
 
       {/* 상단 요약 6칸 */}
-      <div style={{ display:'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 12, marginBottom: 16 }}>
+      <div style={{ display:'grid', gridTemplateColumns: mobileMode ? 'repeat(2,1fr)' : 'repeat(6,1fr)', gap: mobileMode ? 8 : 12, marginBottom: mobileMode ? 12 : 16 }}>
         <div className="mc">
           <p style={{ fontSize: 11, color: tx3, margin: '0 0 6px' }}>오늘 수업</p>
           <p style={{ fontSize: 24, fontWeight: 700, color: navy, margin: 0 }}>
@@ -161,7 +163,7 @@ export default function DashboardPage(){
         </div>
       </div>
 
-      <div style={{ display:'grid', gridTemplateColumns: '1.3fr 1fr', gap: 16 }}>
+      <div style={{ display:'grid', gridTemplateColumns: mobileMode ? '1fr' : '1.3fr 1fr', gap: mobileMode ? 12 : 16 }}>
 
         {/* 좌측: 오늘 수업 일정 */}
         <div className="mc">
