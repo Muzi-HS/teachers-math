@@ -3,8 +3,23 @@ import { useEffect, useRef } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { useAuth } from '@/context/AuthContext'
+import { supabase } from '@/lib/supabase'
+import { requestFCMToken } from '@/lib/firebase'
 import Sidebar from '@/components/Sidebar'
 import { menuAccess, Role } from '@/lib/permissions'
+
+// 관리자용 FCM 토큰 등록 — 학부모(register-fcm-token 엣지함수)와 달리 관리자는 Supabase Auth
+// 세션이 있어 RLS(본인 user_id만)로 바로 보호되므로 클라이언트에서 직접 upsert한다.
+async function registerAdminFCMToken(userId: string) {
+  try {
+    const token = await requestFCMToken()
+    if (!token) return
+    await supabase.from('admin_fcm_tokens').delete().eq('user_id', userId)
+    await supabase.from('admin_fcm_tokens').insert({ user_id: userId, token })
+  } catch (e) {
+    console.error('[FCM] 관리자 토큰 등록 오류:', e)
+  }
+}
 
 const navy = '#0D2A5E', navyDk = '#071A3E'
 
@@ -45,6 +60,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     if (!role || role === 'parent') {
       router.replace('/')
       return
+    }
+    if (!initDone.current && role === 'admin' && teacher?.userId) {
+      registerAdminFCMToken(teacher.userId)
     }
     initDone.current = true
   }, [loading, role])

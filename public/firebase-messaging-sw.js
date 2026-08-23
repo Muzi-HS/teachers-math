@@ -26,13 +26,30 @@ messaging.onBackgroundMessage(payload => {
 })
 
 // 알림 클릭 시 앱으로 이동
+// 이미 열려있는 창을 포커스만 하면 페이지가 새로 마운트되지 않아 수업기록의
+// 읽음 처리(useEffect에서 열람 시점에 viewed_at을 기록)가 실행되지 않는다.
+// 반드시 대상 링크로 실제 이동(navigate)까지 시켜야 읽음 확인이 정상 동작한다.
 self.addEventListener('notificationclick', event => {
   event.notification.close()
   const link = event.notification.data?.link || '/parent/records'
+  const targetUrl = new URL(link, self.location.origin).href
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
-      if (clientList.length > 0) return clientList[0].focus()
-      return clients.openWindow(link)
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async clientList => {
+      const existing = clientList[0]
+      if (existing) {
+        if ('navigate' in existing) {
+          try {
+            const navigated = await existing.navigate(targetUrl)
+            return (navigated || existing).focus()
+          } catch {
+            // navigate가 막힌 브라우저(구형 iOS 등) 대비 폴백
+          }
+        }
+        await existing.focus()
+        existing.postMessage({ type: 'push-navigate', link })
+        return
+      }
+      return clients.openWindow(targetUrl)
     })
   )
 })

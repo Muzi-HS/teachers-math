@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { IconArrowLeft, IconInbox, IconClipboard } from '@/components/icons'
 
 type Student = { id:number; name:string; birth_year:number; school:string }
 type Class_  = { id:number; name:string }
@@ -178,7 +179,7 @@ export default function StatsPage(){
         <div>
           {!selStu?(
             <div style={{background:'#fff',borderRadius:12,border:`1px solid ${bd}`,padding:'80px 0',textAlign:'center',color:tx3}}>
-              <p style={{fontSize:36,marginBottom:10}}>👈</p>
+              <p style={{marginBottom:10,display:'flex',justifyContent:'center'}}><IconArrowLeft size={36} /></p>
               <p style={{fontSize:14}}>왼쪽에서 학생을 선택해주세요</p>
             </div>
           ):(
@@ -227,7 +228,7 @@ export default function StatsPage(){
                 <p style={{textAlign:'center',color:tx3,padding:'40px 0'}}>불러오는 중...</p>
               ):recs.length===0?(
                 <div style={{background:'#fff',borderRadius:12,border:`1px solid ${bd}`,padding:'60px 0',textAlign:'center',color:tx3}}>
-                  <p style={{fontSize:32,marginBottom:8}}>📭</p>
+                  <p style={{marginBottom:8,display:'flex',justifyContent:'center'}}><IconInbox size={32} /></p>
                   <p style={{fontSize:14}}>수업 기록이 없습니다</p>
                 </div>
               ):(
@@ -270,7 +271,7 @@ export default function StatsPage(){
 
                   {/* 응시한 테스트 목록 */}
                   <div style={{background:'#fff',borderRadius:12,border:`1px solid ${bd}`,padding:18,marginBottom:16,boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
-                    <div style={{fontSize:14,fontWeight:600,color:tx,marginBottom:14}}>📝 응시한 테스트 목록</div>
+                    <div style={{fontSize:14,fontWeight:600,color:tx,marginBottom:14,display:'flex',alignItems:'center',gap:6}}><IconClipboard size={13} /> 응시한 테스트 목록</div>
                     {testRecs.length===0?(
                       <p style={{textAlign:'center',color:tx3,fontSize:13,padding:'20px 0'}}>응시한 테스트가 없습니다</p>
                     ):(

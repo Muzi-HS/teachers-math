@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { kstDateStr } from '@/lib/kst'
+import { IconSave, IconCheck } from '@/components/icons'
 
 type Student = {
   id: number
@@ -228,10 +229,10 @@ export default function RecordWritePage() {
             onChange={e => setDate(e.target.value)}
             style={{ padding:'7px 11px',border:`1px solid ${bd}`,borderRadius:8,fontSize:13,fontFamily:'inherit',color:tx,outline:'none' }}/>
           <button className="bout" onClick={() => saveAll(true)} disabled={savingAll}>
-            💾 전체 임시저장
+            <IconSave size={13} /> 전체 임시저장
           </button>
           <button className="bprim" onClick={() => saveAll(false)} disabled={savingAll}>
-            ✅ 전체 최종저장
+            <IconCheck size={13} /> 전체 최종저장
           </button>
         </div>
       </div>
@@ -287,7 +288,7 @@ export default function RecordWritePage() {
                 </div>
                 <div style={{ display:'flex',gap:8 }}>
                   <button className="bout" onClick={() => saveDraft(selIdx)} disabled={saving}>
-                    {saving ? '저장 중...' : '💾 임시저장'}
+                    {saving ? '저장 중...' : <><IconSave size={13} /> 임시저장</>}
                   </button>
                   <button
                     style={{ display:'inline-flex',alignItems:'center',gap:5,padding:'6px 14px',borderRadius:8,fontSize:12,fontWeight:600,cursor:'pointer',border:'none',background:gr,color:'#fff',fontFamily:'inherit' }}
@@ -299,7 +300,7 @@ export default function RecordWritePage() {
                     }}
                     disabled={saving}
                   >
-                    ✅ 저장
+                    <IconCheck size={13} /> 저장
                   </button>
                 </div>
               </div>
@@ -331,7 +332,7 @@ export default function RecordWritePage() {
                   ))}
                 </div>
                 <p style={{ fontSize:11,color:tx3,marginTop:5 }}>
-                  {cur.attitude <= 3 ? '😟 노력 필요' : cur.attitude <= 6 ? '😐 보통' : cur.attitude <= 8 ? '🙂 좋음' : '😄 매우 좋음'}
+                  {cur.attitude <= 3 ? '노력 필요' : cur.attitude <= 6 ? '보통' : cur.attitude <= 8 ? '좋음' : '매우 좋음'}
                 </p>
               </div>
 

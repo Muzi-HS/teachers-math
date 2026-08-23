@@ -1,9 +1,12 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
+import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { kstDateStr, kstNow } from '@/lib/kst'
+import { kstDateStr, kstNow, kstTimeOf } from '@/lib/kst'
 import ClassBulkRecordModal from '@/components/ClassBulkRecordModal'
+import { IconBook, IconX } from '@/components/icons'
+import { isUnreadParentComment } from '@/lib/records'
 
 type Student = { id: number; name: string; parent_phone: string }
 type Class_ = { id: number; name: string }
@@ -15,8 +18,9 @@ type Rec = {
   hw_rate: number; hw_cor: number; attitude: number
   late: boolean; has_test: boolean; feedback: string
   parent_comment: string | null; parent_comment_at: string | null
+  parent_comment_read_at: string | null
   // sms_sent: boolean; sms_sent_at: string | null;
-  push_sent: boolean; push_sent_at: string | null;
+  push_sent: boolean; push_sent_at: string | null; viewed_at: string | null
   is_draft: boolean
   record_test_items?: {
     test_id: number; t_total: number; t_cor: number; t_score: number
@@ -36,6 +40,12 @@ function rateBg(v: number) { return v >= 80 ? '#E0F5EB' : v >= 60 ? '#FEF3E2' : 
 function attColor(v: number) { return v >= 8 ? '#1A7F4E' : v >= 5 ? '#C05621' : '#C0392B' }
 function attBg(v: number) { return v >= 8 ? '#E0F5EB' : v >= 5 ? '#FEF3E2' : '#FDECEA' }
 function attLabel(v: number) { return v >= 8 ? '우수' : v >= 5 ? '보통' : '노력필요' }
+// 발송/읽음 상태를 배지 하나로 통합 (미발송 / 발송됨·안읽음 / 읽음·시각)
+function pushStatus(r: { push_sent?: boolean; viewed_at: string | null }) {
+  if (!(r.push_sent ?? false)) return { label: '미발송', bg, color: tx3, border: bd }
+  if (!r.viewed_at) return { label: '발송됨 · 안읽음', bg: navyM, color: navy }
+  return { label: `읽음 · ${kstTimeOf(r.viewed_at)}`, bg: gbg, color: gr }
+}
 function todayStr() { return kstDateStr() }
 function fmtDate(dt: string) {
   const [y, m, d] = dt.split('-')
@@ -154,6 +164,8 @@ export default function RecordsPage() {
   const [llMonth,  setLlMonth]  = useState(kstNow().getMonth())
   const [selDate,  setSelDate]  = useState(todayStr())
   const [recDates, setRecDates] = useState<Set<string>>(new Set())
+  const [unreadCommentDates, setUnreadCommentDates] = useState<Set<string>>(new Set())
+  const [justReadIds, setJustReadIds] = useState<Set<number>>(new Set())
   const [dayRecs,  setDayRecs]  = useState<Rec[]>([])
   const [loading,  setLoading]  = useState(false)
   const [editModal,     setEditModal]     = useState(false)
@@ -169,11 +181,23 @@ export default function RecordsPage() {
   const [notif,    setNotif]    = useState<{ msg: string; ok: boolean } | null>(null)
   const [bulkModalClsId, setBulkModalClsId] = useState<number | null>(null) // 일괄수정 대상 class_id (null = 닫힘)
 
+  const searchParams = useSearchParams()
+  const dateParamHandled = useRef(false)
+
   function toast(msg: string, ok = true) { setNotif({ msg, ok }); setTimeout(() => setNotif(null), 3000) }
 
   useEffect(() => { fetchBase() }, [])
   useEffect(() => { fetchMonthDates() }, [llYear, llMonth])
   useEffect(() => { fetchDayRecs() }, [selDate])
+
+  // 대시보드 등에서 ?date=YYYY-MM-DD 로 들어온 경우 해당 날짜로 바로 이동
+  useEffect(() => {
+    if (dateParamHandled.current) return
+    const dt = searchParams.get('date')
+    if (!dt) return
+    dateParamHandled.current = true
+    selectDate(dt)
+  }, [searchParams])
 
   async function fetchBase() {
     const [{ data: s }, { data: c }, { data: cs }, { data: t }] = await Promise.all([
@@ -203,6 +227,12 @@ export default function RecordsPage() {
     const to   = `${ym}-${String(last).padStart(2, '0')}`
     const { data } = await supabase.from('records').select('date').eq('is_draft', false).gte('date', from).lte('date', to)
     setRecDates(new Set((data ?? []).map((r: any) => r.date)))
+
+    const { data: withComment } = await supabase.from('records')
+      .select('date,parent_comment,parent_comment_at,parent_comment_read_at')
+      .eq('is_draft', false).not('parent_comment', 'is', null)
+      .gte('date', from).lte('date', to)
+    setUnreadCommentDates(new Set((withComment ?? []).filter(isUnreadParentComment).map((r: any) => r.date)))
   }
 
   async function fetchDayRecs() {
@@ -257,6 +287,18 @@ export default function RecordsPage() {
     }))
     setDayRecs(merged)
     setLoading(false)
+
+    // 학부모 의견 읽음 처리 — 이 날짜를 열람한 시점을 "확인함"으로 기록 (문의하기 읽음 처리와 동일한 개념)
+    const unreadIds = merged.filter(isUnreadParentComment).map(r => r.id)
+    setJustReadIds(new Set(unreadIds))
+    if (unreadIds.length > 0) {
+      const nowIso = new Date().toISOString()
+      supabase.from('records').update({ parent_comment_read_at: nowIso }).in('id', unreadIds).then(({ error }) => {
+        if (error) { console.error('[학부모 의견 읽음 처리 실패]', error); return }
+        setDayRecs(rs => rs.map(r => unreadIds.includes(r.id) ? { ...r, parent_comment_read_at: nowIso } : r))
+        setUnreadCommentDates(ds => { const n = new Set(ds); n.delete(selDate); return n })
+      })
+    }
   }
 
   function moveLLCal(dir: number) {
@@ -501,6 +543,7 @@ export default function RecordsPage() {
     .ll-day.other-month{color:${tx3};opacity:.4;cursor:default;}
     .ll-dot{width:4px;height:4px;border-radius:50%;background:${gold};margin:2px auto 0;}
     .ll-day.today .ll-dot,.ll-day.selected .ll-dot{background:#fff;}
+    .ll-dot-comment{position:absolute;top:2px;right:4px;width:6px;height:6px;border-radius:50%;background:${re};border:1.5px solid #fff;}
     .rc{background:#fff;border:1px solid ${bd};border-radius:10px;padding:16px;margin-bottom:10px;}
     .rch{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid ${bd};}
     .pb{height:6px;background:${bd};border-radius:99px;flex:1;}
@@ -580,15 +623,17 @@ export default function RecordsPage() {
               const isToday = dt === today
               const isSel   = dt === selDate
               const hasRec  = recDates.has(dt)
+              const hasUnreadComment = unreadCommentDates.has(dt)
               let cls = 'll-day'
               if (isToday) cls += ' today'
               if (isSel)   cls += ' selected'
               if (dow === 0) cls += ' sunday'
               if (dow === 6) cls += ' saturday'
               return (
-                <div key={day} className={cls} onClick={() => selectDate(dt)}>
+                <div key={day} className={cls} onClick={() => selectDate(dt)} title={hasUnreadComment ? '확인하지 않은 학부모 의견이 있습니다' : undefined}>
                   {day}
                   {hasRec && <div className="ll-dot" />}
+                  {hasUnreadComment && <div className="ll-dot-comment" />}
                 </div>
               )
             })}
@@ -612,7 +657,7 @@ export default function RecordsPage() {
             <p style={{ color: tx3, fontSize: 13 }}>불러오는 중...</p>
           ) : dayRecs.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 0', color: tx3 }}>
-              <p style={{ fontSize: 32, marginBottom: 8 }}>📖</p>
+              <p style={{ marginBottom: 8, display: 'flex', justifyContent: 'center' }}><IconBook size={32} /></p>
               <p style={{ fontSize: 14 }}>이 날짜에 작성된 수업 기록이 없습니다</p>
             </div>
           ) : (
@@ -652,21 +697,23 @@ export default function RecordsPage() {
                   <div key={r.id} className="rc">
                     {/* 카드 헤더 */}
                     <div className="rch">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                         <div className="sav">{stu?.name[0] ?? '?'}</div>
                         <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             <b style={{ fontSize: 13, color: navy }}>{stu?.name ?? '알 수 없음'}</b>
                             {cls && <span className="badge" style={{ background: navyM, color: navy }}>{cls.name}</span>}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', marginTop: 4 }}>
                             {r.late
                               ? <span className="badge" style={{ background: rbg, color: re }}>지각</span>
                               : <span className="badge" style={{ background: gbg, color: gr }}>정시 등원</span>
                             }
                             {r.has_test && <span className="badge" style={{ background: navyM, color: navy }}>시험</span>}
-                            {(r.push_sent ?? false)
-                              ? <span className="badge" style={{ background: gbg, color: gr }}>푸시 발송됨</span>
-                              : <span className="badge" style={{ background: bg, color: tx3, border: `1px solid ${bd}` }}>미발송</span>
-                            }
+                            {(() => {
+                              const ps = pushStatus(r)
+                              return <span className="badge" style={{ background: ps.bg, color: ps.color, border: ps.border ? `1px solid ${ps.border}` : undefined }}>{ps.label}</span>
+                            })()}
                           </div>
                         </div>
                       </div>
@@ -730,9 +777,11 @@ export default function RecordsPage() {
                   )}
                 </div>
 
+                {/* 본문 — 수업내용/숙제/시험/피드백/학부모의견을 한 흐름으로 정리 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {/* 수업 내용 */}
                 {r.content && (
-                  <div style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'flex-start' }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                     <div style={{ width: 3, alignSelf: 'stretch', background: navy, borderRadius: 2, flexShrink: 0 }} />
                     <div>
                       <p style={{ fontSize: 11, fontWeight: 700, color: navy, margin: '0 0 1px' }}>수업 내용</p>
@@ -743,7 +792,7 @@ export default function RecordsPage() {
 
                 {/* 숙제 */}
                 {r.homework && (
-                  <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'flex-start' }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                     <div style={{ width: 3, alignSelf: 'stretch', background: gold, borderRadius: 2, flexShrink: 0 }} />
                     <div>
                       <p style={{ fontSize: 11, fontWeight: 700, color: gold, margin: '0 0 1px' }}>숙제</p>
@@ -761,7 +810,7 @@ export default function RecordsPage() {
 
                 {/* 피드백 */}
                 {r.feedback && (
-                  <div className="fb">
+                  <div className="fb" style={{ marginTop: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 5 }}>
                       <div style={{ width: 3, height: 14, background: navy, borderRadius: 2 }} />
                       <span style={{ fontSize: 13, fontWeight: 600, color: navy }}>수업 피드백</span>
@@ -772,15 +821,17 @@ export default function RecordsPage() {
 
                 {/* 학부모 의견 */}
                 {r.parent_comment && (
-                  <div className="pc">
+                  <div className="pc" style={{ marginTop: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 5 }}>
                       <div style={{ width: 3, height: 14, background: gold, borderRadius: 2 }} />
                       <span style={{ fontSize: 13, fontWeight: 600, color: gold }}>학부모 의견</span>
+                      {justReadIds.has(r.id) && <span className="badge" style={{ background: rbg, color: re }}>새 의견</span>}
                       {r.parent_comment_at && <span style={{ fontSize: 11, color: tx3, marginLeft: 'auto' }}>{r.parent_comment_at.slice(0, 10)}</span>}
                     </div>
                     <p style={{ fontSize: 14, color: tx, lineHeight: 1.6 }}>{r.parent_comment}</p>
                   </div>
                 )}
+                </div>
                   </div>
                 )
                 })}
@@ -880,8 +931,8 @@ export default function RecordsPage() {
                   {editTestItems.map((item, idx) => (
                     <div key={idx} className="tst-card" style={{ position: 'relative' }}>
                       <button onClick={() => setEditTestItems(p => { const a = [...p]; a.splice(idx, 1); return a })}
-                        style={{ position: 'absolute', top: 8, right: 8, padding: '2px 8px', borderRadius: 6, fontSize: 11, border: 'none', background: rbg, color: re, cursor: 'pointer' }}>
-                        ✕ 제거
+                        style={{ position: 'absolute', top: 8, right: 8, padding: '2px 8px', borderRadius: 6, fontSize: 11, border: 'none', background: rbg, color: re, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                        <IconX size={10} /> 제거
                       </button>
                       <div style={{ marginBottom: 8 }}>
                         <label className="lb">테스트 선택</label>

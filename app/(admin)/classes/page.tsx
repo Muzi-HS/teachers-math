@@ -6,6 +6,7 @@ import { can } from '@/lib/permissions'
 import { useSearchParams } from 'next/navigation'
 import { kstDateStr } from '@/lib/kst'
 import ClassBulkRecordModal from '@/components/ClassBulkRecordModal'
+import { IconBook, IconPencil, IconChat, IconSave, IconX } from '@/components/icons'
 
 type Class = { id: number; name: string; days: string; time: string; mode?: string; active?: boolean }
 type Student = { id: number; name: string; birth_year: number; school: string; parent_phone?: string }
@@ -37,8 +38,9 @@ function attColor(v: number) { return v >= 8 ? '#1A7F4E' : v >= 5 ? '#C05621' : 
 function attBg(v: number) { return v >= 8 ? '#E0F5EB' : v >= 5 ? '#FEF3E2' : '#FDECEA' }
 function attLabel(v: number) { return v >= 8 ? '우수' : v >= 5 ? '보통' : '노력필요' }
 
+// hw_rate/hw_cor는 미입력 상태를 NaN으로 표현 (디폴트 값 없이 완전히 빈 입력칸으로 시작)
 const BLANK_REC = (sid: number): RecForm => ({
-  student_id: sid, content: '', homework: '', hw_rate: 80, hw_cor: 75, attitude: 10,
+  student_id: sid, content: '', homework: '', hw_rate: NaN, hw_cor: NaN, attitude: 10,
   hw_rate_na: false, hw_not_submitted: false, hw_cor_na: false,
   late: false, has_test: false, testItems: [], feedback: ''
 })
@@ -285,8 +287,8 @@ export default function ClassesPage() {
     const row = {
       student_id: curStu.id, date: recDate, class_id: detailCls?.id ?? null,
       content: recF.content, homework: recF.homework,
-      hw_rate: recF.hw_rate_na ? -1 : recF.hw_not_submitted ? -2 : recF.hw_rate,
-      hw_cor: recF.hw_cor_na ? -1 : recF.hw_cor,
+      hw_rate: recF.hw_rate_na ? -1 : recF.hw_not_submitted ? -2 : (Number.isNaN(recF.hw_rate) ? 0 : recF.hw_rate),
+      hw_cor: recF.hw_cor_na ? -1 : (Number.isNaN(recF.hw_cor) ? 0 : recF.hw_cor),
       attitude: recF.attitude,
       late: recF.late, has_test: showTest, feedback: recF.feedback, is_draft: false,
     }
@@ -389,6 +391,8 @@ export default function ClassesPage() {
     .fi{width:100%;padding:9px 11px;border:1.5px solid ${bd};border-radius:8px;font-size:13px;font-family:inherit;color:${tx};outline:none;background:#fff;transition:border-color .2s;box-sizing:border-box;}
     .fi:focus{border-color:${navy};}
     .fi-sm{padding:7px 9px!important;font-size:12px!important;}
+    .no-spinner::-webkit-outer-spin-button,.no-spinner::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+    .no-spinner[type=number]{-moz-appearance:textfield;}
     .lb{display:block;font-size:12px;font-weight:500;color:${tx2};margin-bottom:5px;}
     .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;}
     .bc{font-size:12px;color:${tx3};margin-bottom:14px;display:flex;align-items:center;gap:5px;}
@@ -724,8 +728,8 @@ export default function ClassesPage() {
             const row = {
               student_id: curStu.id, date, class_id: detailCls?.id ?? null,
               content: form.content, homework: form.homework,
-              hw_rate: form.hw_rate_na ? -1 : form.hw_not_submitted ? -2 : form.hw_rate,
-              hw_cor: form.hw_cor_na ? -1 : form.hw_cor,
+              hw_rate: form.hw_rate_na ? -1 : form.hw_not_submitted ? -2 : (Number.isNaN(form.hw_rate) ? 0 : form.hw_rate),
+              hw_cor: form.hw_cor_na ? -1 : (Number.isNaN(form.hw_cor) ? 0 : form.hw_cor),
               attitude: form.attitude,
               late: form.late, has_test: showT, feedback: form.feedback, is_draft: false,
             }
@@ -1078,12 +1082,12 @@ function RecModal({ stuName, initDate, initRec, initShowTest, editRecId, tests, 
 
           <div className="fdv">수업 내용</div>
           <div className="fg" style={{ marginBottom: 10 }}>
-            <label className="lb">📖 수업 내용 (진도)</label>
+            <label className="lb" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><IconBook size={12} /> 수업 내용 (진도)</label>
             <textarea className="fi" rows={2} style={{ resize: 'vertical' }} placeholder="예) 이차함수 그래프 변환 (p.45~52)"
               value={form.content} onChange={e => setF('content', e.target.value)} />
           </div>
           <div className="fg" style={{ marginBottom: 0 }}>
-            <label className="lb">✏️ 숙제</label>
+            <label className="lb" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><IconPencil size={12} /> 숙제</label>
             <textarea className="fi" rows={2} style={{ resize: 'vertical' }} placeholder="예) 교재 p.53~55 연습문제 1~10번"
               value={form.homework} onChange={e => setF('homework', e.target.value)} />
           </div>
@@ -1107,11 +1111,12 @@ function RecModal({ stuName, initDate, initRec, initShowTest, editRecId, tests, 
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input type="number" className="fi" min={0} max={100}
-                  value={form.hw_rate_na || form.hw_not_submitted ? '' : form.hw_rate} disabled={form.hw_rate_na || form.hw_not_submitted}
-                  onChange={e => setF('hw_rate', Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
+                <input type="number" className="fi no-spinner" min={0} max={100}
+                  value={form.hw_rate_na || form.hw_not_submitted || Number.isNaN(form.hw_rate) ? '' : form.hw_rate} disabled={form.hw_rate_na || form.hw_not_submitted}
+                  onChange={e => { const v = e.target.value; setF('hw_rate', v === '' ? NaN : Math.min(100, Math.max(0, parseInt(v) || 0))) }}
+                  onWheel={e => (e.target as HTMLInputElement).blur()}
                   style={{ width: 80, textAlign: 'center', opacity: form.hw_rate_na || form.hw_not_submitted ? 0.4 : 1, background: form.hw_rate_na || form.hw_not_submitted ? bg : '#fff' }}
-                  placeholder={form.hw_rate_na ? '해당없음' : form.hw_not_submitted ? '미제출' : ''} />
+                  placeholder={form.hw_rate_na ? '해당없음' : form.hw_not_submitted ? '미제출' : '입력'} />
                 <span style={{ color: form.hw_rate_na || form.hw_not_submitted ? tx3 : tx2 }}>%</span>
               </div>
             </div>
@@ -1123,11 +1128,12 @@ function RecModal({ stuName, initDate, initRec, initShowTest, editRecId, tests, 
                 </label>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input type="number" className="fi" min={0} max={100}
-                  value={form.hw_cor_na ? '' : form.hw_cor} disabled={form.hw_cor_na}
-                  onChange={e => setF('hw_cor', Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
+                <input type="number" className="fi no-spinner" min={0} max={100}
+                  value={form.hw_cor_na || Number.isNaN(form.hw_cor) ? '' : form.hw_cor} disabled={form.hw_cor_na}
+                  onChange={e => { const v = e.target.value; setF('hw_cor', v === '' ? NaN : Math.min(100, Math.max(0, parseInt(v) || 0))) }}
+                  onWheel={e => (e.target as HTMLInputElement).blur()}
                   style={{ width: 80, textAlign: 'center', opacity: form.hw_cor_na ? 0.4 : 1, background: form.hw_cor_na ? bg : '#fff' }}
-                  placeholder={form.hw_cor_na ? '해당없음' : ''} />
+                  placeholder={form.hw_cor_na ? '해당없음' : '입력'} />
                 <span style={{ color: form.hw_cor_na ? tx3 : tx2 }}>%</span>
               </div>
             </div>
@@ -1165,8 +1171,8 @@ function RecModal({ stuName, initDate, initRec, initShowTest, editRecId, tests, 
               <div style={{ marginTop: 8 }}>
                 {form.testItems.map((item, idx) => (
                   <div key={idx} style={{ background: bg, borderRadius: 8, padding: 10, marginBottom: 6, position: 'relative' }}>
-                    <button style={{ position: 'absolute', top: 6, right: 6, padding: '2px 7px', fontSize: 10, border: 'none', background: rbg, color: re, borderRadius: 5, cursor: 'pointer' }}
-                      onClick={() => setForm(f => { const a = [...f.testItems]; a.splice(idx, 1); return { ...f, testItems: a } })}>✕</button>
+                    <button style={{ position: 'absolute', top: 6, right: 6, padding: '2px 7px', border: 'none', background: rbg, color: re, borderRadius: 5, cursor: 'pointer', display: 'flex' }}
+                      onClick={() => setForm(f => { const a = [...f.testItems]; a.splice(idx, 1); return { ...f, testItems: a } })}><IconX size={10} /></button>
                     <div className="fg" style={{ marginBottom: 6 }}>
                       <select className="fsel fi-sm" value={item.testId || ''} onChange={e => setTestItem(idx, 'testId', parseInt(e.target.value) || null)}>
                         <option value="">테스트 선택</option>
@@ -1189,7 +1195,7 @@ function RecModal({ stuName, initDate, initRec, initShowTest, editRecId, tests, 
 
           <div className="fdv">수업 피드백</div>
           <div className="fg">
-            <label className="lb">💬 피드백 내용</label>
+            <label className="lb" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><IconChat size={12} /> 피드백 내용</label>
             <textarea className="fi" rows={3} style={{ resize: 'vertical' }} placeholder="이번 수업 특이사항 및 종합 의견"
               value={form.feedback} onChange={e => setF('feedback', e.target.value)} />
           </div>
@@ -1198,7 +1204,7 @@ function RecModal({ stuName, initDate, initRec, initShowTest, editRecId, tests, 
         {/* 푸터 */}
         <div style={{ padding: '12px 22px 18px', display: 'flex', gap: 8, justifyContent: 'flex-end', position: 'sticky', bottom: 0, background: '#fff', borderTop: `1px solid ${bd}` }}>
           <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, border: `1px solid ${bd}`, background: '#fff', cursor: 'pointer', color: tx2, fontFamily: 'inherit' }}>취소</button>
-          <button onClick={() => onDraft(date, form, showTest)} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 13, border: `1px solid ${wa}`, background: 'transparent', cursor: 'pointer', color: wa, fontFamily: 'inherit' }}>💾 임시저장</button>
+          <button onClick={() => onDraft(date, form, showTest)} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 13, border: `1px solid ${wa}`, background: 'transparent', cursor: 'pointer', color: wa, fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 5 }}><IconSave size={13} /> 임시저장</button>
           <button className="bgold" onClick={() => onSave(date, form, showTest)} disabled={saving} style={{ opacity: saving ? 0.7 : 1 }}>{saving ? '저장 중...' : '저장'}</button>
         </div>
       </div>

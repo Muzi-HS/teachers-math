@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { kstDateOf } from '@/lib/kst'
+import { IconPin } from '@/components/icons'
 
 const navy='#0D2A5E', tx='#0D1B36', tx2='#4B5C7E', tx3='#96A4BF', bd='#DDE3EE', bg='#F5F7FA'
 const gold='#D87E13'
@@ -46,7 +47,7 @@ export default function ParentNotices() {
         목록으로
       </button>
       <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: 20 }}>
-        {detail.pinned && <span style={{ background: gold, color: '#fff', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4, marginBottom: 10, display: 'inline-block' }}>📌 공지</span>}
+        {detail.pinned && <span style={{ background: gold, color: '#fff', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4, marginBottom: 10, display: 'inline-flex', alignItems: 'center', gap: 4 }}><IconPin size={10} /> 공지</span>}
         <h2 style={{ fontSize: 17, fontWeight: 700, color: tx, marginBottom: 8 }}>{detail.title}</h2>
         <p style={{ fontSize: 12, color: tx3, marginBottom: 16 }}>{kstDateOf(detail.created_at)}</p>
         {detail.image_url && <img src={detail.image_url} alt="첨부이미지" style={{ width: '100%', borderRadius: 8, marginBottom: 16 }} />}

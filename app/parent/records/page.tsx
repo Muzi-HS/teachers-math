@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useParentChild } from '../layout'
+import { IconArrowUp, IconInbox } from '@/components/icons'
 
 const navy='#0D2A5E', gold='#D87E13', tx='#0D1B36', tx2='#4B5C7E', tx3='#96A4BF'
 const bd='#DDE3EE', bg='#F5F7FA', re='#C0392B', rbg='#FDECEA', gr='#1A7F4E', gbg='#E0F5EB'
@@ -11,6 +12,7 @@ type Rec = {
   hw_rate: number; hw_cor: number; attitude: number
   late: boolean; has_test: boolean; feedback: string
   parent_comment: string | null; parent_comment_at: string | null
+  viewed_at: string | null
   record_test_items?: { test_id: number; t_total: number; t_cor: number; t_score: number; tests: { name: string } | null }[]
 }
 
@@ -140,6 +142,18 @@ export default function ParentRecords() {
     setRecs(merged)
     setCommentDrafts(Object.fromEntries(merged.map(r => [r.id, r.parent_comment ?? ''])))
     setLoading(false)
+
+    // 아직 안 읽은(viewed_at이 없는) 기록을 지금 열람한 것으로 기록 — 관리자 쪽 읽음 확인용
+    // (모바일에서 앱이 백그라운드로 전환되며 이 요청이 중간에 끊길 수 있어, saveComment 등
+    // 실제로 학부모가 기록을 다뤘다는 게 확인되는 시점에도 아래에서 한 번 더 보정한다)
+    const unviewedIds = merged.filter(r => !r.viewed_at).map(r => r.id)
+    if (unviewedIds.length > 0) {
+      const nowIso = new Date().toISOString()
+      supabase.from('records').update({ viewed_at: nowIso }).in('id', unviewedIds).then(({ error }) => {
+        if (error) { console.error('[읽음 표시 실패]', error); return }
+        setRecs(rs => rs.map(r => unviewedIds.includes(r.id) ? { ...r, viewed_at: nowIso } : r))
+      })
+    }
   }
 
   async function saveComment(recId: number) {
@@ -147,12 +161,28 @@ export default function ParentRecords() {
     setSavingId(recId)
     setCommentErr(e => ({ ...e, [recId]: '' }))
     const nowIso = new Date().toISOString()
+    // 의견을 남긴다는 것 자체가 학부모가 기록을 확인했다는 확실한 증거이므로,
+    // 아직 읽음 처리가 안 된 기록이면 이 저장에 같이 실어 읽음 처리도 보정한다.
+    const alreadyViewed = !!recs.find(r => r.id === recId)?.viewed_at
     const { error } = await supabase.from('records')
-      .update({ parent_comment: text, parent_comment_at: nowIso })
+      .update({ parent_comment: text, parent_comment_at: nowIso, ...(alreadyViewed ? {} : { viewed_at: nowIso }) })
       .eq('id', recId)
     setSavingId(null)
     if (error) { setCommentErr(e => ({ ...e, [recId]: '의견 저장에 실패했습니다.' })); return }
-    setRecs(rs => rs.map(r => r.id === recId ? { ...r, parent_comment: text, parent_comment_at: nowIso } : r))
+    setRecs(rs => rs.map(r => r.id === recId ? { ...r, parent_comment: text, parent_comment_at: nowIso, viewed_at: r.viewed_at ?? nowIso } : r))
+
+    if (text) {
+      const childName = children.find(c => c.id === selChild)?.name ?? '학생'
+      fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push-admin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({
+          title: '티처스 수학학원',
+          body: `${childName} 학부모님이 수업기록에 의견을 남겼습니다: ${text.slice(0, 40)}`,
+          link: '/records',
+        }),
+      }).catch(() => {})
+    }
   }
 
   const curChild = children.find(c => c.id === selChild)
@@ -162,7 +192,7 @@ export default function ParentRecords() {
       {/* 자녀 선택 안 된 경우 */}
       {!selChild ? (
         <div style={{ textAlign: 'center', padding: '60px 0' }}>
-          <p style={{ fontSize: 28, marginBottom: 8 }}>👆</p>
+          <p style={{ marginBottom: 8, display: 'flex', justifyContent: 'center' }}><IconArrowUp size={28} /></p>
           <p style={{ fontSize: 14, color: tx3 }}>위에서 자녀를 선택해주세요</p>
         </div>
       ) : (
@@ -182,7 +212,7 @@ export default function ParentRecords() {
             <p style={{ textAlign: 'center', color: tx3, padding: '40px 0' }}>불러오는 중...</p>
           ) : recs.length === 0 ? (
             <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: '60px 0', textAlign: 'center', color: tx3 }}>
-              <p style={{ fontSize: 28, marginBottom: 8 }}>📭</p>
+              <p style={{ marginBottom: 8, display: 'flex', justifyContent: 'center' }}><IconInbox size={28} /></p>
               <p style={{ fontSize: 14 }}>수업 기록이 없습니다</p>
             </div>
           ) : recs.map(r => {

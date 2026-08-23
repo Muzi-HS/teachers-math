@@ -31,6 +31,8 @@ const NAV = [
     icon: <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg> },
   { href: '/parent/events', label: '학원일정',
     icon: <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2" strokeWidth={2}/><path strokeWidth={2} d="M16 2v4M8 2v4M3 10h18"/></svg> },
+  { href: '/parent/inquiries', label: '문의하기',
+    icon: <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth={2} d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg> },
 ]
 
 export default function ParentLayout({ children }: { children: React.ReactNode }) {
@@ -96,6 +98,23 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
 
     setReady(true)
   }, [loading, role, parent])
+
+  // 알림 클릭 시 서비스워커가 보내는 이동 요청 처리
+  // (client.navigate를 지원하지 않는 구형 브라우저 대비 폴백 — 라우터로 이동시켜야
+  // 대상 페이지가 새로 마운트되어 수업기록 읽음 처리(viewed_at)가 정상적으로 실행된다)
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !navigator.serviceWorker) return
+    function onMessage(e: MessageEvent) {
+      if (e.data?.type !== 'push-navigate' || !e.data.link) return
+      const link: string = e.data.link
+      // 이미 그 페이지에 머물러 있으면 router.push는 아무 효과가 없으므로(리마운트 안 됨)
+      // 새로고침으로 강제 리마운트시켜 읽음 처리가 다시 실행되게 한다
+      if (link === window.location.pathname) window.location.reload()
+      else router.push(link)
+    }
+    navigator.serviceWorker.addEventListener('message', onMessage)
+    return () => navigator.serviceWorker.removeEventListener('message', onMessage)
+  }, [router])
 
   // /parent 루트 접근 시 수업기록으로 리다이렉트 (별도 effect, pathname만 의존)
   useEffect(() => {

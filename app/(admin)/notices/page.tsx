@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { can, Role } from '@/lib/permissions'
 import { kstDateOf, kstDateStr } from '@/lib/kst'
+import { IconBell, IconPin } from '@/components/icons'
 
 type Notice = {
   id: number
@@ -163,7 +164,7 @@ export default function NoticesPage() {
         <p style={{ color: tx3, fontSize: 13 }}>불러오는 중...</p>
       ) : filtered.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '60px 0', color: tx3 }}>
-          <p style={{ fontSize: 40, marginBottom: 12 }}>📢</p>
+          <p style={{ marginBottom: 12, display: 'flex', justifyContent: 'center' }}><IconBell size={40} /></p>
           <p style={{ fontSize: 14 }}>등록된 공지사항이 없습니다</p>
         </div>
       ) : (

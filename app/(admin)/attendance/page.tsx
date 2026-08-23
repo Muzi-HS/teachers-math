@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { kstDateStr, kstNow } from '@/lib/kst'
 import TimeSlotInput from '@/components/TimeSlotInput'
+import { IconX } from '@/components/icons'
 
 const navy='#0D2A5E', bg='#F5F7FA', bd='#DDE3EE'
 const tx='#0D1B36', tx2='#4B5C7E', tx3='#96A4BF'
@@ -217,7 +218,7 @@ export default function AttendancePage() {
               )}
               {slots.length > 1 && (
                 <button onClick={()=>removeSlot(i)}
-                  style={{padding:'5px 8px',border:'none',background:rbg,color:re,borderRadius:6,cursor:'pointer',fontSize:12,flexShrink:0}}>✕</button>
+                  style={{padding:'5px 8px',border:'none',background:rbg,color:re,borderRadius:6,cursor:'pointer',flexShrink:0,display:'flex'}}><IconX size={12} /></button>
               )}
             </div>
           ))}

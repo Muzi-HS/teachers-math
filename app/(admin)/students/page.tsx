@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { can } from '@/lib/permissions'
 import { kstDateStr, kstNow } from '@/lib/kst'
+import { IconUsers, IconLightbulb } from '@/components/icons'
 
 type Student = {
   id: number
@@ -450,7 +451,7 @@ export default function StudentsPage() {
           <p style={{ color:tx3,fontSize:13 }}>불러오는 중...</p>
         ) : filtered.length === 0 ? (
           <div style={{ textAlign:'center',padding:'40px 0',color:tx3 }}>
-            <p style={{ fontSize:32,marginBottom:8 }}>👨‍🎓</p>
+            <p style={{ marginBottom:8,display:'flex',justifyContent:'center' }}><IconUsers size={32} /></p>
             <p style={{ fontSize:14 }}>등록된 학생이 없습니다</p>
           </div>
         ) : (
@@ -616,8 +617,8 @@ export default function StudentsPage() {
               </div>
 
               {!editId && form.parent_phone && (
-                <div style={{ background:gbg,border:`1px solid ${gr}`,borderRadius:8,padding:'10px 14px',fontSize:12,color:gr }}>
-                  💡 학부모 전화번호 입력 시 학부모 계정이 자동으로 생성됩니다.
+                <div style={{ background:gbg,border:`1px solid ${gr}`,borderRadius:8,padding:'10px 14px',fontSize:12,color:gr,display:'flex',alignItems:'center',gap:6 }}>
+                  <IconLightbulb size={13} /> 학부모 전화번호 입력 시 학부모 계정이 자동으로 생성됩니다.
                 </div>
               )}
             </div>

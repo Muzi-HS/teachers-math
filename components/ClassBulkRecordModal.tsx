@@ -2,19 +2,20 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { kstDateStr } from '@/lib/kst'
+import { IconChat, IconBook, IconPencil, IconSave, IconX } from '@/components/icons'
 
 type Student = { id: number; name: string; school?: string }
 type Test = { id: number; name: string; date: string; total: number }
 type TestItem = { testId: number | null; tTotal: number; tCor: number; tScore: number }
 type RecForm = {
   student_id: number; content: string; homework: string
-  hw_rate: number; hw_cor: number; attitude: number
+  hw_rate: number | ''; hw_cor: number | ''; attitude: number
   hw_rate_na: boolean; hw_not_submitted: boolean; hw_cor_na: boolean
   late: boolean; has_test: boolean; testItems: TestItem[]; feedback: string
 }
 
 const BLANK_REC = (sid: number): RecForm => ({
-  student_id: sid, content: '', homework: '', hw_rate: 80, hw_cor: 75, attitude: 10,
+  student_id: sid, content: '', homework: '', hw_rate: '', hw_cor: '', attitude: 10,
   hw_rate_na: false, hw_not_submitted: false, hw_cor_na: false,
   late: false, has_test: false, testItems: [], feedback: ''
 })
@@ -154,7 +155,7 @@ export default function ClassBulkRecordModal({
       const existingId = bulkRecIds[sid] ?? null
       const blank = !f || (
         !f.content && !f.homework && !f.feedback &&
-        f.attitude === 10 && f.hw_rate === 80 && f.hw_cor === 75 &&
+        f.attitude === 10 && f.hw_rate === '' && f.hw_cor === '' &&
         !f.late && !f.has_test && !f.hw_rate_na && !f.hw_not_submitted && !f.hw_cor_na &&
         (!f.testItems || f.testItems.length === 0)
       )
@@ -163,8 +164,8 @@ export default function ClassBulkRecordModal({
       const row = {
         student_id: sid, date: bulkDate, class_id: classId,
         content: f.content, homework: f.homework,
-        hw_rate: f.hw_rate_na ? -1 : f.hw_not_submitted ? -2 : f.hw_rate,
-        hw_cor: f.hw_cor_na ? -1 : f.hw_cor,
+        hw_rate: f.hw_rate_na ? -1 : f.hw_not_submitted ? -2 : (f.hw_rate === '' ? 0 : f.hw_rate),
+        hw_cor: f.hw_cor_na ? -1 : (f.hw_cor === '' ? 0 : f.hw_cor),
         attitude: f.attitude,
         late: f.late, has_test: f.has_test, feedback: f.feedback, is_draft: false,
       }
@@ -218,6 +219,8 @@ export default function ClassBulkRecordModal({
     .bcr-fi{width:100%;padding:9px 11px;border:1.5px solid ${bd};border-radius:8px;font-size:13px;font-family:inherit;color:${tx};outline:none;background:#fff;transition:border-color .2s;box-sizing:border-box;}
     .bcr-fi:focus{border-color:${navy};}
     .bcr-fi-sm{padding:7px 9px!important;font-size:12px!important;}
+    .no-spinner::-webkit-outer-spin-button,.no-spinner::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+    .no-spinner[type=number]{-moz-appearance:textfield;}
     .bcr-lb{display:block;font-size:12px;font-weight:500;color:${tx2};margin-bottom:5px;}
     .bcr-fg{display:flex;flex-direction:column;}
     .bcr-fr{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
@@ -275,7 +278,7 @@ export default function ClassBulkRecordModal({
           {/* 임시저장 배너 */}
           {hasDraft && (
             <div style={{ background: wbg, border: `1px solid ${wa}`, borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: wa, display: 'flex', alignItems: 'center', gap: 10 }}>
-              💾 임시저장된 내용이 있습니다.
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><IconSave size={13} /> 임시저장된 내용이 있습니다.</span>
               <button onClick={loadBulkDraft} style={{ padding: '3px 10px', borderRadius: 6, border: `1px solid ${wa}`, background: 'transparent', color: wa, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12 }}>불러오기</button>
               <button onClick={clearBulkDraft} style={{ padding: '3px 10px', borderRadius: 6, border: `1px solid ${bd}`, background: 'transparent', color: tx3, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12 }}>무시</button>
             </div>
@@ -283,7 +286,7 @@ export default function ClassBulkRecordModal({
 
           {/* 일괄 피드백 작성 */}
           <div style={{ background: bg, borderRadius: 8, padding: 12, marginBottom: 12 }}>
-            <label className="bcr-lb">💬 피드백 일괄 작성 <span style={{ color: tx3, fontWeight: 400 }}>(선택된 학생 전원의 개별 피드백에 동일하게 입력됩니다)</span></label>
+            <label className="bcr-lb"><span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><IconChat size={12} /> 피드백 일괄 작성</span> <span style={{ color: tx3, fontWeight: 400 }}>(선택된 학생 전원의 개별 피드백에 동일하게 입력됩니다)</span></label>
             <div style={{ display: 'flex', gap: 8 }}>
               <textarea className="bcr-fi" rows={2} style={{ resize: 'vertical', background: '#fff' }} value={bulkFeedbackText} onChange={e => setBulkFeedbackText(e.target.value)} placeholder="예) 이번 주 전반적으로 집중도가 좋았습니다." />
               <button type="button" className="bcr-bout" style={{ flexShrink: 0, alignSelf: 'flex-start' }} onClick={applyBulkFeedback}>일괄작성</button>
@@ -310,11 +313,11 @@ export default function ClassBulkRecordModal({
                   {s.school && !bulkRecIds[sid] && <span className="bcr-badge" style={{ background: navyM, color: navy, marginLeft: 'auto' }}>{s.school}</span>}
                 </div>
                 <div className="bcr-fg" style={{ marginBottom: 10 }}>
-                  <label className="bcr-lb">📖 수업 내용 (진도)</label>
+                  <label className="bcr-lb" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><IconBook size={12} /> 수업 내용 (진도)</label>
                   <textarea className="bcr-fi" rows={2} style={{ resize: 'vertical' }} placeholder="예) 이차함수 그래프 변환 (p.45~52)" value={f.content} onChange={e => setBF(sid, 'content', e.target.value)} />
                 </div>
                 <div className="bcr-fg" style={{ marginBottom: 10 }}>
-                  <label className="bcr-lb">✏️ 숙제</label>
+                  <label className="bcr-lb" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><IconPencil size={12} /> 숙제</label>
                   <textarea className="bcr-fi" rows={2} style={{ resize: 'vertical' }} placeholder="예) 교재 p.53~55 연습문제 1~10번" value={f.homework} onChange={e => setBF(sid, 'homework', e.target.value)} />
                 </div>
                 <div className="bcr-fr" style={{ marginBottom: 10 }}>
@@ -337,12 +340,13 @@ export default function ClassBulkRecordModal({
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <input type="number" className="bcr-fi" min={0} max={100}
+                      <input type="number" className="bcr-fi no-spinner" min={0} max={100}
                         value={f.hw_rate_na || f.hw_not_submitted ? '' : f.hw_rate}
                         disabled={!!f.hw_rate_na || !!f.hw_not_submitted}
-                        onChange={e => setBF(sid, 'hw_rate', Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
+                        onChange={e => { const v = e.target.value; setBF(sid, 'hw_rate', v === '' ? '' : Math.min(100, Math.max(0, parseInt(v) || 0))) }}
+                        onWheel={e => (e.target as HTMLInputElement).blur()}
                         style={{ width: 80, textAlign: 'center', opacity: f.hw_rate_na || f.hw_not_submitted ? 0.4 : 1, background: f.hw_rate_na || f.hw_not_submitted ? bg : '#fff' }}
-                        placeholder={f.hw_rate_na ? '해당없음' : f.hw_not_submitted ? '미제출' : ''} />
+                        placeholder={f.hw_rate_na ? '해당없음' : f.hw_not_submitted ? '미제출' : '입력'} />
                       <span style={{ color: f.hw_rate_na || f.hw_not_submitted ? tx3 : tx2 }}>%</span>
                     </div>
                   </div>
@@ -357,12 +361,13 @@ export default function ClassBulkRecordModal({
                       </label>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <input type="number" className="bcr-fi" min={0} max={100}
+                      <input type="number" className="bcr-fi no-spinner" min={0} max={100}
                         value={f.hw_cor_na ? '' : f.hw_cor}
                         disabled={!!f.hw_cor_na}
-                        onChange={e => setBF(sid, 'hw_cor', Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
+                        onChange={e => { const v = e.target.value; setBF(sid, 'hw_cor', v === '' ? '' : Math.min(100, Math.max(0, parseInt(v) || 0))) }}
+                        onWheel={e => (e.target as HTMLInputElement).blur()}
                         style={{ width: 80, textAlign: 'center', opacity: f.hw_cor_na ? 0.4 : 1, background: f.hw_cor_na ? bg : '#fff' }}
-                        placeholder={f.hw_cor_na ? '해당없음' : ''} />
+                        placeholder={f.hw_cor_na ? '해당없음' : '입력'} />
                       <span style={{ color: f.hw_cor_na ? tx3 : tx2 }}>%</span>
                     </div>
                   </div>
@@ -393,7 +398,7 @@ export default function ClassBulkRecordModal({
                     <div style={{ marginTop: 8 }}>
                       {(f.testItems || []).map((item, idx) => (
                         <div key={idx} style={{ background: bg, borderRadius: 8, padding: 10, marginBottom: 6, position: 'relative' }}>
-                          <button className="bcr-bdng" style={{ position: 'absolute', top: 6, right: 6, padding: '2px 7px', fontSize: 10 }} onClick={() => removeBulkTestItem(sid, idx)}>✕</button>
+                          <button className="bcr-bdng" style={{ position: 'absolute', top: 6, right: 6, padding: '2px 7px' }} onClick={() => removeBulkTestItem(sid, idx)}><IconX size={10} /></button>
                           <div className="bcr-fg" style={{ marginBottom: 6 }}>
                             <select className="bcr-fsel bcr-fi-sm" value={item.testId || ''} onChange={e => setBulkTestItem(sid, idx, 'testId', parseInt(e.target.value) || null)}>
                               <option value="">테스트 선택</option>
@@ -414,7 +419,7 @@ export default function ClassBulkRecordModal({
                   )}
                 </div>
                 <div className="bcr-fg">
-                  <label className="bcr-lb">💬 개별 피드백</label>
+                  <label className="bcr-lb" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><IconChat size={12} /> 개별 피드백</label>
                   <textarea className="bcr-fi" rows={2} style={{ resize: 'vertical' }} placeholder="이 학생에 대한 개별 메모" value={f.feedback} onChange={e => setBF(sid, 'feedback', e.target.value)} />
                 </div>
               </div>
@@ -424,7 +429,7 @@ export default function ClassBulkRecordModal({
 
         <div style={{ padding: '0 22px 18px', display: 'flex', gap: 8, justifyContent: 'flex-end', position: 'sticky', bottom: 0, background: '#fff', borderTop: `1px solid ${bd}`, paddingTop: 12 }}>
           <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, border: `1px solid ${bd}`, background: '#fff', cursor: 'pointer', color: tx2, fontFamily: 'inherit' }}>취소</button>
-          <button onClick={saveBulkDraft} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 13, border: `1px solid ${wa}`, background: 'transparent', cursor: 'pointer', color: wa, fontFamily: 'inherit' }}>💾 임시저장</button>
+          <button onClick={saveBulkDraft} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 13, border: `1px solid ${wa}`, background: 'transparent', cursor: 'pointer', color: wa, fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 5 }}><IconSave size={13} /> 임시저장</button>
           <button className="bcr-bprim" onClick={saveBulkRec} disabled={saving} style={{ opacity: saving ? 0.7 : 1 }}>{saving ? '저장 중...' : '전체 저장'}</button>
         </div>
       </div>

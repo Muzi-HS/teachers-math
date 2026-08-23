@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { can, Role } from '@/lib/permissions'
 import { kstDateStr, kstNow } from '@/lib/kst'
+import { IconClock, IconLock } from '@/components/icons'
 
 type Evt = {
     id: number
@@ -15,6 +16,16 @@ type Evt = {
     type: 'normal' | 'holiday'
     parent_visible: boolean
     memo: string | null
+}
+
+// 학부모가 등록한 결석/지각 — 관리자/선생님/조교 캘린더에만 표시
+type AttNotice = {
+    id: number
+    parent_id: number
+    student_id: number
+    date: string
+    type: 'absence' | 'late'
+    reason: string | null
 }
 
 type FormState = {
@@ -58,8 +69,18 @@ export default function SchedulePage() {
     const [yr, setYr] = useState(kstNow().getFullYear())
     const [mo, setMo] = useState(kstNow().getMonth())  // 0-based
     const [notif, setNotif] = useState<{ msg: string; ok: boolean } | null>(null)
+    const [attNotices, setAttNotices] = useState<AttNotice[]>([])
+    const [studentsMap, setStudentsMap] = useState<Record<number, string>>({})
 
     useEffect(() => { load() }, [yr, mo])
+    useEffect(() => { fetchStudents() }, [])
+
+    async function fetchStudents() {
+        const { data } = await supabase.from('students').select('id, name')
+        const map: Record<number, string> = {}
+        for (const s of (data ?? [])) map[s.id] = s.name
+        setStudentsMap(map)
+    }
 
     async function load() {
         setLoading(true)
@@ -87,6 +108,13 @@ export default function SchedulePage() {
         const map = new Map<number, Evt>()
         for (const e of [...(A ?? []), ...(B ?? [])]) map.set(e.id, e)
         setEvts([...map.values()].sort((a, b) => a.start_date.localeCompare(b.start_date)))
+
+        // 학부모가 등록한 결석/지각
+        const { data: N } = await supabase
+            .from('attendance_notices').select('*')
+            .gte('date', from).lte('date', to)
+        setAttNotices(N ?? [])
+
         setLoading(false)
     }
 
@@ -172,6 +200,9 @@ export default function SchedulePage() {
             return e.start_date <= ds && end >= ds
         })
     }
+    function dayNotices(ds: string) {
+        return attNotices.filter(n => n.date === ds)
+    }
 
     return (
         <div style={{ padding: '28px 32px', fontFamily: "'Noto Sans KR',sans-serif" }}>
@@ -186,6 +217,8 @@ export default function SchedulePage() {
         .ce{font-size:10px;padding:1px 5px;border-radius:3px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}
         .ce.normal{background:${navyM};color:${navy};}
         .ce.holiday{background:rgba(222,53,11,.15);color:${re};}
+        .ce.absence{background:#F3E7E4;color:#A85D52;font-weight:700;cursor:default;}
+        .ce.late{background:#F3ECDD;color:#A67C3D;font-weight:700;cursor:default;}
         .bgold{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:none;background:${gold};color:${navyDk};font-family:inherit;}
         .bgold:hover{background:${goldL};}
         .bout{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid ${bd};background:transparent;color:${tx2};font-family:inherit;}
@@ -265,12 +298,19 @@ export default function SchedulePage() {
                                     width: 20, height: 20, lineHeight: '20px', textAlign: 'center',
                                     borderRadius: '50%', background: isHol ? re : 'transparent',
                                 }}>{day}</div>
+                                {dayNotices(ds).map(n => (
+                                    <div key={'n' + n.id} className={`ce ${n.type}`}
+                                        onClick={ev => ev.stopPropagation()}
+                                        title={`${n.type === 'absence' ? '결석' : '지각'} 등록 - ${studentsMap[n.student_id] ?? '학생'}${n.reason ? ` (${n.reason})` : ''}`}>
+                                        {n.type === 'late' && <IconClock size={9} strokeWidth={2.5} />} {studentsMap[n.student_id] ?? '학생'} {n.type === 'absence' ? '결석' : '지각'}
+                                    </div>
+                                ))}
                                 {de.map(e => (
                                     <div key={e.id} className={`ce ${e.type}`}
                                         onClick={ev => { ev.stopPropagation(); canWrite && openEdit(e, ev) }}
                                         title={e.title + (e.start_time ? ' ' + e.start_time.slice(0, 5) : '')}>
                                         {e.start_time && <span style={{ opacity: .7, fontSize: 9 }}>{e.start_time.slice(0, 5)} </span>}
-                                        {!e.parent_visible && '🔒 '}{e.title}
+                                        {!e.parent_visible && <IconLock size={9} strokeWidth={2.5} />} {e.title}
                                     </div>
                                 ))}
                             </div>
@@ -381,7 +421,7 @@ export default function SchedulePage() {
                                     <label className="lb">종류</label>
                                     <div className="rr">
                                         <label><input type="radio" checked={form.type === 'normal'} onChange={() => setForm(f => ({ ...f, type: 'normal' }))} />일반</label>
-                                        <label><input type="radio" checked={form.type === 'holiday'} onChange={() => setForm(f => ({ ...f, type: 'holiday' }))} />쉬는 날 🔴</label>
+                                        <label><input type="radio" checked={form.type === 'holiday'} onChange={() => setForm(f => ({ ...f, type: 'holiday' }))} />쉬는 날</label>
                                     </div>
                                 </div>
                                 <div>

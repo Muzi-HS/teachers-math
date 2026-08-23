@@ -62,34 +62,20 @@ async function getAccessToken(): Promise<string> {
   return data.access_token
 }
 
+// 학부모가 새 문의를 등록했을 때 모든 관리자에게 푸시 발송
 serve(async (req) => {
-  // CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const { parent_phone, title, body, link } = await req.json()
+    const { title, body, link } = await req.json()
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-    const normalized = parent_phone.replace(/-/g, '')
-    const { data: parent } = await supabase
-      .from('parents')
-      .select('id')
-      .eq('phone', normalized)
-      .single()
-
-    if (!parent) {
-      return new Response(JSON.stringify({ message: '학부모 없음' }), {
-        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
-
     const { data: tokens } = await supabase
-      .from('fcm_tokens')
+      .from('admin_fcm_tokens')
       .select('token')
-      .eq('parent_id', parent.id)
 
     if (!tokens || tokens.length === 0) {
       return new Response(JSON.stringify({ message: 'FCM 토큰 없음' }), {
@@ -110,12 +96,10 @@ serve(async (req) => {
           body: JSON.stringify({
             message: {
               token,
-              // notification 페이로드 제거 — FCM 자동 표시 방지
-              // onBackgroundMessage에서만 1번 표시
               data: {
                 title,
                 body,
-                link: link || '/parent/records',
+                link: link || '/inquiries',
               },
               webpush: {
                 headers: {
@@ -132,7 +116,7 @@ serve(async (req) => {
     )
 
     const succeeded = results.filter(r => r.status === 'fulfilled').length
-    console.log(`푸시 발송: ${succeeded}/${tokens.length}`)
+    console.log(`관리자 푸시 발송: ${succeeded}/${tokens.length}`)
 
     return new Response(
       JSON.stringify({ sent: succeeded, total: tokens.length }),

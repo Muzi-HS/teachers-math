@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { supabase } from '@/lib/supabase'
+import { supabase, TEACHER_AUTO_LOGIN_KEY } from '@/lib/supabase'
 import { teacherLogin, parentLookup, parentLoginWithPin } from '@/lib/auth'
 import { useAuth } from '@/context/AuthContext'
 
@@ -10,6 +10,18 @@ type Tab      = 'parent' | 'teacher'
 type PStep    = 'phone' | 'pin' | 'pin-setup'  // 학부모 로그인 단계
 
 const AUTO_KEY = 'parent_auto_login'
+
+function AutoLoginToggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label style={{ display:'flex', alignItems:'center', gap:8, marginTop:14, marginBottom:6, cursor:'pointer', width:'fit-content' }}>
+      <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)}
+        style={{ width:16, height:16, cursor:'pointer', accentColor:'#D87E13' }} />
+      <span style={{ fontSize:13, color: checked ? 'rgba(255,255,255,.85)' : 'rgba(255,255,255,.5)', transition:'color .2s' }}>
+        자동 로그인
+      </span>
+    </label>
+  )
+}
 
 export default function LoginPage() {
   const router = useRouter()
@@ -40,6 +52,7 @@ export default function LoginPage() {
   const [newPin,    setNewPin]    = useState('')
   const [newPin2,   setNewPin2]   = useState('')
   const [autoLogin, setAutoLogin] = useState(false)
+  const [teacherAutoLogin, setTeacherAutoLogin] = useState(false)
   const [parentData,setParentData]= useState<any>(null)
   const [email,     setEmail]     = useState('')
   const [password,  setPassword]  = useState('')
@@ -65,6 +78,8 @@ export default function LoginPage() {
     setError(''); setLoading(true)
     try {
       if (!email || !password) throw new Error('이메일과 비밀번호를 입력하세요.')
+      // signInWithPassword가 세션을 저장하기 전에 저장 위치(자동 로그인 여부)를 먼저 확정
+      localStorage.setItem(TEACHER_AUTO_LOGIN_KEY, teacherAutoLogin ? '1' : '0')
       const teacher = await teacherLogin(email, password)
       loginAsTeacher(teacher)
     } catch(e:any) { setError(e.message); setLoading(false) }
@@ -241,20 +256,7 @@ export default function LoginPage() {
                 위 영역을 탭하면 키패드가 열립니다
               </p>
               {error && <p style={{ fontSize:12, color:'#F48771', textAlign:'center', margin:'6px 0' }}>{error}</p>}
-              <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:24, justifyContent:'center', cursor:'pointer' }}
-                onClick={() => setAutoLogin(v => !v)}>
-                <div style={{ width:42, height:24, borderRadius:12, flexShrink:0, position:'relative',
-                  background: autoLogin ? '#D87E13' : 'rgba(255,255,255,.1)',
-                  border: `1.5px solid ${autoLogin ? '#D87E13' : 'rgba(255,255,255,.2)'}`,
-                  transition:'background .2s, border-color .2s' }}>
-                  <div style={{ position:'absolute', top:3, left: autoLogin ? 19 : 3, width:16, height:16,
-                    borderRadius:'50%', background:'#fff', transition:'left .2s',
-                    boxShadow:'0 1px 4px rgba(0,0,0,.3)' }}/>
-                </div>
-                <span style={{ fontSize:13, color: autoLogin ? 'rgba(255,255,255,.85)' : 'rgba(255,255,255,.4)', transition:'color .2s' }}>
-                  자동 로그인
-                </span>
-              </div>
+              <AutoLoginToggle checked={autoLogin} onChange={setAutoLogin} />
             </>
           )}
 
@@ -285,20 +287,7 @@ export default function LoginPage() {
                 위 영역을 탭하면 키패드가 열립니다
               </p>
               {error && <p style={{ fontSize:12, color:'#F48771', textAlign:'center', margin:'6px 0' }}>{error}</p>}
-              <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:24, justifyContent:'center', cursor:'pointer' }}
-                onClick={() => setAutoLogin(v => !v)}>
-                <div style={{ width:42, height:24, borderRadius:12, flexShrink:0, position:'relative',
-                  background: autoLogin ? '#D87E13' : 'rgba(255,255,255,.1)',
-                  border: `1.5px solid ${autoLogin ? '#D87E13' : 'rgba(255,255,255,.2)'}`,
-                  transition:'background .2s, border-color .2s' }}>
-                  <div style={{ position:'absolute', top:3, left: autoLogin ? 19 : 3, width:16, height:16,
-                    borderRadius:'50%', background:'#fff', transition:'left .2s',
-                    boxShadow:'0 1px 4px rgba(0,0,0,.3)' }}/>
-                </div>
-                <span style={{ fontSize:13, color: autoLogin ? 'rgba(255,255,255,.85)' : 'rgba(255,255,255,.4)', transition:'color .2s' }}>
-                  자동 로그인
-                </span>
-              </div>
+              <AutoLoginToggle checked={autoLogin} onChange={setAutoLogin} />
             </>
           )}
 
@@ -335,6 +324,7 @@ export default function LoginPage() {
                     <input type="password" value={password} onChange={e=>setPassword(e.target.value)}
                       onKeyDown={e=>e.key==='Enter'&&handleTeacherLogin()} placeholder="비밀번호 입력" style={iStyle}/>
                   </div>
+                  <AutoLoginToggle checked={teacherAutoLogin} onChange={setTeacherAutoLogin} />
                 </>
               )}
 

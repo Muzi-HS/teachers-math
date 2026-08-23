@@ -5,6 +5,7 @@ import { useAuth } from '@/context/AuthContext'
 import { kstNow } from '@/lib/kst'
 import TimeSlotInput from '@/components/TimeSlotInput'
 import * as XLSX from 'xlsx-js-style'
+import { IconX } from '@/components/icons'
 
 const navy='#0D2A5E', navyDk='#071A3E', navyM='#E8EEF8'
 const gold='#D87E13', goldL='#F09830', bg='#F5F7FA', bd='#DDE3EE'
@@ -466,7 +467,7 @@ export default function TeachersPage(){
                   )}
                   {editSlots.length>1&&(
                     <button onClick={()=>removeEditSlot(i)}
-                      style={{padding:'5px 8px',border:'none',background:rbg,color:re,borderRadius:6,cursor:'pointer',fontSize:12}}>✕</button>
+                      style={{padding:'5px 8px',border:'none',background:rbg,color:re,borderRadius:6,cursor:'pointer',display:'flex'}}><IconX size={12} /></button>
                   )}
                 </div>
               ))}

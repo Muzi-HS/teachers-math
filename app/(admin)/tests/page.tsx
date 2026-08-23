@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { can } from '@/lib/permissions'
 import { kstDateStr, kstNow } from '@/lib/kst'
+import { IconClipboard, IconBarChart, IconTrophy } from '@/components/icons'
 
 type Test = { id:number; name:string; date:string; total:number }
 type ScoreRow = {
@@ -357,13 +358,13 @@ export default function TestsPage() {
               <div style={{background:'#fff',borderRadius:12,border:`1px solid ${bd}`,overflow:'hidden',boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
                 {selDate&&(
                   <div style={{padding:'10px 16px',borderBottom:`1px solid ${bd}`,fontSize:13,fontWeight:700,color:tx,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                    📋 {selDate} 테스트
+                    <span style={{display:'flex',alignItems:'center',gap:5}}><IconClipboard size={13} /> {selDate} 테스트</span>
                     <span style={{fontSize:12,color:tx3,fontWeight:400}}>{filtered.length}건</span>
                   </div>
                 )}
                 {filtered.length===0?(
                   <div style={{padding:'50px 0',textAlign:'center',color:tx3}}>
-                    <p style={{fontSize:28,marginBottom:8}}>📋</p>
+                    <p style={{marginBottom:8,display:'flex',justifyContent:'center'}}><IconClipboard size={28} /></p>
                     <p style={{fontSize:14}}>{selDate?'이 날짜에 테스트가 없습니다':'등록된 테스트가 없습니다'}</p>
                   </div>
                 ):filtered.map((t,idx)=>{
@@ -465,7 +466,7 @@ export default function TestsPage() {
                 </div>
 
                 {/* 도수분포표 */}
-                <p style={{fontSize:11,fontWeight:600,color:tx3,marginBottom:10,letterSpacing:'.5px'}}>📊 도수분포표</p>
+                <p style={{fontSize:11,fontWeight:600,color:tx3,marginBottom:10,letterSpacing:'.5px',display:'flex',alignItems:'center',gap:5}}><IconBarChart size={11} /> 도수분포표</p>
                 <div style={{border:`1px solid ${bd}`,borderRadius:8,overflow:'hidden'}}>
                   <div style={{display:'grid',gridTemplateColumns:'88px 48px 56px 1fr',background:bg,padding:'6px 12px',borderBottom:`1px solid ${bd}`}}>
                     <span style={{fontSize:10,fontWeight:600,color:tx3}}>계급 (점)</span>
@@ -498,7 +499,7 @@ export default function TestsPage() {
               {/* 오른쪽: 순위 목록 */}
               <div style={{background:'#fff',borderRadius:12,border:`1px solid ${bd}`,overflow:'hidden',boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
                 <div style={{padding:'12px 16px',borderBottom:`1px solid ${bd}`,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                  <span style={{fontSize:13,fontWeight:700,color:tx}}>🏆 학생 순위</span>
+                  <span style={{fontSize:13,fontWeight:700,color:tx,display:'flex',alignItems:'center',gap:5}}><IconTrophy size={13} /> 학생 순위</span>
                   <span style={{fontSize:12,color:tx3,fontWeight:400}}>{scores.length}명</span>
                 </div>
                 {/* 헤더 */}

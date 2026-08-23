@@ -4,9 +4,13 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { kstNow } from '@/lib/kst'
+import { IconCalendar, IconBell, IconChat, IconCheck } from '@/components/icons'
+import { isUnreadParentComment } from '@/lib/records'
 
 type Class_   = { id:number; name:string; days:string; time:string }
 type Student  = { id:number; name:string }
+type InqMsg   = { id:number; parent_id:number; content:string; created_at:string }
+type UnreadRecComment = { id:number; student_id:number; date:string; parent_comment:string; parent_comment_at:string; parent_comment_read_at:string|null }
 
 const navy='#0D2A5E', navyDk='#071A3E', navyM='#E8EEF8'
 const gold='#D87E13', goldL='#F09830'
@@ -23,18 +27,26 @@ export default function DashboardPage(){
   const [classes,    setClasses]    = useState<Class_[]>([])
   const [csMap,      setCsMap]      = useState<Record<number, number[]>>({}) // class_id -> student_ids
   const [students,   setStudents]   = useState<Student[]>([])
-  const [unsentRecs, setUnsentRecs] = useState<{ id:number; student_id:number; date:string; sms_sent:boolean }[]>([])
-  const [loading,    setLoading]    = useState(true)
+  const [unsentRecs, setUnsentRecs] = useState<{ id:number; student_id:number; date:string; push_sent:boolean }[]>([])
+  const [unreadInq,     setUnreadInq]     = useState<InqMsg[]>([])
+  const [unreadInqTotal,setUnreadInqTotal]= useState(0)
+  const [unreadComments,setUnreadComments]= useState<UnreadRecComment[]>([])
+  const [childrenMap,   setChildrenMap]   = useState<Record<number, string[]>>({})
+  const [loading,       setLoading]       = useState(true)
 
   useEffect(()=>{ fetchAll() },[])
 
   async function fetchAll(){
     setLoading(true)
-    const [{ data:cls },{ data:cs },{ data:stu },{ data:unsent }] = await Promise.all([
+    const [{ data:cls },{ data:cs },{ data:stu },{ data:unsent },{ data:inq, count:inqCount },{ data:par },{ data:comments }] = await Promise.all([
       supabase.from('classes').select('id,name,days,time').order('name'),
       supabase.from('class_students').select('class_id,student_id'),
       supabase.from('students').select('id,name'),
-      supabase.from('records').select('id,student_id,date,sms_sent').eq('sms_sent',false).eq('is_draft',false).order('date',{ascending:false}).limit(10),
+      supabase.from('records').select('id,student_id,date,push_sent').eq('push_sent',false).eq('is_draft',false).order('date',{ascending:false}).limit(10),
+      supabase.from('inquiry_messages').select('id,parent_id,content,created_at',{count:'exact'}).eq('sender_type','parent').eq('is_read',false).order('created_at',{ascending:false}).limit(10),
+      supabase.from('parents').select('id, parent_students(students(name))'),
+      supabase.from('records').select('id,student_id,date,parent_comment,parent_comment_at,parent_comment_read_at')
+        .eq('is_draft',false).not('parent_comment','is',null).order('parent_comment_at',{ascending:false}).limit(50),
     ])
     setClasses(cls??[])
     const map:Record<number,number[]>={}
@@ -45,6 +57,14 @@ export default function DashboardPage(){
     setCsMap(map)
     setStudents(stu??[])
     setUnsentRecs(unsent??[])
+    setUnreadInq(inq??[])
+    setUnreadInqTotal(inqCount ?? (inq??[]).length)
+    setUnreadComments((comments??[]).filter(isUnreadParentComment) as UnreadRecComment[])
+    const cmap:Record<number,string[]> = {}
+    for (const row of (par??[]) as any[]) {
+      cmap[row.id] = (row.parent_students ?? []).map((ps:any) => ps.students?.name).filter(Boolean)
+    }
+    setChildrenMap(cmap)
     setLoading(false)
   }
 
@@ -61,7 +81,16 @@ export default function DashboardPage(){
     router.push('/records')
   }
 
+  function goToInquiries(){
+    router.push('/inquiries')
+  }
+
+  function goToRecordDate(date: string){
+    router.push(`/records?date=${date}`)
+  }
+
   const studentNameOf = (sid:number) => students.find(s=>s.id===sid)?.name ?? '알 수 없음'
+  const childNameOf = (parentId:number) => (childrenMap[parentId] ?? []).join(', ') || '학부모'
 
   const css = `
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;900&display=swap');
@@ -83,7 +112,7 @@ export default function DashboardPage(){
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: 20 }}>
         <div>
           <p style={{ fontSize: 20, fontWeight: 700, color: tx, margin: 0 }}>
-            안녕하세요, {teacher?.name ?? '선생님'}님 👋
+            안녕하세요, {teacher?.name ?? '선생님'}님
           </p>
           <p style={{ fontSize: 13, color: tx2, margin: '4px 0 0' }}>
             {kstNow().toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric', weekday:'long' })}
@@ -92,8 +121,8 @@ export default function DashboardPage(){
         </div>
       </div>
 
-      {/* 상단 요약 4칸 */}
-      <div style={{ display:'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 16 }}>
+      {/* 상단 요약 6칸 */}
+      <div style={{ display:'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 12, marginBottom: 16 }}>
         <div className="mc">
           <p style={{ fontSize: 11, color: tx3, margin: '0 0 6px' }}>오늘 수업</p>
           <p style={{ fontSize: 24, fontWeight: 700, color: navy, margin: 0 }}>
@@ -113,9 +142,21 @@ export default function DashboardPage(){
           </p>
         </div>
         <div className="mc" style={{ borderColor: unsentRecs.length > 0 ? re + '55' : bd, borderWidth: unsentRecs.length > 0 ? 1.5 : 1 }}>
-          <p style={{ fontSize: 11, color: unsentRecs.length > 0 ? re : tx3, fontWeight: unsentRecs.length > 0 ? 600 : 400, margin: '0 0 6px' }}>미발송 알림</p>
+          <p style={{ fontSize: 11, color: unsentRecs.length > 0 ? re : tx3, fontWeight: unsentRecs.length > 0 ? 600 : 400, margin: '0 0 6px' }}>미발송 푸시 알림</p>
           <p style={{ fontSize: 24, fontWeight: 700, color: unsentRecs.length > 0 ? re : tx, margin: 0 }}>
             {unsentRecs.length}<span style={{ fontSize: 13, fontWeight: 400 }}>건</span>
+          </p>
+        </div>
+        <div className="mc" style={{ cursor: 'pointer', borderColor: unreadInqTotal > 0 ? re + '55' : bd, borderWidth: unreadInqTotal > 0 ? 1.5 : 1 }} onClick={goToInquiries}>
+          <p style={{ fontSize: 11, color: unreadInqTotal > 0 ? re : tx3, fontWeight: unreadInqTotal > 0 ? 600 : 400, margin: '0 0 6px' }}>읽지 않은 문의</p>
+          <p style={{ fontSize: 24, fontWeight: 700, color: unreadInqTotal > 0 ? re : tx, margin: 0 }}>
+            {unreadInqTotal}<span style={{ fontSize: 13, fontWeight: 400 }}>건</span>
+          </p>
+        </div>
+        <div className="mc" style={{ cursor: 'pointer', borderColor: unreadComments.length > 0 ? re + '55' : bd, borderWidth: unreadComments.length > 0 ? 1.5 : 1 }} onClick={goToRecordsMenu}>
+          <p style={{ fontSize: 11, color: unreadComments.length > 0 ? re : tx3, fontWeight: unreadComments.length > 0 ? 600 : 400, margin: '0 0 6px' }}>안읽은 학부모 의견</p>
+          <p style={{ fontSize: 24, fontWeight: 700, color: unreadComments.length > 0 ? re : tx, margin: 0 }}>
+            {unreadComments.length}<span style={{ fontSize: 13, fontWeight: 400 }}>건</span>
           </p>
         </div>
       </div>
@@ -124,7 +165,7 @@ export default function DashboardPage(){
 
         {/* 좌측: 오늘 수업 일정 */}
         <div className="mc">
-          <p style={{ fontSize: 13, fontWeight: 700, color: tx, margin: '0 0 4px' }}>📅 오늘 수업 일정</p>
+          <p style={{ fontSize: 13, fontWeight: 700, color: tx, margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: 6 }}><IconCalendar size={14} /> 오늘 수업 일정</p>
           {loading ? (
             <p style={{ fontSize: 13, color: tx3, padding: '20px 0', textAlign: 'center' }}>불러오는 중...</p>
           ) : todayClasses.length === 0 ? (
@@ -144,10 +185,10 @@ export default function DashboardPage(){
           })}
         </div>
 
-        {/* 우측: 미발송 문자 알림 */}
+        {/* 우측: 미발송 푸시 알림 */}
         <div className="mc">
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: 10 }}>
-            <p style={{ fontSize: 13, fontWeight: 700, color: unsentRecs.length>0?re:tx, margin: 0 }}>✉️ 미발송 문자 알림</p>
+            <p style={{ fontSize: 13, fontWeight: 700, color: unsentRecs.length>0?re:tx, margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}><IconBell size={14} /> 미발송 푸시 알림</p>
             {unsentRecs.length > 0 && (
               <span style={{ fontSize: 12, color: navy, fontWeight: 600, cursor: 'pointer' }} onClick={goToRecordsMenu}>
                 수업기록에서 발송 →
@@ -157,7 +198,7 @@ export default function DashboardPage(){
           {loading ? (
             <p style={{ fontSize: 13, color: tx3, padding: '20px 0', textAlign: 'center' }}>불러오는 중...</p>
           ) : unsentRecs.length === 0 ? (
-            <p style={{ fontSize: 13, color: tx3, padding: '20px 0', textAlign: 'center' }}>미발송 알림이 없습니다 🎉</p>
+            <p style={{ fontSize: 13, color: tx3, padding: '20px 0', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><IconCheck size={14} /> 미발송 알림이 없습니다</p>
           ) : (
             <>
               {unsentRecs.slice(0, 5).map(r => (
@@ -175,6 +216,70 @@ export default function DashboardPage(){
           )}
         </div>
 
+      </div>
+
+      {/* 읽지 않은 문의 */}
+      <div className="mc" style={{ marginTop: 16, borderColor: unreadInq.length > 0 ? re + '55' : bd, borderWidth: unreadInq.length > 0 ? 1.5 : 1 }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: 10 }}>
+          <p style={{ fontSize: 13, fontWeight: 700, color: unreadInq.length>0?re:tx, margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}><IconChat size={14} /> 읽지 않은 문의</p>
+          {unreadInq.length > 0 && (
+            <span style={{ fontSize: 12, color: navy, fontWeight: 600, cursor: 'pointer' }} onClick={goToInquiries}>
+              문의하기에서 확인 →
+            </span>
+          )}
+        </div>
+        {loading ? (
+          <p style={{ fontSize: 13, color: tx3, padding: '20px 0', textAlign: 'center' }}>불러오는 중...</p>
+        ) : unreadInq.length === 0 ? (
+          <p style={{ fontSize: 13, color: tx3, padding: '20px 0', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><IconCheck size={14} /> 읽지 않은 문의가 없습니다</p>
+        ) : (
+          <>
+            {unreadInq.slice(0, 5).map(m => (
+              <div key={m.id} style={{ display:'flex', alignItems:'center', gap: 8, padding: '6px 0', cursor: 'pointer' }} onClick={goToInquiries}>
+                <div className="bav">{childNameOf(m.parent_id)[0]}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: tx, margin: 0 }}>{childNameOf(m.parent_id)} 학부모</p>
+                  <p style={{ fontSize: 11, color: tx2, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.content}</p>
+                </div>
+              </div>
+            ))}
+            {unreadInqTotal > 5 && (
+              <p style={{ fontSize: 11, color: tx3, margin: '6px 0 0' }}>외 {unreadInqTotal - 5}건 더보기</p>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* 안읽은 학부모 의견 */}
+      <div className="mc" style={{ marginTop: 16, borderColor: unreadComments.length > 0 ? re + '55' : bd, borderWidth: unreadComments.length > 0 ? 1.5 : 1 }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: 10 }}>
+          <p style={{ fontSize: 13, fontWeight: 700, color: unreadComments.length>0?re:tx, margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}><IconChat size={14} /> 안읽은 학부모 의견</p>
+          {unreadComments.length > 0 && (
+            <span style={{ fontSize: 12, color: navy, fontWeight: 600, cursor: 'pointer' }} onClick={goToRecordsMenu}>
+              수업기록에서 확인 →
+            </span>
+          )}
+        </div>
+        {loading ? (
+          <p style={{ fontSize: 13, color: tx3, padding: '20px 0', textAlign: 'center' }}>불러오는 중...</p>
+        ) : unreadComments.length === 0 ? (
+          <p style={{ fontSize: 13, color: tx3, padding: '20px 0', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><IconCheck size={14} /> 안읽은 학부모 의견이 없습니다</p>
+        ) : (
+          <>
+            {unreadComments.slice(0, 5).map(c => (
+              <div key={c.id} style={{ display:'flex', alignItems:'center', gap: 8, padding: '6px 0', cursor: 'pointer' }} onClick={() => goToRecordDate(c.date)}>
+                <div className="bav">{studentNameOf(c.student_id)[0]}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: tx, margin: 0 }}>{studentNameOf(c.student_id)} · {c.date}</p>
+                  <p style={{ fontSize: 11, color: tx2, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.parent_comment}</p>
+                </div>
+              </div>
+            ))}
+            {unreadComments.length > 5 && (
+              <p style={{ fontSize: 11, color: tx3, margin: '6px 0 0' }}>외 {unreadComments.length - 5}건 더보기</p>
+            )}
+          </>
+        )}
       </div>
     </div>
   )

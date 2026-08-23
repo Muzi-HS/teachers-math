@@ -14,3 +14,14 @@ export function kstDateOf(utcStr: string): string {
   const s = utcStr.length > 10 && !/[Z+]/.test(utcStr.slice(10)) ? utcStr + 'Z' : utcStr
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date(s))
 }
+
+/** UTC 타임스탬프를 KST 기준 'HH:mm'으로 변환 */
+export function kstTimeOf(utcStr: string): string {
+  const s = utcStr.length > 10 && !/[Z+]/.test(utcStr.slice(10)) ? utcStr + 'Z' : utcStr
+  return new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(s))
+}
+
+/** UTC 타임스탬프를 KST 기준 'YYYY-MM-DD HH:mm'으로 변환 */
+export function kstDateTimeOf(utcStr: string): string {
+  return `${kstDateOf(utcStr)} ${kstTimeOf(utcStr)}`
+}

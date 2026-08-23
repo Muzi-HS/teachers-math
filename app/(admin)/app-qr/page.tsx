@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import { QRCodeCanvas } from 'qrcode.react'
+import { IconSmartphone, IconShare } from '@/components/icons'
 
 const navy = '#0D2A5E', navyDk = '#071A3E', navyM = '#E8EEF8'
 const gold = '#D87E13'
@@ -62,16 +63,16 @@ export default function AppQrPage() {
           <p style={{ fontSize: 13, fontWeight: 700, color: tx, margin: '0 0 14px' }}>설치 방법 안내</p>
 
           <div style={{ background: bg, borderRadius: 10, padding: '12px 14px', marginBottom: 12 }}>
-            <p style={{ fontSize: 12, fontWeight: 700, color: navy, margin: '0 0 6px' }}>📱 안드로이드 (Chrome)</p>
+            <p style={{ fontSize: 12, fontWeight: 700, color: navy, margin: '0 0 6px', display: 'flex', alignItems: 'center', gap: 5 }}><IconSmartphone size={12} /> 안드로이드 (Chrome)</p>
             <p style={{ fontSize: 12, color: tx2, margin: 0, lineHeight: 1.6 }}>
               QR코드 스캔 → 사이트 접속 후 화면 하단 "설치" 배너를 누르면 바로 설치됩니다.
             </p>
           </div>
 
           <div style={{ background: bg, borderRadius: 10, padding: '12px 14px' }}>
-            <p style={{ fontSize: 12, fontWeight: 700, color: navy, margin: '0 0 6px' }}>🍎 아이폰 (Safari)</p>
+            <p style={{ fontSize: 12, fontWeight: 700, color: navy, margin: '0 0 6px', display: 'flex', alignItems: 'center', gap: 5 }}><IconSmartphone size={12} /> 아이폰 (Safari)</p>
             <p style={{ fontSize: 12, color: tx2, margin: 0, lineHeight: 1.6 }}>
-              QR코드 스캔 → 사이트 접속 후 화면 하단 안내에 따라, Safari 하단 공유 버튼(<span style={{ color: navy, fontWeight: 600 }}>⬆️</span>)을 누르고<br/>
+              QR코드 스캔 → 사이트 접속 후 화면 하단 안내에 따라, Safari 하단 공유 버튼(<span style={{ color: navy, display: 'inline-flex', verticalAlign: 'middle' }}><IconShare size={12} /></span>)을 누르고<br/>
               "홈 화면에 추가"를 선택하면 설치됩니다.
             </p>
           </div>
