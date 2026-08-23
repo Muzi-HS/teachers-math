@@ -467,7 +467,7 @@ export default function StudentsPage() {
                   {!mobileMode && canFull && <th>학생 연락처</th>}
                   {canFull && <th>학부모 연락처</th>}
                   {!mobileMode && <th>소속 반</th>}
-                  {isAdmin && <th>관리</th>}
+                  {!mobileMode && isAdmin && <th>관리</th>}
                 </tr>
               </thead>
               <tbody>
@@ -501,7 +501,7 @@ export default function StudentsPage() {
                           </div>
                         </td>
                       )}
-                      {isAdmin && (
+                      {!mobileMode && isAdmin && (
                         <td onClick={e => e.stopPropagation()}>
                           <div style={{ display:'flex',gap:5 }}>
                             <button className="bout" onClick={() => openEdit(s)}>수정</button>
