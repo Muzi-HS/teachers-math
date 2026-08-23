@@ -421,7 +421,7 @@ export default function TeachersPage(){
     .tab-btn.active{color:${navy};font-weight:700;border-bottom-color:${navy};}
     .sub-tab{padding:6px 16px;border:none;background:none;cursor:pointer;font-size:13px;font-family:inherit;color:${tx3};border-bottom:2px solid transparent;}
     .sub-tab.active{color:${navy};font-weight:600;border-bottom-color:${navy};}
-    .cd{min-height:80px;background:#fff;border:1px solid ${bd};border-radius:8px;padding:6px;cursor:pointer;transition:background .15s;}
+    .cd{min-height:${mobileMode?46:80}px;background:#fff;border:1px solid ${bd};border-radius:8px;padding:${mobileMode?'3px':'6px'};cursor:pointer;transition:background .15s;}
     .cd:hover{background:${navyM};}
     .cd.om{opacity:.35;cursor:default;pointer-events:none;}
     .fi{width:100%;padding:9px 11px;border:1.5px solid ${bd};border-radius:8px;font-size:13px;font-family:inherit;color:${tx};outline:none;background:#fff;transition:border-color .2s;box-sizing:border-box;}
@@ -579,6 +579,23 @@ export default function TeachersPage(){
         <div style={{background:'#fff',borderRadius:12,border:`1px solid ${bd}`,boxShadow:'0 1px 4px rgba(0,0,0,.06)',overflow:'hidden'}}>
           {loading?(
             <p style={{padding:24,color:tx3}}>불러오는 중...</p>
+          ):mobileMode?(
+            <div>
+              {sortedTeachers.map((t,idx)=>(
+                <div key={t.id} style={{padding:'12px 14px',borderBottom:idx<sortedTeachers.length-1?`1px solid ${bd}`:'none',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
+                  <div style={{minWidth:0}}>
+                    <p style={{fontSize:14,fontWeight:600,color:tx,margin:0}}>{t.name}</p>
+                    <p style={{fontSize:12,color:tx2,margin:'2px 0 0'}}>{fmtPhone(t.phone)}</p>
+                  </div>
+                  <select className="fsel" value={t.role} onChange={e=>changeRole(t,e.target.value)}
+                    style={{padding:'4px 8px',fontSize:11,flexShrink:0}}>
+                    <option value="teacher">선생님</option>
+                    <option value="assistant">조교</option>
+                    <option value="admin">관리자</option>
+                  </select>
+                </div>
+              ))}
+            </div>
           ):(
             <div style={{overflowX:'auto'}}>
             <table>
@@ -693,33 +710,48 @@ export default function TeachersPage(){
                     const pending=dLogs.filter(l=>!l.approved).length
                     const approved=dLogs.filter(l=>l.approved).length
                     const dow=(fd+d-1)%7
+                    const dEvts = dayEvts(ds)
                     return(
                       <div key={d} className="cd" onClick={()=>dLogs.length>0&&setCalDay(ds)}
-                        style={{cursor:dLogs.length>0?'pointer':'default'}}>
-                        <div style={{fontSize:11,fontWeight:600,marginBottom:3,
+                        style={{cursor:dLogs.length>0?'pointer':'default',
+                          ...(mobileMode?{display:'flex',flexDirection:'column',alignItems:'center',gap:2,padding:'4px 0 6px'}:{})}}>
+                        <div style={{fontSize:11,fontWeight:600,marginBottom:mobileMode?0:3,
                           color:dow===0?re:dow===6?navy:tx2}}>
                           {d}
                         </div>
-                        {dayEvts(ds).map(e=>(
-                          <div key={'e'+e.id} title={e.title} style={{
-                            fontSize:9,padding:'2px 4px',borderRadius:3,marginBottom:2,
-                            background:e.type==='holiday'?'rgba(222,53,11,.15)':navyM,
-                            color:e.type==='holiday'?re:navy,
-                            whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                            {e.start_time&&`${e.start_time.slice(0,5)} `}{e.title}
+                        {mobileMode?(
+                          <div style={{display:'flex',gap:2,flexWrap:'wrap',justifyContent:'center'}}>
+                            {dEvts.slice(0,2).map(e=>(
+                              <div key={'e'+e.id} style={{width:4,height:4,borderRadius:'50%',background:e.type==='holiday'?re:navy}}/>
+                            ))}
+                            {dLogs.slice(0,3).map(l=>(
+                              <div key={l.id} style={{width:4,height:4,borderRadius:'50%',background:l.approved?gr:'#D87E13'}}/>
+                            ))}
                           </div>
-                        ))}
-                        {dLogs.map(l=>(
-                          <div key={l.id} style={{
-                            fontSize:9,padding:'2px 4px',borderRadius:3,marginBottom:2,
-                            background:l.approved?gbg:'#FEF3E2',
-                            color:l.approved?gr:'#D87E13',
-                            whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                            {teacherName(l.teacher_id)} {fmtHours(l.work_minutes)}
-                          </div>
-                        ))}
-                        {pending>0&&(
-                          <div style={{fontSize:9,color:'#D87E13',fontWeight:700}}>대기 {pending}</div>
+                        ):(
+                          <>
+                            {dEvts.map(e=>(
+                              <div key={'e'+e.id} title={e.title} style={{
+                                fontSize:9,padding:'2px 4px',borderRadius:3,marginBottom:2,
+                                background:e.type==='holiday'?'rgba(222,53,11,.15)':navyM,
+                                color:e.type==='holiday'?re:navy,
+                                whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                                {e.start_time&&`${e.start_time.slice(0,5)} `}{e.title}
+                              </div>
+                            ))}
+                            {dLogs.map(l=>(
+                              <div key={l.id} style={{
+                                fontSize:9,padding:'2px 4px',borderRadius:3,marginBottom:2,
+                                background:l.approved?gbg:'#FEF3E2',
+                                color:l.approved?gr:'#D87E13',
+                                whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                                {teacherName(l.teacher_id)} {fmtHours(l.work_minutes)}
+                              </div>
+                            ))}
+                            {pending>0&&(
+                              <div style={{fontSize:9,color:'#D87E13',fontWeight:700}}>대기 {pending}</div>
+                            )}
+                          </>
                         )}
                       </div>
                     )

@@ -292,29 +292,44 @@ export default function SchedulePage() {
                         if (isTod) cls += ' tod'
                         if (isHol) cls += ' hol'
                         const nc = dow === 0 ? re : dow === 6 ? navy : tx
+                        const dNotices = dayNotices(ds)
                         return (
-                            <div key={day} className={cls} onClick={() => canWrite && openAdd(ds)}>
+                            <div key={day} className={cls} onClick={() => canWrite && openAdd(ds)}
+                                style={mobileMode ? { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '4px 0 6px' } : undefined}>
                                 <div style={{
-                                    fontSize: 12, fontWeight: isTod || isHol ? 700 : 500, marginBottom: 2,
+                                    fontSize: 12, fontWeight: isTod || isHol ? 700 : 500, marginBottom: mobileMode ? 0 : 2,
                                     color: isHol ? '#fff' : nc,
                                     width: 20, height: 20, lineHeight: '20px', textAlign: 'center',
                                     borderRadius: '50%', background: isHol ? re : 'transparent',
                                 }}>{day}</div>
-                                {dayNotices(ds).map(n => (
-                                    <div key={'n' + n.id} className={`ce ${n.type}`}
-                                        onClick={ev => ev.stopPropagation()}
-                                        title={`${n.type === 'absence' ? '결석' : '지각'} 등록 - ${studentsMap[n.student_id] ?? '학생'}${n.reason ? ` (${n.reason})` : ''}`}>
-                                        {n.type === 'late' && <IconClock size={9} strokeWidth={2.5} />} {studentsMap[n.student_id] ?? '학생'} {n.type === 'absence' ? '결석' : '지각'}
+                                {mobileMode ? (
+                                    <div style={{ display: 'flex', gap: 2 }}>
+                                        {de.slice(0, 3).map(e => (
+                                            <div key={'e' + e.id} style={{ width: 4, height: 4, borderRadius: '50%', background: e.type === 'holiday' ? re : navy }} />
+                                        ))}
+                                        {dNotices.slice(0, 3).map(n => (
+                                            <div key={'n' + n.id} style={{ width: 4, height: 4, borderRadius: '50%', background: n.type === 'absence' ? '#A85D52' : '#A67C3D' }} />
+                                        ))}
                                     </div>
-                                ))}
-                                {de.map(e => (
-                                    <div key={e.id} className={`ce ${e.type}`}
-                                        onClick={ev => { ev.stopPropagation(); canWrite && openEdit(e, ev) }}
-                                        title={e.title + (e.start_time ? ' ' + e.start_time.slice(0, 5) : '')}>
-                                        {e.start_time && <span style={{ opacity: .7, fontSize: 9 }}>{e.start_time.slice(0, 5)} </span>}
-                                        {!e.parent_visible && <IconLock size={9} strokeWidth={2.5} />} {e.title}
-                                    </div>
-                                ))}
+                                ) : (
+                                    <>
+                                        {dNotices.map(n => (
+                                            <div key={'n' + n.id} className={`ce ${n.type}`}
+                                                onClick={ev => ev.stopPropagation()}
+                                                title={`${n.type === 'absence' ? '결석' : '지각'} 등록 - ${studentsMap[n.student_id] ?? '학생'}${n.reason ? ` (${n.reason})` : ''}`}>
+                                                {n.type === 'late' && <IconClock size={9} strokeWidth={2.5} />} {studentsMap[n.student_id] ?? '학생'} {n.type === 'absence' ? '결석' : '지각'}
+                                            </div>
+                                        ))}
+                                        {de.map(e => (
+                                            <div key={e.id} className={`ce ${e.type}`}
+                                                onClick={ev => { ev.stopPropagation(); canWrite && openEdit(e, ev) }}
+                                                title={e.title + (e.start_time ? ' ' + e.start_time.slice(0, 5) : '')}>
+                                                {e.start_time && <span style={{ opacity: .7, fontSize: 9 }}>{e.start_time.slice(0, 5)} </span>}
+                                                {!e.parent_visible && <IconLock size={9} strokeWidth={2.5} />} {e.title}
+                                            </div>
+                                        ))}
+                                    </>
+                                )}
                             </div>
                         )
                     })}

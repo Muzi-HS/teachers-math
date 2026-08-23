@@ -462,11 +462,11 @@ export default function StudentsPage() {
               <thead>
                 <tr>
                   <th>이름</th>
-                  <th>나이</th>
-                  <th>학교</th>
-                  {canFull && <th>학생 연락처</th>}
+                  {!mobileMode && <th>나이</th>}
+                  {!mobileMode && <th>학교</th>}
+                  {!mobileMode && canFull && <th>학생 연락처</th>}
                   {canFull && <th>학부모 연락처</th>}
-                  <th>소속 반</th>
+                  {!mobileMode && <th>소속 반</th>}
                   {isAdmin && <th>관리</th>}
                 </tr>
               </thead>
@@ -484,21 +484,23 @@ export default function StudentsPage() {
                           )}
                         </div>
                       </td>
-                      <td style={{ color:tx2 }}>{ageOf(s.birth_year)}세</td>
-                      <td style={{ color:tx2 }}>{s.school || '-'}</td>
-                      {canFull && <td style={{ color:tx2 }}>{fmtPhone(s.phone)}</td>}
+                      {!mobileMode && <td style={{ color:tx2 }}>{ageOf(s.birth_year)}세</td>}
+                      {!mobileMode && <td style={{ color:tx2 }}>{s.school || '-'}</td>}
+                      {!mobileMode && canFull && <td style={{ color:tx2 }}>{fmtPhone(s.phone)}</td>}
                       {canFull && <td style={{ color:tx2 }}>{fmtPhone(s.parent_phone)}</td>}
-                      <td onClick={e => e.stopPropagation()}>
-                        <div style={{ display:'flex',gap:4,flexWrap:'wrap' }}>
-                          {activeClsIds.length > 0
-                            ? activeClsIds.map(cid => {
-                                const cls = classes.find(c => c.id === cid)
-                                return cls ? <span key={cid} className="badge" style={{ background:gbg,color:gr }}>{cls.name}</span> : null
-                              })
-                            : <span style={{ color:tx3,fontSize:12 }}>미배정</span>
-                          }
-                        </div>
-                      </td>
+                      {!mobileMode && (
+                        <td onClick={e => e.stopPropagation()}>
+                          <div style={{ display:'flex',gap:4,flexWrap:'wrap' }}>
+                            {activeClsIds.length > 0
+                              ? activeClsIds.map(cid => {
+                                  const cls = classes.find(c => c.id === cid)
+                                  return cls ? <span key={cid} className="badge" style={{ background:gbg,color:gr }}>{cls.name}</span> : null
+                                })
+                              : <span style={{ color:tx3,fontSize:12 }}>미배정</span>
+                            }
+                          </div>
+                        </td>
+                      )}
                       {isAdmin && (
                         <td onClick={e => e.stopPropagation()}>
                           <div style={{ display:'flex',gap:5 }}>
