@@ -517,9 +517,8 @@ export default function RecordsPage() {
 
   // 반별 그룹핑 (달력 날짜 기준)
   function recClsId(r: Rec) { return r.class_id ?? (csMap[r.student_id] ?? null) }
-  // justReadIds(이 날짜를 여는 순간 읽음 처리된 카드)도 함께 강조 대상으로 봐서,
-  // 읽음 처리 요청이 백그라운드에서 완료되는 타이밍에 카드가 갑자기 순서/테두리를 바꾸지 않게 한다
-  function isHighlighted(r: Rec) { return isUnreadParentComment(r) || justReadIds.has(r.id) }
+  // 확인 여부와 무관하게 학부모 의견이 남겨진 카드는 계속 강조/맨 앞 정렬 유지
+  function isHighlighted(r: Rec) { return !!r.parent_comment }
   const clsGroups = (() => {
     const groups: { cls: Class_ | null; recs: Rec[] }[] = []
     const seen = new Set<number | null>()
