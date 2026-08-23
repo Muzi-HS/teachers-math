@@ -30,6 +30,7 @@ type Rec = {
 
 const navy = '#0D2A5E', navyDk = '#071A3E', navyM = '#E8EEF8'
 const gold = '#D87E13', goldL = '#F09830'
+const hlYellow = '#F2B705', hlYellowBg = '#FFFBEA' // 안읽은 학부모 의견 카드 강조색
 const bg = '#F5F7FA', bd = '#DDE3EE'
 const tx = '#0D1B36', tx2 = '#4B5C7E', tx3 = '#96A4BF'
 const re = '#C0392B', rbg = '#FDECEA', gr = '#1A7F4E', gbg = '#E0F5EB'
@@ -516,6 +517,9 @@ export default function RecordsPage() {
 
   // 반별 그룹핑 (달력 날짜 기준)
   function recClsId(r: Rec) { return r.class_id ?? (csMap[r.student_id] ?? null) }
+  // justReadIds(이 날짜를 여는 순간 읽음 처리된 카드)도 함께 강조 대상으로 봐서,
+  // 읽음 처리 요청이 백그라운드에서 완료되는 타이밍에 카드가 갑자기 순서/테두리를 바꾸지 않게 한다
+  function isHighlighted(r: Rec) { return isUnreadParentComment(r) || justReadIds.has(r.id) }
   const clsGroups = (() => {
     const groups: { cls: Class_ | null; recs: Rec[] }[] = []
     const seen = new Set<number | null>()
@@ -524,7 +528,11 @@ export default function RecordsPage() {
       if (!seen.has(clsId)) {
         seen.add(clsId)
         const cls = clsId !== null ? (classes.find(c => c.id === clsId) ?? null) : null
-        groups.push({ cls, recs: dayRecs.filter(rec => recClsId(rec) === clsId) })
+        // 학부모 의견을 아직 확인하지 않은 카드를 그 반 안에서 맨 앞으로 (나머지는 기존 순서 유지)
+        const recsForCls = dayRecs.filter(rec => recClsId(rec) === clsId)
+          .slice()
+          .sort((a, b) => Number(isHighlighted(b)) - Number(isHighlighted(a)))
+        groups.push({ cls, recs: recsForCls })
       }
     }
     return groups
@@ -694,7 +702,7 @@ export default function RecordsPage() {
                 const cls = classes.find(c => c.id === recClsId(r))
                 const tItems = r.record_test_items ?? []
                 return (
-                  <div key={r.id} className="rc">
+                  <div key={r.id} className="rc" style={isHighlighted(r) ? { border: `2px solid ${hlYellow}`, background: hlYellowBg } : undefined}>
                     {/* 카드 헤더 */}
                     <div className="rch">
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
