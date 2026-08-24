@@ -58,7 +58,7 @@ export default function ParentInquiriesPage() {
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}` },
       body: JSON.stringify({
         title: '티처스 수학학원',
-        body: `${childNames ? childNames + ' 학부모' : '학부모'}님의 새 문의: ${content.slice(0, 40)}`,
+        body: `${childNames ? childNames + ' 학부모' : '학부모'}님에게서 메시지가 도착했습니다`,
         link: '/inquiries',
       }),
     }).catch(() => {})

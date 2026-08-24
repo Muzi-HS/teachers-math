@@ -5,8 +5,8 @@ import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { kstDateStr, kstNow, kstTimeOf } from '@/lib/kst'
 import ClassBulkRecordModal from '@/components/ClassBulkRecordModal'
-import { IconBook, IconX } from '@/components/icons'
-import { isUnreadParentComment } from '@/lib/records'
+import { IconBook, IconX, IconSend } from '@/components/icons'
+import { isUnreadParentComment, RecordComment, groupCommentsByRecord } from '@/lib/records'
 import { useMobileMode } from '@/context/MobileModeContext'
 
 type Student = { id: number; name: string; parent_phone: string }
@@ -170,6 +170,9 @@ export default function RecordsPage() {
   const [unreadCommentDates, setUnreadCommentDates] = useState<Set<string>>(new Set())
   const [justReadIds, setJustReadIds] = useState<Set<number>>(new Set())
   const [dayRecs,  setDayRecs]  = useState<Rec[]>([])
+  const [comments, setComments] = useState<RecordComment[]>([])
+  const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({})
+  const [sendingCommentId, setSendingCommentId] = useState<number | null>(null)
   const [loading,  setLoading]  = useState(false)
   const [editModal,     setEditModal]     = useState(false)
   const [editId,        setEditId]        = useState<number | null>(null)
@@ -251,12 +254,12 @@ export default function RecordsPage() {
 
     if (!recs || recs.length === 0) { setDayRecs([]); setLoading(false); return }
 
-    // 2. record_test_items 별도 조회 (join RLS 우회)
+    // 2. record_test_items / record_comments 별도 조회 (join RLS 우회)
     const recIds = recs.map(r => r.id)
-    const { data: items } = await supabase
-      .from('record_test_items')
-      .select('id, record_id, test_id, t_total, t_cor, t_score')
-      .in('record_id', recIds)
+    const [{ data: items }, { data: commentsData }] = await Promise.all([
+      supabase.from('record_test_items').select('id, record_id, test_id, t_total, t_cor, t_score').in('record_id', recIds),
+      supabase.from('record_comments').select('*').in('record_id', recIds).order('created_at', { ascending: true }),
+    ])
 
     // 3. tests 조회 (시험명)
     const testIds = [...new Set((items ?? []).map((x: any) => x.test_id))]
@@ -289,6 +292,7 @@ export default function RecordsPage() {
       record_test_items: itemsByRecord[r.id] ?? [],
     }))
     setDayRecs(merged)
+    setComments((commentsData ?? []) as RecordComment[])
     setLoading(false)
 
     // 학부모 의견 읽음 처리 — 이 날짜를 열람한 시점을 "확인함"으로 기록 (문의하기 읽음 처리와 동일한 개념)
@@ -296,11 +300,47 @@ export default function RecordsPage() {
     setJustReadIds(new Set(unreadIds))
     if (unreadIds.length > 0) {
       const nowIso = new Date().toISOString()
-      supabase.from('records').update({ parent_comment_read_at: nowIso }).in('id', unreadIds).then(({ error }) => {
-        if (error) { console.error('[학부모 의견 읽음 처리 실패]', error); return }
+      const unreadCommentIds = (commentsData ?? []).filter(c => c.sender_type === 'parent' && !c.is_read).map(c => c.id)
+      Promise.all([
+        supabase.from('records').update({ parent_comment_read_at: nowIso }).in('id', unreadIds),
+        unreadCommentIds.length > 0
+          ? supabase.from('record_comments').update({ is_read: true }).in('id', unreadCommentIds)
+          : Promise.resolve({ error: null }),
+      ]).then(([r1, r2]) => {
+        if (r1.error) { console.error('[학부모 의견 읽음 처리 실패]', r1.error); return }
+        if (r2.error) console.error('[record_comments 읽음 처리 실패]', r2.error)
         setDayRecs(rs => rs.map(r => unreadIds.includes(r.id) ? { ...r, parent_comment_read_at: nowIso } : r))
+        setComments(cs => cs.map(c => unreadCommentIds.includes(c.id) ? { ...c, is_read: true } : c))
         setUnreadCommentDates(ds => { const n = new Set(ds); n.delete(selDate); return n })
       })
+    }
+  }
+
+  async function sendCommentReply(recId: number) {
+    const text = (replyDrafts[recId] ?? '').trim()
+    if (!text) return
+    setSendingCommentId(recId)
+    const { data, error } = await supabase.from('record_comments')
+      .insert({ record_id: recId, sender_type: 'admin', sender_teacher_id: teacher?.userId ?? null, content: text })
+      .select('*').single()
+    setSendingCommentId(null)
+    if (error) { toast('전송 실패: ' + error.message, false); return }
+    setComments(cs => [...cs, data as RecordComment])
+    setReplyDrafts(d => ({ ...d, [recId]: '' }))
+
+    const r = dayRecs.find(x => x.id === recId)
+    const phone = r ? students.find(s => s.id === r.student_id)?.parent_phone : null
+    if (phone) {
+      fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({
+          parent_phone: phone,
+          title: '티처스 수학학원',
+          body: `수업기록에 대한 메시지가 등록되었습니다.`,
+          link: '/parent/records',
+        }),
+      }).catch(() => {})
     }
   }
 
@@ -521,6 +561,7 @@ export default function RecordsPage() {
   function recClsId(r: Rec) { return r.class_id ?? (csMap[r.student_id] ?? null) }
   // 확인 여부와 무관하게 학부모 의견이 남겨진 카드는 계속 강조/맨 앞 정렬 유지
   function isHighlighted(r: Rec) { return !!r.parent_comment }
+  const commentsByRecord = groupCommentsByRecord(comments)
   const clsGroups = (() => {
     const groups: { cls: Class_ | null; recs: Rec[] }[] = []
     const seen = new Set<number | null>()
@@ -832,16 +873,52 @@ export default function RecordsPage() {
                   </div>
                 )}
 
-                {/* 학부모 의견 */}
-                {r.parent_comment && (
+                {/* 학부모 의견 — 학부모와 주고받는 대화 */}
+                {(commentsByRecord[r.id] ?? []).length > 0 && (
                   <div className="pc" style={{ marginTop: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 5 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 8 }}>
                       <div style={{ width: 3, height: 14, background: gold, borderRadius: 2 }} />
                       <span style={{ fontSize: 13, fontWeight: 600, color: gold }}>학부모 의견</span>
                       {justReadIds.has(r.id) && <span className="badge" style={{ background: rbg, color: re }}>새 의견</span>}
-                      {r.parent_comment_at && <span style={{ fontSize: 11, color: tx3, marginLeft: 'auto' }}>{r.parent_comment_at.slice(0, 10)}</span>}
                     </div>
-                    <p style={{ fontSize: 14, color: tx, lineHeight: 1.6 }}>{r.parent_comment}</p>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10, maxHeight: 260, overflowY: 'auto' }}>
+                      {(commentsByRecord[r.id] ?? []).map(c => {
+                        const isAdmin = c.sender_type === 'admin'
+                        return (
+                          <div key={c.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isAdmin ? 'flex-end' : 'flex-start' }}>
+                            {!isAdmin && <span style={{ fontSize: 10, color: tx3, marginBottom: 2 }}>학부모</span>}
+                            <div style={{
+                              maxWidth: '85%', padding: '8px 12px', borderRadius: 12, fontSize: 13, lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                              background: isAdmin ? navy : bg, color: isAdmin ? '#fff' : tx,
+                              borderBottomRightRadius: isAdmin ? 3 : 12, borderBottomLeftRadius: isAdmin ? 12 : 3,
+                            }}>
+                              {c.content}
+                            </div>
+                            <span style={{ fontSize: 10, color: tx3, marginTop: 2 }}>{c.created_at.slice(0, 10)}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end' }}>
+                      <textarea
+                        value={replyDrafts[r.id] ?? ''}
+                        onChange={e => setReplyDrafts(d => ({ ...d, [r.id]: e.target.value }))}
+                        placeholder="학부모에게 답글을 남겨주세요"
+                        rows={1}
+                        style={{ flex: 1, padding: '8px 10px', border: `1.5px solid ${bd}`, borderRadius: 8, fontSize: 13, fontFamily: 'inherit', color: tx, outline: 'none', resize: 'none', boxSizing: 'border-box' }}
+                      />
+                      <button onClick={() => sendCommentReply(r.id)} disabled={sendingCommentId === r.id || !(replyDrafts[r.id] ?? '').trim()}
+                        style={{
+                          flexShrink: 0, width: 36, height: 36, borderRadius: 8, border: 'none', background: navy, color: '#fff',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          cursor: sendingCommentId === r.id || !(replyDrafts[r.id] ?? '').trim() ? 'not-allowed' : 'pointer',
+                          opacity: sendingCommentId === r.id || !(replyDrafts[r.id] ?? '').trim() ? 0.6 : 1,
+                        }}>
+                        <IconSend size={15} />
+                      </button>
+                    </div>
                   </div>
                 )}
                 </div>

@@ -2,7 +2,8 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useParentChild } from '../layout'
-import { IconArrowUp, IconInbox } from '@/components/icons'
+import { IconArrowUp, IconInbox, IconSend } from '@/components/icons'
+import { RecordComment, groupCommentsByRecord } from '@/lib/records'
 
 const navy='#0D2A5E', gold='#D87E13', tx='#0D1B36', tx2='#4B5C7E', tx3='#96A4BF'
 const bd='#DDE3EE', bg='#F5F7FA', re='#C0392B', rbg='#FDECEA', gr='#1A7F4E', gbg='#E0F5EB'
@@ -11,7 +12,6 @@ type Rec = {
   id: number; date: string; content: string; homework: string
   hw_rate: number; hw_cor: number; attitude: number
   late: boolean; has_test: boolean; feedback: string
-  parent_comment: string | null; parent_comment_at: string | null
   viewed_at: string | null
   record_test_items?: { test_id: number; t_total: number; t_cor: number; t_score: number; tests: { name: string } | null }[]
 }
@@ -94,8 +94,9 @@ export default function ParentRecords() {
   const { selChild, setSelChild, children } = useParentChild()
   const [recs,    setRecs]    = useState<Rec[]>([])
   const [loading, setLoading] = useState(false)
+  const [comments, setComments] = useState<RecordComment[]>([])
   const [commentDrafts, setCommentDrafts] = useState<Record<number, string>>({})
-  const [savingId, setSavingId] = useState<number | null>(null)
+  const [sendingId, setSendingId] = useState<number | null>(null)
   const [commentErr, setCommentErr] = useState<Record<number, string>>({})
 
   useEffect(() => {
@@ -113,13 +114,13 @@ export default function ParentRecords() {
       .eq('push_sent', true) // 알림 발송 전에는 학부모에게 노출되지 않음
       .order('date', { ascending: false })
 
-    if (!recsData || recsData.length === 0) { setRecs([]); setLoading(false); return }
+    if (!recsData || recsData.length === 0) { setRecs([]); setComments([]); setLoading(false); return }
 
     const recIds = recsData.map(r => r.id)
-    const { data: items } = await supabase
-      .from('record_test_items')
-      .select('id,record_id,test_id,t_total,t_cor,t_score')
-      .in('record_id', recIds)
+    const [{ data: items }, { data: commentsData }] = await Promise.all([
+      supabase.from('record_test_items').select('id,record_id,test_id,t_total,t_cor,t_score').in('record_id', recIds),
+      supabase.from('record_comments').select('*').in('record_id', recIds).order('created_at', { ascending: true }),
+    ])
 
     const testIds = [...new Set((items ?? []).map((x: any) => x.test_id))]
     let testsMap: Record<number, string> = {}
@@ -140,11 +141,11 @@ export default function ParentRecords() {
 
     const merged = recsData.map(r => ({ ...r, record_test_items: itemsByRecord[r.id] ?? [] })) as Rec[]
     setRecs(merged)
-    setCommentDrafts(Object.fromEntries(merged.map(r => [r.id, r.parent_comment ?? ''])))
+    setComments((commentsData ?? []) as RecordComment[])
     setLoading(false)
 
     // 아직 안 읽은(viewed_at이 없는) 기록을 지금 열람한 것으로 기록 — 관리자 쪽 읽음 확인용
-    // (모바일에서 앱이 백그라운드로 전환되며 이 요청이 중간에 끊길 수 있어, saveComment 등
+    // (모바일에서 앱이 백그라운드로 전환되며 이 요청이 중간에 끊길 수 있어, sendComment 등
     // 실제로 학부모가 기록을 다뤘다는 게 확인되는 시점에도 아래에서 한 번 더 보정한다)
     const unviewedIds = merged.filter(r => !r.viewed_at).map(r => r.id)
     if (unviewedIds.length > 0) {
@@ -156,36 +157,42 @@ export default function ParentRecords() {
     }
   }
 
-  async function saveComment(recId: number) {
+  async function sendComment(recId: number) {
     const text = (commentDrafts[recId] ?? '').trim()
-    setSavingId(recId)
+    if (!text) return
+    setSendingId(recId)
     setCommentErr(e => ({ ...e, [recId]: '' }))
-    const nowIso = new Date().toISOString()
-    // 의견을 남긴다는 것 자체가 학부모가 기록을 확인했다는 확실한 증거이므로,
-    // 아직 읽음 처리가 안 된 기록이면 이 저장에 같이 실어 읽음 처리도 보정한다.
-    const alreadyViewed = !!recs.find(r => r.id === recId)?.viewed_at
-    const { error } = await supabase.from('records')
-      .update({ parent_comment: text, parent_comment_at: nowIso, ...(alreadyViewed ? {} : { viewed_at: nowIso }) })
-      .eq('id', recId)
-    setSavingId(null)
-    if (error) { setCommentErr(e => ({ ...e, [recId]: '의견 저장에 실패했습니다.' })); return }
-    setRecs(rs => rs.map(r => r.id === recId ? { ...r, parent_comment: text, parent_comment_at: nowIso, viewed_at: r.viewed_at ?? nowIso } : r))
+    const { data, error } = await supabase.from('record_comments')
+      .insert({ record_id: recId, sender_type: 'parent', content: text })
+      .select('*').single()
+    setSendingId(null)
+    if (error) { setCommentErr(e => ({ ...e, [recId]: '전송에 실패했습니다.' })); return }
+    setComments(cs => [...cs, data as RecordComment])
+    setCommentDrafts(d => ({ ...d, [recId]: '' }))
 
-    if (text) {
-      const childName = children.find(c => c.id === selChild)?.name ?? '학생'
-      fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push-admin`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}` },
-        body: JSON.stringify({
-          title: '티처스 수학학원',
-          body: `${childName} 학부모님이 수업기록에 의견을 남겼습니다: ${text.slice(0, 40)}`,
-          link: '/records',
-        }),
-      }).catch(() => {})
+    // 의견을 남긴다는 것 자체가 학부모가 기록을 확인했다는 확실한 증거이므로,
+    // 아직 읽음 처리가 안 된 기록이면 여기서 읽음 처리도 보정한다.
+    const alreadyViewed = !!recs.find(r => r.id === recId)?.viewed_at
+    if (!alreadyViewed) {
+      const nowIso = new Date().toISOString()
+      supabase.from('records').update({ viewed_at: nowIso }).eq('id', recId).then(({ error: e2 }) => {
+        if (!e2) setRecs(rs => rs.map(r => r.id === recId ? { ...r, viewed_at: nowIso } : r))
+      })
     }
+
+    fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push-admin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({
+        title: '티처스 수학학원',
+        body: `학부모 의견이 등록되었습니다.`,
+        link: '/records',
+      }),
+    }).catch(() => {})
   }
 
   const curChild = children.find(c => c.id === selChild)
+  const commentsByRecord = groupCommentsByRecord(comments)
 
   return (
     <div>
@@ -320,29 +327,53 @@ export default function ParentRecords() {
                   </div>
                 )}
 
-                {/* 학부모 의견 */}
+                {/* 학부모 의견 — 선생님과 주고받는 대화 */}
                 <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${bd}` }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 8 }}>
                     <div style={{ width: 3, height: 14, background: gold, borderRadius: 2 }} />
                     <span style={{ fontSize: 13, fontWeight: 600, color: gold }}>학부모 의견</span>
                   </div>
-                  <textarea
-                    value={commentDrafts[r.id] ?? ''}
-                    onChange={e => setCommentDrafts(d => ({ ...d, [r.id]: e.target.value }))}
-                    placeholder="선생님께 전달하고 싶은 의견을 남겨주세요"
-                    rows={2}
-                    style={{ width: '100%', padding: '8px 10px', border: `1.5px solid ${bd}`, borderRadius: 8, fontSize: 13, fontFamily: 'inherit', color: tx, outline: 'none', resize: 'vertical', boxSizing: 'border-box' }}
-                  />
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
-                    <span style={{ fontSize: 11, color: re }}>{commentErr[r.id]}</span>
-                    <button onClick={() => saveComment(r.id)} disabled={savingId === r.id}
-                      style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: gold, color: '#fff', fontSize: 12, fontWeight: 700, cursor: savingId === r.id ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: savingId === r.id ? 0.7 : 1 }}>
-                      {savingId === r.id ? '저장 중...' : (r.parent_comment ? '의견 수정' : '의견 남기기')}
+
+                  {(commentsByRecord[r.id] ?? []).length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10, maxHeight: 260, overflowY: 'auto' }}>
+                      {(commentsByRecord[r.id] ?? []).map(c => {
+                        const isParent = c.sender_type === 'parent'
+                        return (
+                          <div key={c.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isParent ? 'flex-end' : 'flex-start' }}>
+                            {!isParent && <span style={{ fontSize: 10, color: tx3, marginBottom: 2 }}>선생님</span>}
+                            <div style={{
+                              maxWidth: '85%', padding: '8px 12px', borderRadius: 12, fontSize: 13, lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                              background: isParent ? '#FEF3E2' : bg, color: tx,
+                              borderBottomRightRadius: isParent ? 3 : 12, borderBottomLeftRadius: isParent ? 12 : 3,
+                            }}>
+                              {c.content}
+                            </div>
+                            <span style={{ fontSize: 10, color: tx3, marginTop: 2 }}>{c.created_at.slice(0, 10)}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end' }}>
+                    <textarea
+                      value={commentDrafts[r.id] ?? ''}
+                      onChange={e => setCommentDrafts(d => ({ ...d, [r.id]: e.target.value }))}
+                      placeholder="선생님께 전달하고 싶은 의견을 남겨주세요"
+                      rows={1}
+                      style={{ flex: 1, padding: '8px 10px', border: `1.5px solid ${bd}`, borderRadius: 8, fontSize: 13, fontFamily: 'inherit', color: tx, outline: 'none', resize: 'none', boxSizing: 'border-box' }}
+                    />
+                    <button onClick={() => sendComment(r.id)} disabled={sendingId === r.id || !(commentDrafts[r.id] ?? '').trim()}
+                      style={{
+                        flexShrink: 0, width: 36, height: 36, borderRadius: 8, border: 'none', background: gold, color: '#fff',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: sendingId === r.id || !(commentDrafts[r.id] ?? '').trim() ? 'not-allowed' : 'pointer',
+                        opacity: sendingId === r.id || !(commentDrafts[r.id] ?? '').trim() ? 0.6 : 1,
+                      }}>
+                      <IconSend size={15} />
                     </button>
                   </div>
-                  {r.parent_comment_at && (
-                    <p style={{ fontSize: 10, color: tx3, margin: '4px 0 0', textAlign: 'right' }}>최종 전달: {r.parent_comment_at.slice(0, 10)}</p>
-                  )}
+                  {commentErr[r.id] && <span style={{ fontSize: 11, color: re, display: 'block', marginTop: 4 }}>{commentErr[r.id]}</span>}
                 </div>
               </div>
             )

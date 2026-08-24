@@ -142,7 +142,7 @@ export default function AdminInquiriesPage() {
         body: JSON.stringify({
           parent_phone: p.phone,
           title: '티처스 수학학원',
-          body: `문의하신 내용에 답변이 등록됐습니다: ${content.slice(0, 40)}`,
+          body: `학원에서 메시지가 도착했습니다`,
           link: '/parent/inquiries',
         }),
       }).catch(() => {})
