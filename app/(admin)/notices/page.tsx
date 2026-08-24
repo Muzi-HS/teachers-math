@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { can, Role } from '@/lib/permissions'
-import { kstDateOf, kstDateStr } from '@/lib/kst'
+import { kstDateOf, kstDateStr, kstTimeOf } from '@/lib/kst'
 import { IconBell, IconPin } from '@/components/icons'
 import { useMobileMode } from '@/context/MobileModeContext'
 
@@ -17,7 +17,20 @@ type Notice = {
   created_at: string
 }
 
-const EMPTY = { title: '', content: '', pinned: false, parent_visible: true, image_url: '' }
+type StudentLite = { id: number; name: string; school_type: string | null }
+
+type NoticeComment = {
+  id: number; notice_id: number; parent_comment_id: number | null
+  sender_type: 'parent' | 'admin'; parent_id: number | null; sender_teacher_id: string | null
+  is_anonymous: boolean; content: string; created_at: string
+}
+
+const SCHOOL_TYPES = ['초등', '중등', '고등']
+
+const EMPTY = {
+  title: '', content: '', pinned: false, parent_visible: true, image_url: '',
+  target_mode: 'all' as 'all' | 'selected', target_student_ids: [] as number[],
+}
 
 /* ── 공통 스타일 상수 (v18 CSS 변수 기반) ── */
 const navy    = '#0D2A5E'
@@ -42,6 +55,9 @@ export default function NoticesPage() {
   const { teacher, role } = useAuth()
   const { mobileMode } = useMobileMode()
   const [notices, setNotices] = useState<Notice[]>([])
+  const [students, setStudents] = useState<StudentLite[]>([])
+  const [targetsByNotice, setTargetsByNotice] = useState<Record<number, number[]>>({})
+  const [parentsMap, setParentsMap] = useState<Record<number, string[]>>({}) // parent_id -> 자녀 이름 목록
   const [loading, setLoading] = useState(true)
   const [modal,   setModal]   = useState(false)
   const [detail,  setDetail]  = useState<Notice | null>(null)
@@ -50,17 +66,53 @@ export default function NoticesPage() {
   const [saving,  setSaving]  = useState(false)
   const [notif,   setNotif]   = useState<{ msg: string; ok: boolean } | null>(null)
   const [search,  setSearch]  = useState('')
+  const [pickerSearch, setPickerSearch] = useState('')
+  const [pickerStageFlt, setPickerStageFlt] = useState<string[]>([])
 
-  useEffect(() => { fetchNotices() }, [])
+  // 댓글 · 대댓글
+  const [comments, setComments] = useState<NoticeComment[]>([])
+  const [commentsLoading, setCommentsLoading] = useState(false)
+  const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({})
+  const [replyOpenFor, setReplyOpenFor] = useState<number | null>(null)
+  const [sendingReply, setSendingReply] = useState(false)
+
+  useEffect(() => { fetchNotices(); fetchStudents(); fetchParentsMap() }, [])
+  useEffect(() => { if (detail) fetchComments(detail.id) }, [detail?.id])
 
   async function fetchNotices() {
-    const { data } = await supabase
-      .from('notices')
-      .select('*')
-      .order('pinned', { ascending: false })
-      .order('created_at', { ascending: false })
+    const [{ data }, { data: targets }] = await Promise.all([
+      supabase.from('notices').select('*').order('pinned', { ascending: false }).order('created_at', { ascending: false }),
+      supabase.from('notice_target_students').select('notice_id,student_id'),
+    ])
     setNotices(data ?? [])
+    const tmap: Record<number, number[]> = {}
+    for (const row of (targets ?? []) as any[]) {
+      if (!tmap[row.notice_id]) tmap[row.notice_id] = []
+      tmap[row.notice_id].push(row.student_id)
+    }
+    setTargetsByNotice(tmap)
     setLoading(false)
+  }
+
+  async function fetchStudents() {
+    const { data } = await supabase.from('students').select('id,name,school_type').order('name')
+    setStudents((data ?? []) as StudentLite[])
+  }
+
+  async function fetchParentsMap() {
+    const { data } = await supabase.from('parents').select('id, parent_students(students(name))')
+    const map: Record<number, string[]> = {}
+    for (const row of (data ?? []) as any[]) {
+      map[row.id] = (row.parent_students ?? []).map((ps: any) => ps.students?.name).filter(Boolean)
+    }
+    setParentsMap(map)
+  }
+
+  async function fetchComments(noticeId: number) {
+    setCommentsLoading(true)
+    const { data } = await supabase.from('notice_comments').select('*').eq('notice_id', noticeId).order('created_at', { ascending: true })
+    setComments((data ?? []) as NoticeComment[])
+    setCommentsLoading(false)
   }
 
   function toast(msg: string, ok = true) {
@@ -69,31 +121,123 @@ export default function NoticesPage() {
   }
 
   function openAdd() {
-    setEditId(null); setForm({ ...EMPTY }); setModal(true)
+    setEditId(null); setForm({ ...EMPTY }); setPickerSearch(''); setPickerStageFlt([]); setModal(true)
   }
   function openEdit(n: Notice) {
     setEditId(n.id)
-    setForm({ title: n.title, content: n.content, pinned: n.pinned, parent_visible: n.parent_visible, image_url: n.image_url ?? '' })
+    const targetIds = targetsByNotice[n.id] ?? []
+    setForm({
+      title: n.title, content: n.content, pinned: n.pinned, parent_visible: n.parent_visible, image_url: n.image_url ?? '',
+      target_mode: targetIds.length > 0 ? 'selected' : 'all',
+      target_student_ids: targetIds,
+    })
+    setPickerSearch(''); setPickerStageFlt([])
     setDetail(null); setModal(true)
+  }
+
+  function toggleTarget(sid: number) {
+    setForm(f => ({
+      ...f,
+      target_student_ids: f.target_student_ids.includes(sid)
+        ? f.target_student_ids.filter(x => x !== sid)
+        : [...f.target_student_ids, sid],
+    }))
+  }
+  function togglePickerStage(t: string) {
+    setPickerStageFlt(p => p.includes(t) ? p.filter(x => x !== t) : [...p, t])
+  }
+
+  const pickerFiltered = students.filter(s => {
+    if (pickerStageFlt.length > 0 && !(s.school_type && pickerStageFlt.includes(s.school_type))) return false
+    if (pickerSearch.trim() && !s.name.includes(pickerSearch.trim())) return false
+    return true
+  })
+
+  function selectAllFiltered() {
+    setForm(f => {
+      const ids = new Set(f.target_student_ids)
+      for (const s of pickerFiltered) ids.add(s.id)
+      return { ...f, target_student_ids: [...ids] }
+    })
+  }
+  function deselectAllFiltered() {
+    setForm(f => {
+      const filteredIds = new Set(pickerFiltered.map(s => s.id))
+      return { ...f, target_student_ids: f.target_student_ids.filter(id => !filteredIds.has(id)) }
+    })
   }
 
   async function save() {
     if (!form.title.trim()) return toast('제목을 입력하세요.', false)
     setSaving(true)
+    const payload = { title: form.title, content: form.content, pinned: form.pinned, parent_visible: form.parent_visible, image_url: form.image_url }
+    let noticeId = editId
     if (editId) {
-      await supabase.from('notices').update({ ...form }).eq('id', editId)
-      toast('공지가 수정되었습니다.')
+      await supabase.from('notices').update(payload).eq('id', editId)
     } else {
-      await supabase.from('notices').insert({ ...form, created_by: teacher?.userId, created_at: kstDateStr() })
-      toast('공지가 등록되었습니다.')
+      const { data } = await supabase.from('notices').insert({ ...payload, created_by: teacher?.userId, created_at: kstDateStr() }).select('id').single()
+      noticeId = data?.id ?? null
     }
+
+    if (noticeId) {
+      await supabase.from('notice_target_students').delete().eq('notice_id', noticeId)
+      const targetIds = form.parent_visible && form.target_mode === 'selected' ? form.target_student_ids : []
+      if (targetIds.length > 0) {
+        await supabase.from('notice_target_students').insert(targetIds.map(sid => ({ notice_id: noticeId, student_id: sid })))
+      }
+    }
+
+    const isNew = !editId
+    toast(editId ? '공지가 수정되었습니다.' : '공지가 등록되었습니다.')
     setSaving(false); setModal(false); fetchNotices()
+
+    // 신규 등록 + 학부모 공개인 경우에만 열람 가능한 학부모 전원에게 푸시 발송 (수정 시 알림 스팸 방지)
+    if (isNew && form.parent_visible && noticeId) {
+      const targetIds = form.target_mode === 'selected' ? form.target_student_ids : undefined
+      fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push-notice`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({
+          title: '티처스 수학학원',
+          body: `새 공지사항이 등록되었습니다: ${form.title.slice(0, 40)}`,
+          link: '/parent/notices',
+          student_ids: targetIds,
+        }),
+      }).catch(() => {})
+    }
   }
 
   async function remove(id: number) {
     if (!confirm('공지사항을 삭제하시겠습니까?')) return
     await supabase.from('notices').delete().eq('id', id)
     setDetail(null); toast('삭제되었습니다.', false); fetchNotices()
+  }
+
+  async function sendReply(parentCommentId: number, noticeId: number) {
+    const text = (replyDrafts[parentCommentId] ?? '').trim()
+    if (!text) return
+    setSendingReply(true)
+    const { data, error } = await supabase.from('notice_comments').insert({
+      notice_id: noticeId, parent_comment_id: parentCommentId, sender_type: 'admin', sender_teacher_id: teacher?.userId ?? null, content: text,
+    }).select('*').single()
+    setSendingReply(false)
+    if (error) { toast('답글 전송 실패: ' + error.message, false); return }
+    setComments(cs => [...cs, data as NoticeComment])
+    setReplyDrafts(d => ({ ...d, [parentCommentId]: '' }))
+    setReplyOpenFor(null)
+  }
+
+  async function deleteComment(id: number) {
+    if (!confirm('이 댓글을 삭제하시겠습니까?')) return
+    await supabase.from('notice_comments').delete().eq('id', id)
+    setComments(cs => cs.filter(c => c.id !== id && c.parent_comment_id !== id))
+  }
+
+  function identityOf(c: NoticeComment): string {
+    if (c.sender_type === 'admin') return '학원'
+    if (c.is_anonymous) return '익명'
+    const names = c.parent_id != null ? (parentsMap[c.parent_id] ?? []) : []
+    return names.length > 0 ? names.join(', ') + ' 학부모' : '학부모'
   }
 
   const canWrite = role ? can.writeNotice(role as Role) : false
@@ -107,6 +251,15 @@ export default function NoticesPage() {
   function isNew(createdAt: string) {
     return Date.now() - new Date(createdAt).getTime() < 24 * 60 * 60 * 1000
   }
+
+  function targetLabel(n: Notice): string {
+    if (!n.parent_visible) return '비공개'
+    const ids = targetsByNotice[n.id] ?? []
+    return ids.length > 0 ? `${ids.length}명 공개` : '전체공개'
+  }
+
+  const topComments = comments.filter(c => !c.parent_comment_id)
+  function repliesOf(commentId: number) { return comments.filter(c => c.parent_comment_id === commentId) }
 
   return (
     <div style={{ padding: mobileMode ? '16px 14px 88px' : '28px 32px', fontFamily: "'Noto Sans KR', sans-serif" }}>
@@ -123,8 +276,13 @@ export default function NoticesPage() {
         .sbox input { border:none; outline:none; font-size:13px; font-family:inherit; color:${tx}; background:transparent; width:100%; }
         .badge-green { display:inline-flex; align-items:center; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:500; background:${gbg}; color:${gr}; }
         .badge-red   { display:inline-flex; align-items:center; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:500; background:${rbg}; color:${re}; }
+        .badge-navy  { display:inline-flex; align-items:center; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:500; background:${navyMuted}; color:${navy}; }
         .radio-row { display:flex; gap:16px; margin-top:6px; }
         .radio-row label { display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer; }
+        .pill { padding:5px 12px; border-radius:20px; font-size:12px; font-weight:500; cursor:pointer; border:1.5px solid ${bd}; background:#fff; color:${tx2}; font-family:inherit; transition:all .15s; }
+        .pill.active { border-color:${navy}; background:${navy}; color:#fff; font-weight:700; }
+        .chip { display:inline-flex; align-items:center; gap:4px; padding:3px 8px 3px 10px; border-radius:20px; font-size:12px; background:${navyMuted}; color:${navy}; font-weight:500; }
+        .chip button { border:none; background:none; cursor:pointer; color:${navy}; font-size:13px; padding:0; line-height:1; display:flex; }
       `}</style>
 
       {/* 토스트 */}
@@ -177,14 +335,14 @@ export default function NoticesPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 90px 80px 108px', gap: 8, padding: '11px 16px', background: bg, borderBottom: `1px solid ${bd}`, fontSize: 11, fontWeight: 600, color: tx3 }}>
               <div style={{ textAlign: 'center' }}>번호</div>
               <div>제목</div>
-              <div style={{ textAlign: 'center' }}>공개여부</div>
+              <div style={{ textAlign: 'center' }}>공개대상</div>
               <div style={{ textAlign: 'center' }}>등록일</div>
               <div style={{ textAlign: 'center' }}>관리</div>
             </div>
           )}
 
           {pinnedList.map((n, i) => (
-            <BoardRow key={n.id} notice={n} index="공지" pinned canWrite={canWrite} mobile={mobileMode}
+            <BoardRow key={n.id} notice={n} index="공지" pinned canWrite={canWrite} mobile={mobileMode} visLabel={targetLabel(n)}
               onClick={() => setDetail(n)} onEdit={() => openEdit(n)} onDelete={() => remove(n.id)}
               isLast={i === pinnedList.length - 1 && normalList.length === 0} />
           ))}
@@ -194,7 +352,7 @@ export default function NoticesPage() {
           )}
 
           {normalList.map((n, i) => (
-            <BoardRow key={n.id} notice={n} index={normalList.length - i} pinned={false} canWrite={canWrite} mobile={mobileMode}
+            <BoardRow key={n.id} notice={n} index={normalList.length - i} pinned={false} canWrite={canWrite} mobile={mobileMode} visLabel={targetLabel(n)}
               onClick={() => setDetail(n)} onEdit={() => openEdit(n)} onDelete={() => remove(n.id)}
               isLast={i === normalList.length - 1} />
           ))}
@@ -207,24 +365,33 @@ export default function NoticesPage() {
       {detail && (
         <div onClick={() => setDetail(null)} style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,.42)',
-          zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+          zIndex: 1000, display: 'flex', alignItems: mobileMode ? 'flex-end' : 'center', justifyContent: 'center', padding: mobileMode ? 0 : 16,
         }}>
           <div onClick={e => e.stopPropagation()} style={{
-            background: '#fff', borderRadius: 12, width: 560,
-            maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto',
+            background: '#fff', borderRadius: mobileMode ? '16px 16px 0 0' : 12, width: mobileMode ? '100%' : 560,
+            maxWidth: '100%', maxHeight: mobileMode ? '88vh' : '90vh', overflowY: 'auto',
             boxShadow: '0 20px 60px rgba(0,0,0,.15)',
           }}>
             <div style={{ padding: '18px 22px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
                 <h2 style={{ fontSize: 18, fontWeight: 700, color: tx }}>{detail.title}</h2>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
                   <p style={{ fontSize: 12, color: tx3 }}>{kstDateOf(detail.created_at)}</p>
                   {detail.pinned && <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 20, background: goldPale, color: gold, fontWeight: 500 }}>상단 고정</span>}
-                  {detail.parent_visible
-                    ? <span className="badge-green">학부모 공개</span>
-                    : <span className="badge-red">학부모 비공개</span>
+                  {!detail.parent_visible
+                    ? <span className="badge-red">학부모 비공개</span>
+                    : (targetsByNotice[detail.id]?.length ?? 0) > 0
+                      ? <span className="badge-navy">선택 공개 {targetsByNotice[detail.id].length}명</span>
+                      : <span className="badge-green">학부모 전체공개</span>
                   }
                 </div>
+                {detail.parent_visible && (targetsByNotice[detail.id]?.length ?? 0) > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
+                    {targetsByNotice[detail.id].map(sid => (
+                      <span key={sid} className="chip" style={{ padding: '2px 8px' }}>{students.find(s => s.id === sid)?.name ?? '?'}</span>
+                    ))}
+                  </div>
+                )}
               </div>
               <button onClick={() => setDetail(null)} style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: bg, cursor: 'pointer', fontSize: 17, color: tx2, flexShrink: 0 }}>×</button>
             </div>
@@ -237,7 +404,56 @@ export default function NoticesPage() {
                 <img src={detail.image_url} alt="첨부이미지" style={{ width: '100%', borderRadius: 8, border: `1px solid ${bd}` }} />
               </div>
             )}
-            <div style={{ padding: '0 22px 18px', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+
+            {/* 댓글 · 대댓글 */}
+            <div style={{ borderTop: `1px solid ${bd}`, margin: '4px 22px 0' }} />
+            <div style={{ padding: '14px 22px 4px' }}>
+              <p style={{ fontSize: 13, fontWeight: 700, color: tx, marginBottom: 10 }}>댓글 {topComments.length}개</p>
+              {commentsLoading ? (
+                <p style={{ fontSize: 12, color: tx3, padding: '10px 0' }}>불러오는 중...</p>
+              ) : topComments.length === 0 ? (
+                <p style={{ fontSize: 12, color: tx3, padding: '10px 0' }}>아직 댓글이 없습니다</p>
+              ) : topComments.map(c => (
+                <div key={c.id} style={{ marginBottom: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: tx }}>{identityOf(c)}</span>
+                    <span style={{ fontSize: 10, color: tx3 }}>{kstDateOf(c.created_at)} {kstTimeOf(c.created_at)}</span>
+                    {canWrite && (
+                      <button onClick={() => deleteComment(c.id)} style={{ marginLeft: 'auto', border: 'none', background: 'none', color: tx3, cursor: 'pointer', fontSize: 11, fontFamily: 'inherit' }}>삭제</button>
+                    )}
+                  </div>
+                  <p style={{ fontSize: 13, color: tx, lineHeight: 1.5, margin: '0 0 6px', whiteSpace: 'pre-wrap' }}>{c.content}</p>
+
+                  {repliesOf(c.id).map(r => (
+                    <div key={r.id} style={{ marginLeft: 16, paddingLeft: 10, borderLeft: `2px solid ${bd}`, marginTop: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: navy }}>학원</span>
+                        <span style={{ fontSize: 10, color: tx3 }}>{kstDateOf(r.created_at)} {kstTimeOf(r.created_at)}</span>
+                        {canWrite && (
+                          <button onClick={() => deleteComment(r.id)} style={{ marginLeft: 'auto', border: 'none', background: 'none', color: tx3, cursor: 'pointer', fontSize: 11, fontFamily: 'inherit' }}>삭제</button>
+                        )}
+                      </div>
+                      <p style={{ fontSize: 13, color: tx, margin: 0, whiteSpace: 'pre-wrap' }}>{r.content}</p>
+                    </div>
+                  ))}
+
+                  {canWrite && (
+                    replyOpenFor === c.id ? (
+                      <div style={{ display: 'flex', gap: 6, marginTop: 6, marginLeft: 16 }}>
+                        <input className="fi" autoFocus value={replyDrafts[c.id] ?? ''} onChange={e => setReplyDrafts(d => ({ ...d, [c.id]: e.target.value }))}
+                          placeholder="답글을 입력하세요" onKeyDown={e => { if (e.key === 'Enter') sendReply(c.id, detail.id) }} />
+                        <button className="btn-gold" onClick={() => sendReply(c.id, detail.id)} disabled={sendingReply}>등록</button>
+                        <button className="btn-outline" onClick={() => setReplyOpenFor(null)}>취소</button>
+                      </div>
+                    ) : (
+                      <button onClick={() => setReplyOpenFor(c.id)} style={{ marginLeft: 16, border: 'none', background: 'none', color: navy, fontSize: 12, cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>답글달기</button>
+                    )
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div style={{ padding: '10px 22px 18px', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               {canWrite && <button className="btn-outline" onClick={() => openEdit(detail)}>편집</button>}
               <button className="btn-gold" onClick={() => setDetail(null)}>닫기</button>
             </div>
@@ -249,11 +465,11 @@ export default function NoticesPage() {
       {modal && (
         <div onClick={() => setModal(false)} style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,.42)',
-          zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+          zIndex: 1000, display: 'flex', alignItems: mobileMode ? 'flex-end' : 'center', justifyContent: 'center', padding: mobileMode ? 0 : 16,
         }}>
           <div onClick={e => e.stopPropagation()} style={{
-            background: '#fff', borderRadius: 12, width: 560,
-            maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto',
+            background: '#fff', borderRadius: mobileMode ? '16px 16px 0 0' : 12, width: mobileMode ? '100%' : 560,
+            maxWidth: '100%', maxHeight: mobileMode ? '90vh' : '90vh', overflowY: 'auto',
             boxShadow: '0 20px 60px rgba(0,0,0,.15)',
           }}>
             {/* 모달 헤더 */}
@@ -302,6 +518,73 @@ export default function NoticesPage() {
                 </div>
               </div>
 
+              {/* 공개 대상 선택 (학부모 열람=공개일 때만) */}
+              {form.parent_visible && (
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: tx2, marginBottom: 5 }}>공개 대상</label>
+                  <div className="radio-row" style={{ marginBottom: form.target_mode === 'selected' ? 10 : 0 }}>
+                    {[{ v: 'all' as const, l: '전체 학부모' }, { v: 'selected' as const, l: '선택한 학생만' }].map(({ v, l }) => (
+                      <label key={v}>
+                        <input type="radio" name="noticeTargetMode" checked={form.target_mode === v} onChange={() => setForm(f => ({ ...f, target_mode: v }))} />
+                        {l}
+                      </label>
+                    ))}
+                  </div>
+
+                  {form.target_mode === 'selected' && (
+                    <div style={{ border: `1px solid ${bd}`, borderRadius: 8, padding: 10, background: bg }}>
+                      {/* 선택된 학생 chips — 바로바로 확인 */}
+                      <div style={{ marginBottom: 8 }}>
+                        <p style={{ fontSize: 11, fontWeight: 600, color: tx2, marginBottom: 6 }}>선택됨 ({form.target_student_ids.length}명)</p>
+                        {form.target_student_ids.length === 0 ? (
+                          <p style={{ fontSize: 12, color: tx3 }}>아래 목록에서 학생을 선택하세요</p>
+                        ) : (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                            {form.target_student_ids.map(sid => (
+                              <span key={sid} className="chip">
+                                {students.find(s => s.id === sid)?.name ?? '?'}
+                                <button onClick={() => toggleTarget(sid)}>×</button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div style={{ height: 1, background: bd, margin: '8px 0' }} />
+
+                      {/* 검색 + 학교급 필터 */}
+                      <input className="fi" style={{ marginBottom: 8 }} placeholder="학생 이름 검색" value={pickerSearch} onChange={e => setPickerSearch(e.target.value)} />
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
+                        {SCHOOL_TYPES.map(t => (
+                          <button key={t} type="button" className={`pill${pickerStageFlt.includes(t) ? ' active' : ''}`} onClick={() => togglePickerStage(t)}>{t}</button>
+                        ))}
+                      </div>
+
+                      {/* 분류 전/후 전체선택 — 현재 필터된 목록 기준 */}
+                      <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                        <button type="button" className="btn-outline" onClick={selectAllFiltered}>
+                          {pickerStageFlt.length > 0 ? '필터된 학생 전체 선택' : '전체 선택'} ({pickerFiltered.length}명)
+                        </button>
+                        <button type="button" className="btn-outline" onClick={deselectAllFiltered}>전체 해제</button>
+                      </div>
+
+                      {/* 학생 목록 */}
+                      <div style={{ maxHeight: 200, overflowY: 'auto', background: '#fff', border: `1px solid ${bd}`, borderRadius: 6 }}>
+                        {pickerFiltered.length === 0 ? (
+                          <p style={{ fontSize: 12, color: tx3, padding: 14, textAlign: 'center' }}>일치하는 학생이 없습니다</p>
+                        ) : pickerFiltered.map(s => (
+                          <label key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderBottom: `1px solid ${bg}`, cursor: 'pointer', fontSize: 13, color: tx }}>
+                            <input type="checkbox" checked={form.target_student_ids.includes(s.id)} onChange={() => toggleTarget(s.id)} />
+                            {s.name}
+                            {s.school_type && <span style={{ fontSize: 10, color: tx3 }}>{s.school_type}</span>}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* 내용 */}
               <div style={{ marginBottom: 14 }}>
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: tx2, marginBottom: 5 }}>내용</label>
@@ -332,21 +615,20 @@ export default function NoticesPage() {
 }
 
 // ── 게시판 행 (네이버카페 스타일) ──
-function BoardRow({ notice, index, pinned, canWrite, mobile, onClick, onEdit, onDelete, isLast }: {
-  notice: Notice; index: number | string; pinned: boolean; canWrite: boolean; mobile?: boolean
+function BoardRow({ notice, index, pinned, canWrite, mobile, visLabel, onClick, onEdit, onDelete, isLast }: {
+  notice: Notice; index: number | string; pinned: boolean; canWrite: boolean; mobile?: boolean; visLabel: string
   onClick: () => void; onEdit: () => void; onDelete: () => void; isLast: boolean
 }) {
   const navy = '#0D2A5E', gold = '#D87E13', bd = '#DDE3EE'
   const tx = '#0D1B36', tx2 = '#4B5C7E', tx3 = '#96A4BF'
-  const re = '#C0392B', rbg = '#FDECEA', gr = '#1A7F4E', gbg = '#E0F5EB'
+  const re = '#C0392B', rbg = '#FDECEA', gr = '#1A7F4E', gbg = '#E0F5EB', navyM = '#E8EEF8'
 
   function isNew(createdAt: string) {
     return Date.now() - new Date(createdAt).getTime() < 24 * 60 * 60 * 1000
   }
 
-  const visBadge = notice.parent_visible
-    ? <span style={{ background: gbg, color: gr, fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 4 }}>학부모공개</span>
-    : <span style={{ background: rbg, color: re, fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 4 }}>비공개</span>
+  const visColor = visLabel === '비공개' ? { bg: rbg, color: re } : visLabel === '전체공개' ? { bg: gbg, color: gr } : { bg: navyM, color: navy }
+  const visBadge = <span style={{ background: visColor.bg, color: visColor.color, fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 4 }}>{visLabel}</span>
 
   if (mobile) {
     return (

@@ -1,22 +1,37 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { kstDateOf } from '@/lib/kst'
+import { useAuth } from '@/context/AuthContext'
+import { kstDateOf, kstTimeOf } from '@/lib/kst'
 import { IconPin } from '@/components/icons'
 
 const navy='#0D2A5E', tx='#0D1B36', tx2='#4B5C7E', tx3='#96A4BF', bd='#DDE3EE', bg='#F5F7FA'
-const gold='#D87E13'
+const gold='#D87E13', re='#C0392B'
 
 type Notice = {
   id: number; title: string; content: string
   pinned: boolean; image_url: string | null; created_at: string
 }
 
+type NoticeComment = {
+  id: number; notice_id: number; parent_comment_id: number | null
+  sender_type: 'parent' | 'admin'; parent_id: number | null
+  is_anonymous: boolean; content: string; created_at: string
+}
+
 export default function ParentNotices() {
+  const { parent } = useAuth()
   const [notices, setNotices]   = useState<Notice[]>([])
   const [loading, setLoading]   = useState(true)
   const [detail,  setDetail]    = useState<Notice | null>(null)
   const [search,  setSearch]    = useState('')
+
+  const [comments, setComments] = useState<NoticeComment[]>([])
+  const [commentsLoading, setCommentsLoading] = useState(false)
+  const [commentInput, setCommentInput] = useState('')
+  const [isAnonymous, setIsAnonymous] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [err, setErr] = useState('')
 
   useEffect(() => {
     async function fetch() {
@@ -26,11 +41,46 @@ export default function ParentNotices() {
         .eq('parent_visible', true)
         .order('pinned', { ascending: false })
         .order('created_at', { ascending: false })
-      setNotices(data ?? [])
+      const all = data ?? []
+
+      // 대상이 지정된 공지는 내 자녀가 대상에 포함된 경우에만 노출 (지정이 없으면 전체공개)
+      const noticeIds = all.map(n => n.id)
+      const myStudentIds = new Set((parent?.children ?? []).map(c => c.id))
+      let visibleIds = new Set(noticeIds)
+      if (noticeIds.length > 0) {
+        const { data: targets } = await supabase.from('notice_target_students').select('notice_id,student_id').in('notice_id', noticeIds)
+        const targetedNoticeIds = new Set((targets ?? []).map((t: any) => t.notice_id))
+        const allowedNoticeIds = new Set((targets ?? []).filter((t: any) => myStudentIds.has(t.student_id)).map((t: any) => t.notice_id))
+        visibleIds = new Set(noticeIds.filter(id => !targetedNoticeIds.has(id) || allowedNoticeIds.has(id)))
+      }
+
+      setNotices(all.filter(n => visibleIds.has(n.id)))
       setLoading(false)
     }
     fetch()
-  }, [])
+  }, [parent?.children])
+
+  useEffect(() => { if (detail) fetchComments(detail.id) }, [detail?.id])
+
+  async function fetchComments(noticeId: number) {
+    setCommentsLoading(true)
+    const { data } = await supabase.from('notice_comments').select('*').eq('notice_id', noticeId).order('created_at', { ascending: true })
+    setComments((data ?? []) as NoticeComment[])
+    setCommentsLoading(false)
+  }
+
+  async function sendComment() {
+    const text = commentInput.trim()
+    if (!text || !detail || !parent?.parentId || sending) return
+    setSending(true); setErr('')
+    const { data, error } = await supabase.from('notice_comments').insert({
+      notice_id: detail.id, sender_type: 'parent', parent_id: parent.parentId, is_anonymous: isAnonymous, content: text,
+    }).select('*').single()
+    setSending(false)
+    if (error) { setErr('댓글 등록에 실패했습니다.'); return }
+    setComments(cs => [...cs, data as NoticeComment])
+    setCommentInput(''); setIsAnonymous(false)
+  }
 
   const filtered = notices.filter(n => n.title.includes(search))
   const pinned   = filtered.filter(n => n.pinned)
@@ -40,18 +90,71 @@ export default function ParentNotices() {
     return Date.now() - new Date(createdAt).getTime() < 24 * 60 * 60 * 1000
   }
 
+  const childNames = (parent?.children ?? []).map(c => c.name)
+  const myName = childNames.length > 0 ? childNames.join(', ') + ' 학부모' : '학부모'
+  const topComments = comments.filter(c => !c.parent_comment_id)
+  function repliesOf(commentId: number) { return comments.filter(c => c.parent_comment_id === commentId) }
+
   if (detail) return (
     <div>
       <button onClick={() => setDetail(null)} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, color: tx2, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', marginBottom: 16 }}>
         <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth={2} d="M15 18l-6-6 6-6"/></svg>
         목록으로
       </button>
-      <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: 20 }}>
+      <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: 20, marginBottom: 14 }}>
         {detail.pinned && <span style={{ background: gold, color: '#fff', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4, marginBottom: 10, display: 'inline-flex', alignItems: 'center', gap: 4 }}><IconPin size={10} /> 공지</span>}
         <h2 style={{ fontSize: 17, fontWeight: 700, color: tx, marginBottom: 8 }}>{detail.title}</h2>
         <p style={{ fontSize: 12, color: tx3, marginBottom: 16 }}>{kstDateOf(detail.created_at)}</p>
         {detail.image_url && <img src={detail.image_url} alt="첨부이미지" style={{ width: '100%', borderRadius: 8, marginBottom: 16 }} />}
         <p style={{ fontSize: 14, color: tx, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{detail.content}</p>
+      </div>
+
+      {/* 댓글 */}
+      <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: 18 }}>
+        <p style={{ fontSize: 14, fontWeight: 700, color: tx, marginBottom: 12 }}>댓글 {topComments.length}개</p>
+
+        {commentsLoading ? (
+          <p style={{ fontSize: 13, color: tx3, padding: '10px 0' }}>불러오는 중...</p>
+        ) : topComments.length === 0 ? (
+          <p style={{ fontSize: 13, color: tx3, padding: '10px 0' }}>아직 댓글이 없습니다. 첫 댓글을 남겨보세요.</p>
+        ) : topComments.map(c => (
+          <div key={c.id} style={{ marginBottom: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: tx }}>{c.is_anonymous ? '익명' : myName}</span>
+              <span style={{ fontSize: 10, color: tx3 }}>{kstDateOf(c.created_at)} {kstTimeOf(c.created_at)}</span>
+            </div>
+            <p style={{ fontSize: 13, color: tx, lineHeight: 1.5, margin: '0 0 6px', whiteSpace: 'pre-wrap' }}>{c.content}</p>
+
+            {repliesOf(c.id).map(r => (
+              <div key={r.id} style={{ marginLeft: 16, paddingLeft: 10, borderLeft: `2px solid ${bd}`, marginTop: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: navy }}>학원</span>
+                  <span style={{ fontSize: 10, color: tx3 }}>{kstDateOf(r.created_at)} {kstTimeOf(r.created_at)}</span>
+                </div>
+                <p style={{ fontSize: 13, color: tx, margin: 0, whiteSpace: 'pre-wrap' }}>{r.content}</p>
+              </div>
+            ))}
+          </div>
+        ))}
+
+        <div style={{ height: 1, background: bd, margin: '10px 0 14px' }} />
+
+        <textarea
+          rows={2} value={commentInput} onChange={e => setCommentInput(e.target.value)}
+          placeholder="댓글을 남겨보세요"
+          style={{ width: '100%', padding: '8px 10px', border: `1.5px solid ${bd}`, borderRadius: 8, fontSize: 13, fontFamily: 'inherit', color: tx, outline: 'none', resize: 'vertical', boxSizing: 'border-box', marginBottom: 8 }}
+        />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: tx2, cursor: 'pointer' }}>
+            <input type="checkbox" checked={isAnonymous} onChange={e => setIsAnonymous(e.target.checked)} />
+            익명으로 작성
+          </label>
+          <button onClick={sendComment} disabled={sending || !commentInput.trim()}
+            style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: gold, color: '#fff', fontSize: 12, fontWeight: 700, cursor: sending || !commentInput.trim() ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: sending || !commentInput.trim() ? 0.6 : 1 }}>
+            {sending ? '등록 중...' : '댓글 등록'}
+          </button>
+        </div>
+        {err && <p style={{ fontSize: 11, color: re, marginTop: 6 }}>{err}</p>}
       </div>
     </div>
   )
