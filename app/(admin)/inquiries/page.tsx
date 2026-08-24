@@ -39,6 +39,8 @@ export default function AdminInquiriesPage() {
   const [editText, setEditText] = useState('')
   const [search, setSearch] = useState('')
   const [notif, setNotif] = useState<{ msg: string; ok: boolean } | null>(null)
+  const [newMsgModal, setNewMsgModal] = useState(false)
+  const [studentSearch, setStudentSearch] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
 
   function toast(msg: string, ok = true) { setNotif({ msg, ok }); setTimeout(() => setNotif(null), 3000) }
@@ -84,6 +86,26 @@ export default function AdminInquiriesPage() {
       return names.includes(q) || (p?.phone ?? '').includes(q.replace(/-/g, ''))
     })
   }, [msgs, search, parentsMap, childrenMap])
+
+  // 새 문의 대상 선택용 — 전체 학부모의 자녀 목록을 학생 이름 기준으로 펼친 목록
+  const studentOptions = useMemo(() => {
+    const list: { parentId: number; studentName: string; phone: string }[] = []
+    for (const pid in parentsMap) {
+      const parentId = Number(pid)
+      const names = childrenMap[parentId] ?? []
+      for (const studentName of names) list.push({ parentId, studentName, phone: parentsMap[parentId]?.phone ?? '' })
+    }
+    list.sort((a, b) => a.studentName.localeCompare(b.studentName, 'ko'))
+    if (!studentSearch.trim()) return list
+    const q = studentSearch.trim()
+    return list.filter(o => o.studentName.includes(q) || o.phone.includes(q.replace(/-/g, '')))
+  }, [parentsMap, childrenMap, studentSearch])
+
+  function startNewThread(parentId: number) {
+    setNewMsgModal(false)
+    setStudentSearch('')
+    openThread(parentId)
+  }
 
   const threadMsgs = selParentId ? msgs.filter(m => m.parent_id === selParentId) : []
 
@@ -187,11 +209,17 @@ export default function AdminInquiriesPage() {
         {/* 좌측: 대화 목록 */}
         {showList && (
         <div style={{ width: mobileMode ? '100%' : 300, flexShrink: 0, borderRight: mobileMode ? 'none' : `1px solid ${bd}`, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: 12, borderBottom: `1px solid ${bd}` }}>
-            <div className="iq-sbox">
+          <div style={{ padding: 12, borderBottom: `1px solid ${bd}`, display: 'flex', gap: 8 }}>
+            <div className="iq-sbox" style={{ flex: 1 }}>
               <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke={tx3}><circle cx="11" cy="11" r="8" strokeWidth={2} /><path strokeWidth={2} d="M21 21l-4.35-4.35" /></svg>
               <input placeholder="학생 이름 또는 전화번호 검색" value={search} onChange={e => setSearch(e.target.value)} />
             </div>
+            <button onClick={() => setNewMsgModal(true)} title="새 문의 보내기" style={{
+              flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 36, height: 36, borderRadius: 8, border: 'none', background: gold, color: navyDk, cursor: 'pointer',
+            }}>
+              <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.4}><path d="M12 5v14M5 12h14" /></svg>
+            </button>
           </div>
           <div style={{ flex: 1, overflowY: 'auto' }}>
             {loading ? (
@@ -251,6 +279,12 @@ export default function AdminInquiriesPage() {
               </div>
 
               <div style={{ flex: 1, overflowY: 'auto', padding: '18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {threadMsgs.length === 0 && (
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', color: tx3 }}>
+                    <p style={{ marginBottom: 8, display: 'flex', justifyContent: 'center' }}><IconChat size={28} /></p>
+                    <p style={{ fontSize: 13 }}>아직 대화가 없습니다. 첫 메시지를 보내보세요.</p>
+                  </div>
+                )}
                 {threadMsgs.map(m => {
                   const isAdmin = m.sender_type === 'admin'
                   const isEditing = editingId === m.id
@@ -303,6 +337,46 @@ export default function AdminInquiriesPage() {
         </div>
         )}
       </div>
+
+      {/* 새 문의 보내기 — 학생 선택 모달 */}
+      {newMsgModal && (
+        <div onClick={() => { setNewMsgModal(false); setStudentSearch('') }} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,.42)', zIndex: 1000,
+          display: 'flex', alignItems: mobileMode ? 'flex-end' : 'center', justifyContent: 'center',
+          padding: mobileMode ? 0 : 16,
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: '#fff', width: mobileMode ? '100%' : 420, maxWidth: '100%',
+            maxHeight: mobileMode ? '80vh' : '75vh', display: 'flex', flexDirection: 'column',
+            borderRadius: mobileMode ? '16px 16px 0 0' : 12,
+            boxShadow: '0 -8px 30px rgba(0,0,0,.15)',
+          }}>
+            <div style={{ padding: '16px 18px 12px', borderBottom: `1px solid ${bd}`, flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <span style={{ fontSize: 15, fontWeight: 700, color: tx }}>새 문의 보내기</span>
+                <button onClick={() => { setNewMsgModal(false); setStudentSearch('') }} style={{ width: 26, height: 26, borderRadius: '50%', border: 'none', background: bg, cursor: 'pointer', fontSize: 15, color: tx2 }}>×</button>
+              </div>
+              <div className="iq-sbox">
+                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke={tx3}><circle cx="11" cy="11" r="8" strokeWidth={2} /><path strokeWidth={2} d="M21 21l-4.35-4.35" /></svg>
+                <input autoFocus placeholder="학생 이름 또는 학부모 전화번호 검색" value={studentSearch} onChange={e => setStudentSearch(e.target.value)} />
+              </div>
+            </div>
+            <div style={{ overflowY: 'auto', flex: 1 }}>
+              {studentOptions.length === 0 ? (
+                <p style={{ color: tx3, fontSize: 13, textAlign: 'center', padding: 24 }}>일치하는 학생이 없습니다</p>
+              ) : studentOptions.map((o, idx) => (
+                <div key={o.parentId + '-' + o.studentName} className="iq-list-item" onClick={() => startNewThread(o.parentId)} style={{ borderBottom: idx < studentOptions.length - 1 ? `1px solid ${bd}` : 'none' }}>
+                  <div className="iq-av">{o.studentName[0]}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: tx, margin: 0 }}>{o.studentName} 학부모</p>
+                    <p style={{ fontSize: 12, color: tx3, margin: '2px 0 0' }}>{fmtPhone(o.phone)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
