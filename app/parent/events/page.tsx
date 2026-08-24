@@ -49,6 +49,7 @@ export default function ParentEvents() {
 
   // 결석/지각 등록 모달
   const [noticeModal, setNoticeModal] = useState(false)
+  const [editingNoticeId, setEditingNoticeId] = useState<number | null>(null)
   const [nStudentId,  setNStudentId]  = useState<number | null>(null)
   const [nType,       setNType]       = useState<'absence' | 'late'>('absence')
   const [nDate,        setNDate]      = useState('')
@@ -89,10 +90,21 @@ export default function ParentEvents() {
   }
 
   function openNoticeModal(presetDate?: string) {
+    setEditingNoticeId(null)
     setNStudentId(children[0]?.id ?? null)
     setNType('absence')
     setNDate(presetDate ?? todayStr_())
     setNReason('')
+    setNErr('')
+    setNoticeModal(true)
+  }
+
+  function openEditNotice(n: AttNotice) {
+    setEditingNoticeId(n.id)
+    setNStudentId(n.student_id)
+    setNType(n.type)
+    setNDate(n.date)
+    setNReason(n.reason ?? '')
     setNErr('')
     setNoticeModal(true)
   }
@@ -103,12 +115,43 @@ export default function ParentEvents() {
     if (!nDate) { setNErr('날짜를 선택하세요.'); return }
     setNSubmitting(true)
     setNErr('')
+
+    if (editingNoticeId) {
+      const { error } = await supabase.from('attendance_notices')
+        .update({ student_id: nStudentId, date: nDate, type: nType, reason: nReason.trim() || null })
+        .eq('id', editingNoticeId)
+      setNSubmitting(false)
+      if (error) { setNErr('수정에 실패했습니다. 다시 시도해주세요.'); return }
+      setNoticeModal(false)
+      fetchNotices(parent.parentId)
+      return
+    }
+
     const { error } = await supabase.from('attendance_notices').insert({
       parent_id: parent.parentId, student_id: nStudentId, date: nDate, type: nType, reason: nReason.trim() || null,
     })
     setNSubmitting(false)
     if (error) { setNErr('등록에 실패했습니다. 다시 시도해주세요.'); return }
     setNoticeModal(false)
+    fetchNotices(parent.parentId)
+
+    const name = children.find(c => c.id === nStudentId)?.name ?? '학생'
+    fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push-admin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({
+        title: '티처스 수학학원',
+        body: `${name} 학생의 ${nType === 'absence' ? '결석' : '지각'}이 등록되었습니다.`,
+        link: '/schedule',
+      }),
+    }).catch(() => {})
+  }
+
+  async function deleteNotice(id: number) {
+    if (!parent?.parentId) return
+    if (!confirm('이 등록 내역을 삭제하시겠습니까?')) return
+    const { error } = await supabase.from('attendance_notices').delete().eq('id', id)
+    if (error) return
     fetchNotices(parent.parentId)
   }
 
@@ -257,6 +300,10 @@ export default function ParentEvents() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ background: '#fff', color: nc.color, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4, display: 'inline-flex', alignItems: 'center', gap: 3 }}>{nc.clock && <IconClock size={10} />}{nc.label}</span>
                       <p style={{ fontSize: 14, fontWeight: 700, color: nc.color, margin: 0 }}>{childName(n.student_id)}</p>
+                      <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+                        <button onClick={() => openEditNotice(n)} style={{ background: 'none', border: 'none', color: nc.color, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>수정</button>
+                        <button onClick={() => deleteNotice(n.id)} style={{ background: 'none', border: 'none', color: nc.color, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: 0, opacity: .75 }}>삭제</button>
+                      </div>
                     </div>
                     {n.reason && <p style={{ fontSize: 13, color: tx2, marginTop: 6, marginBottom: 0 }}>{n.reason}</p>}
                   </div>
@@ -304,6 +351,10 @@ export default function ParentEvents() {
                         <span style={{ fontSize: 12, color: tx2, marginLeft: 'auto' }}>{n.date.slice(5).replace('-', '/')}</span>
                       </div>
                       {n.reason && <p style={{ fontSize: 13, color: tx2, marginTop: 6, marginBottom: 0 }}>{n.reason}</p>}
+                      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                        <button onClick={() => openEditNotice(n)} style={{ background: 'none', border: 'none', color: nc.color, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>수정</button>
+                        <button onClick={() => deleteNotice(n.id)} style={{ background: 'none', border: 'none', color: nc.color, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: 0, opacity: .75 }}>삭제</button>
+                      </div>
                     </div>
                   )
                 })
@@ -345,7 +396,7 @@ export default function ParentEvents() {
         <div onClick={() => setNoticeModal(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
           <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 400, padding: 20, boxShadow: '0 8px 40px rgba(0,0,0,.2)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-              <p style={{ fontSize: 16, fontWeight: 700, color: tx, margin: 0 }}>결석지각 등록</p>
+              <p style={{ fontSize: 16, fontWeight: 700, color: tx, margin: 0 }}>{editingNoticeId ? '결석지각 수정' : '결석지각 등록'}</p>
               <button onClick={() => setNoticeModal(false)} style={{ background: 'none', border: 'none', fontSize: 18, color: tx3, cursor: 'pointer' }}>×</button>
             </div>
 
@@ -394,7 +445,7 @@ export default function ParentEvents() {
               width: '100%', padding: 13, borderRadius: 8, border: 'none', background: nType === 'absence' ? absCol : lateCol, color: '#fff',
               fontSize: 14, fontWeight: 700, fontFamily: 'inherit', cursor: nSubmitting ? 'not-allowed' : 'pointer', opacity: nSubmitting ? 0.7 : 1,
             }}>
-              {nSubmitting ? '등록 중...' : '등록하기'}
+              {nSubmitting ? (editingNoticeId ? '수정 중...' : '등록 중...') : (editingNoticeId ? '수정하기' : '등록하기')}
             </button>
           </div>
         </div>

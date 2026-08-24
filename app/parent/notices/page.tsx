@@ -27,11 +27,16 @@ export default function ParentNotices() {
   const [search,  setSearch]    = useState('')
 
   const [comments, setComments] = useState<NoticeComment[]>([])
+  const [identityMap, setIdentityMap] = useState<Record<number, string[]>>({}) // parent_id -> 자녀 이름 (다른 학부모 댓글 표시용)
   const [commentsLoading, setCommentsLoading] = useState(false)
   const [commentInput, setCommentInput] = useState('')
   const [isAnonymous, setIsAnonymous] = useState(false)
   const [sending, setSending] = useState(false)
   const [err, setErr] = useState('')
+  const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({})
+  const [replyAnon, setReplyAnon] = useState<Record<number, boolean>>({})
+  const [replyOpenFor, setReplyOpenFor] = useState<number | null>(null)
+  const [sendingReply, setSendingReply] = useState(false)
 
   useEffect(() => {
     async function fetch() {
@@ -60,6 +65,18 @@ export default function ParentNotices() {
     fetch()
   }, [parent?.children])
 
+  useEffect(() => {
+    async function fetchIdentities() {
+      const { data } = await supabase.from('parents').select('id, parent_students(students(name))')
+      const map: Record<number, string[]> = {}
+      for (const row of (data ?? []) as any[]) {
+        map[row.id] = (row.parent_students ?? []).map((ps: any) => ps.students?.name).filter(Boolean)
+      }
+      setIdentityMap(map)
+    }
+    fetchIdentities()
+  }, [])
+
   useEffect(() => { if (detail) fetchComments(detail.id) }, [detail?.id])
 
   async function fetchComments(noticeId: number) {
@@ -67,6 +84,14 @@ export default function ParentNotices() {
     const { data } = await supabase.from('notice_comments').select('*').eq('notice_id', noticeId).order('created_at', { ascending: true })
     setComments((data ?? []) as NoticeComment[])
     setCommentsLoading(false)
+  }
+
+  function notifyAdmin(bodyText: string) {
+    fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push-admin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({ title: '티처스 수학학원', body: bodyText, link: '/notices' }),
+    }).catch(() => {})
   }
 
   async function sendComment() {
@@ -80,6 +105,23 @@ export default function ParentNotices() {
     if (error) { setErr('댓글 등록에 실패했습니다.'); return }
     setComments(cs => [...cs, data as NoticeComment])
     setCommentInput(''); setIsAnonymous(false)
+    notifyAdmin('공지사항에 댓글이 등록되었습니다.')
+  }
+
+  async function sendReply(rootCommentId: number) {
+    const text = (replyDrafts[rootCommentId] ?? '').trim()
+    if (!text || !detail || !parent?.parentId || sendingReply) return
+    setSendingReply(true)
+    const { data, error } = await supabase.from('notice_comments').insert({
+      notice_id: detail.id, parent_comment_id: rootCommentId, sender_type: 'parent', parent_id: parent.parentId,
+      is_anonymous: replyAnon[rootCommentId] ?? false, content: text,
+    }).select('*').single()
+    setSendingReply(false)
+    if (error) { setErr('답글 등록에 실패했습니다.'); return }
+    setComments(cs => [...cs, data as NoticeComment])
+    setReplyDrafts(d => ({ ...d, [rootCommentId]: '' }))
+    setReplyOpenFor(null)
+    notifyAdmin('공지사항에 댓글이 등록되었습니다.')
   }
 
   const filtered = notices.filter(n => n.title.includes(search))
@@ -90,8 +132,12 @@ export default function ParentNotices() {
     return Date.now() - new Date(createdAt).getTime() < 24 * 60 * 60 * 1000
   }
 
-  const childNames = (parent?.children ?? []).map(c => c.name)
-  const myName = childNames.length > 0 ? childNames.join(', ') + ' 학부모' : '학부모'
+  function identityOf(c: NoticeComment): string {
+    if (c.sender_type === 'admin') return '티처스 수학학원'
+    if (c.is_anonymous) return '익명'
+    const names = c.parent_id != null ? (identityMap[c.parent_id] ?? []) : []
+    return names.length > 0 ? names.join(', ') + ' 학부모' : '학부모'
+  }
   const topComments = comments.filter(c => !c.parent_comment_id)
   function repliesOf(commentId: number) { return comments.filter(c => c.parent_comment_id === commentId) }
 
@@ -120,7 +166,7 @@ export default function ParentNotices() {
         ) : topComments.map(c => (
           <div key={c.id} style={{ marginBottom: 14 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: tx }}>{c.is_anonymous ? '익명' : myName}</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: tx }}>{identityOf(c)}</span>
               <span style={{ fontSize: 10, color: tx3 }}>{kstDateOf(c.created_at)} {kstTimeOf(c.created_at)}</span>
             </div>
             <p style={{ fontSize: 13, color: tx, lineHeight: 1.5, margin: '0 0 6px', whiteSpace: 'pre-wrap' }}>{c.content}</p>
@@ -128,12 +174,37 @@ export default function ParentNotices() {
             {repliesOf(c.id).map(r => (
               <div key={r.id} style={{ marginLeft: 16, paddingLeft: 10, borderLeft: `2px solid ${bd}`, marginTop: 6 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: navy }}>학원</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: r.sender_type === 'admin' ? navy : tx }}>{identityOf(r)}</span>
                   <span style={{ fontSize: 10, color: tx3 }}>{kstDateOf(r.created_at)} {kstTimeOf(r.created_at)}</span>
                 </div>
                 <p style={{ fontSize: 13, color: tx, margin: 0, whiteSpace: 'pre-wrap' }}>{r.content}</p>
               </div>
             ))}
+
+            {replyOpenFor === c.id ? (
+              <div style={{ marginLeft: 16, marginTop: 8 }}>
+                <textarea
+                  rows={1} autoFocus value={replyDrafts[c.id] ?? ''} onChange={e => setReplyDrafts(d => ({ ...d, [c.id]: e.target.value }))}
+                  placeholder="답글을 입력하세요"
+                  style={{ width: '100%', padding: '7px 9px', border: `1.5px solid ${bd}`, borderRadius: 8, fontSize: 13, fontFamily: 'inherit', color: tx, outline: 'none', resize: 'vertical', boxSizing: 'border-box', marginBottom: 6 }}
+                />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: tx2, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={replyAnon[c.id] ?? false} onChange={e => setReplyAnon(a => ({ ...a, [c.id]: e.target.checked }))} />
+                    익명으로 작성
+                  </label>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={() => setReplyOpenFor(null)} style={{ padding: '5px 12px', borderRadius: 7, border: `1px solid ${bd}`, background: '#fff', color: tx2, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>취소</button>
+                    <button onClick={() => sendReply(c.id)} disabled={sendingReply || !(replyDrafts[c.id] ?? '').trim()}
+                      style={{ padding: '5px 14px', borderRadius: 7, border: 'none', background: gold, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', opacity: sendingReply || !(replyDrafts[c.id] ?? '').trim() ? 0.6 : 1 }}>
+                      등록
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <button onClick={() => setReplyOpenFor(c.id)} style={{ marginLeft: 16, marginTop: 4, border: 'none', background: 'none', color: navy, fontSize: 12, cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>답글달기</button>
+            )}
           </div>
         ))}
 

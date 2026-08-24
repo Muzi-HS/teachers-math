@@ -57,7 +57,7 @@ export default function NoticesPage() {
   const [notices, setNotices] = useState<Notice[]>([])
   const [students, setStudents] = useState<StudentLite[]>([])
   const [targetsByNotice, setTargetsByNotice] = useState<Record<number, number[]>>({})
-  const [parentsMap, setParentsMap] = useState<Record<number, string[]>>({}) // parent_id -> 자녀 이름 목록
+  const [parentsMap, setParentsMap] = useState<Record<number, { phone: string; names: string[] }>>({}) // parent_id -> 전화번호·자녀 이름
   const [loading, setLoading] = useState(true)
   const [modal,   setModal]   = useState(false)
   const [detail,  setDetail]  = useState<Notice | null>(null)
@@ -100,10 +100,13 @@ export default function NoticesPage() {
   }
 
   async function fetchParentsMap() {
-    const { data } = await supabase.from('parents').select('id, parent_students(students(name))')
-    const map: Record<number, string[]> = {}
+    const { data } = await supabase.from('parents').select('id, phone, parent_students(students(name))')
+    const map: Record<number, { phone: string; names: string[] }> = {}
     for (const row of (data ?? []) as any[]) {
-      map[row.id] = (row.parent_students ?? []).map((ps: any) => ps.students?.name).filter(Boolean)
+      map[row.id] = {
+        phone: row.phone,
+        names: (row.parent_students ?? []).map((ps: any) => ps.students?.name).filter(Boolean),
+      }
     }
     setParentsMap(map)
   }
@@ -225,6 +228,22 @@ export default function NoticesPage() {
     setComments(cs => [...cs, data as NoticeComment])
     setReplyDrafts(d => ({ ...d, [parentCommentId]: '' }))
     setReplyOpenFor(null)
+
+    // 그 댓글 스레드를 시작한 학부모에게 대댓글 알림
+    const rootComment = comments.find(c => c.id === parentCommentId)
+    const phone = rootComment?.parent_id != null ? parentsMap[rootComment.parent_id]?.phone : null
+    if (phone) {
+      fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({
+          parent_phone: phone,
+          title: '티처스 수학학원',
+          body: `공지사항 댓글에 답글이 등록되었습니다.`,
+          link: '/parent/notices',
+        }),
+      }).catch(() => {})
+    }
   }
 
   async function deleteComment(id: number) {
@@ -234,9 +253,9 @@ export default function NoticesPage() {
   }
 
   function identityOf(c: NoticeComment): string {
-    if (c.sender_type === 'admin') return '학원'
+    if (c.sender_type === 'admin') return '티처스 수학학원'
     if (c.is_anonymous) return '익명'
-    const names = c.parent_id != null ? (parentsMap[c.parent_id] ?? []) : []
+    const names = c.parent_id != null ? (parentsMap[c.parent_id]?.names ?? []) : []
     return names.length > 0 ? names.join(', ') + ' 학부모' : '학부모'
   }
 
@@ -427,7 +446,7 @@ export default function NoticesPage() {
                   {repliesOf(c.id).map(r => (
                     <div key={r.id} style={{ marginLeft: 16, paddingLeft: 10, borderLeft: `2px solid ${bd}`, marginTop: 6 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: navy }}>학원</span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: r.sender_type === 'admin' ? navy : tx }}>{identityOf(r)}</span>
                         <span style={{ fontSize: 10, color: tx3 }}>{kstDateOf(r.created_at)} {kstTimeOf(r.created_at)}</span>
                         {canWrite && (
                           <button onClick={() => deleteComment(r.id)} style={{ marginLeft: 'auto', border: 'none', background: 'none', color: tx3, cursor: 'pointer', fontSize: 11, fontFamily: 'inherit' }}>삭제</button>
