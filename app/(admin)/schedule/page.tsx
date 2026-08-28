@@ -380,6 +380,31 @@ export default function SchedulePage() {
                 ))}
             </div>
 
+            {/* 이번달 결석·지각 목록 */}
+            <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: mobileMode ? 14 : 22, boxShadow: '0 1px 4px rgba(0,0,0,.06)', marginTop: mobileMode ? 12 : 18 }}>
+                <h2 style={{ fontSize: 14, fontWeight: 600, color: tx, marginBottom: 14 }}>{mo + 1}월 결석·지각 목록</h2>
+                {loading ? (
+                    <p style={{ color: tx3, fontSize: 13 }}>불러오는 중...</p>
+                ) : attNotices.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '30px 0', color: tx3 }}>
+                        <p style={{ fontSize: 14 }}>이번달 결석·지각 등록이 없습니다</p>
+                    </div>
+                ) : [...attNotices].sort((a, b) => a.date.localeCompare(b.date)).map(n => (
+                    <div key={n.id} style={{ padding: '10px 0', borderBottom: `1px solid ${bd}`, display: 'flex', alignItems: 'center', gap: 10, flexWrap: mobileMode ? 'wrap' : 'nowrap' }}>
+                        <span style={{
+                            fontSize: 10, padding: '2px 7px', borderRadius: 3, flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 3,
+                            background: n.type === 'late' ? '#F3ECDD' : '#F3E7E4',
+                            color: n.type === 'late' ? '#A67C3D' : '#A85D52',
+                        }}>
+                            {n.type === 'late' && <IconClock size={9} />}{n.type === 'late' ? '지각' : '결석'}
+                        </span>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: tx, flex: 1 }}>{studentsMap[n.student_id] ?? '학생'}</span>
+                        {n.reason && <span style={{ fontSize: 12, color: tx2 }}>{n.reason}</span>}
+                        <span style={{ fontSize: 12, color: tx3, whiteSpace: 'nowrap' }}>{n.date.slice(5).replace('-', '/')}</span>
+                    </div>
+                ))}
+            </div>
+
             {/* 모달 */}
             {modal && (
                 <div onClick={() => setModal(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.42)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>

@@ -3,8 +3,8 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
-import { kstNow } from '@/lib/kst'
-import { IconCalendar, IconBell, IconChat, IconCheck } from '@/components/icons'
+import { kstNow, kstDateStr } from '@/lib/kst'
+import { IconCalendar, IconBell, IconChat, IconCheck, IconClock } from '@/components/icons'
 import { isUnreadParentComment } from '@/lib/records'
 import { useMobileMode } from '@/context/MobileModeContext'
 
@@ -12,6 +12,7 @@ type Class_   = { id:number; name:string; days:string; time:string }
 type Student  = { id:number; name:string }
 type InqMsg   = { id:number; parent_id:number; content:string; created_at:string }
 type UnreadRecComment = { id:number; student_id:number; date:string; parent_comment:string; parent_comment_at:string; parent_comment_read_at:string|null }
+type TodayAtt = { id:number; student_id:number; type:'absence'|'late'; reason:string|null }
 
 const navy='#0D2A5E', navyDk='#071A3E', navyM='#E8EEF8'
 const gold='#D87E13', goldL='#F09830'
@@ -34,13 +35,14 @@ export default function DashboardPage(){
   const [unreadInqTotal,setUnreadInqTotal]= useState(0)
   const [unreadComments,setUnreadComments]= useState<UnreadRecComment[]>([])
   const [childrenMap,   setChildrenMap]   = useState<Record<number, string[]>>({})
+  const [todayAtt,      setTodayAtt]      = useState<TodayAtt[]>([])
   const [loading,       setLoading]       = useState(true)
 
   useEffect(()=>{ fetchAll() },[])
 
   async function fetchAll(){
     setLoading(true)
-    const [{ data:cls },{ data:cs },{ data:stu },{ data:unsent },{ data:inq, count:inqCount },{ data:par },{ data:comments }] = await Promise.all([
+    const [{ data:cls },{ data:cs },{ data:stu },{ data:unsent },{ data:inq, count:inqCount },{ data:par },{ data:comments },{ data:att }] = await Promise.all([
       supabase.from('classes').select('id,name,days,time').order('name'),
       supabase.from('class_students').select('class_id,student_id'),
       supabase.from('students').select('id,name'),
@@ -49,6 +51,7 @@ export default function DashboardPage(){
       supabase.from('parents').select('id, parent_students(students(name))'),
       supabase.from('records').select('id,student_id,date,parent_comment,parent_comment_at,parent_comment_read_at')
         .eq('is_draft',false).not('parent_comment','is',null).order('parent_comment_at',{ascending:false}).limit(50),
+      supabase.from('attendance_notices').select('id,student_id,type,reason').eq('date',kstDateStr()),
     ])
     setClasses(cls??[])
     const map:Record<number,number[]>={}
@@ -62,6 +65,7 @@ export default function DashboardPage(){
     setUnreadInq(inq??[])
     setUnreadInqTotal(inqCount ?? (inq??[]).length)
     setUnreadComments((comments??[]).filter(isUnreadParentComment) as UnreadRecComment[])
+    setTodayAtt((att??[]) as TodayAtt[])
     const cmap:Record<number,string[]> = {}
     for (const row of (par??[]) as any[]) {
       cmap[row.id] = (row.parent_students ?? []).map((ps:any) => ps.students?.name).filter(Boolean)
@@ -89,6 +93,10 @@ export default function DashboardPage(){
 
   function goToRecordDate(date: string){
     router.push(`/records?date=${date}`)
+  }
+
+  function goToSchedule(){
+    router.push('/schedule')
   }
 
   const studentNameOf = (sid:number) => students.find(s=>s.id===sid)?.name ?? '알 수 없음'
@@ -123,8 +131,8 @@ export default function DashboardPage(){
         </div>
       </div>
 
-      {/* 상단 요약 6칸 */}
-      <div style={{ display:'grid', gridTemplateColumns: mobileMode ? 'repeat(2,1fr)' : 'repeat(6,1fr)', gap: mobileMode ? 8 : 12, marginBottom: mobileMode ? 12 : 16 }}>
+      {/* 상단 요약 7칸 */}
+      <div style={{ display:'grid', gridTemplateColumns: mobileMode ? 'repeat(2,1fr)' : 'repeat(7,1fr)', gap: mobileMode ? 8 : 12, marginBottom: mobileMode ? 12 : 16 }}>
         <div className="mc">
           <p style={{ fontSize: 11, color: tx3, margin: '0 0 6px' }}>오늘 수업</p>
           <p style={{ fontSize: 24, fontWeight: 700, color: navy, margin: 0 }}>
@@ -159,6 +167,12 @@ export default function DashboardPage(){
           <p style={{ fontSize: 11, color: unreadComments.length > 0 ? re : tx3, fontWeight: unreadComments.length > 0 ? 600 : 400, margin: '0 0 6px' }}>안읽은 학부모 의견</p>
           <p style={{ fontSize: 24, fontWeight: 700, color: unreadComments.length > 0 ? re : tx, margin: 0 }}>
             {unreadComments.length}<span style={{ fontSize: 13, fontWeight: 400 }}>건</span>
+          </p>
+        </div>
+        <div className="mc" style={{ cursor: 'pointer', borderColor: todayAtt.length > 0 ? re + '55' : bd, borderWidth: todayAtt.length > 0 ? 1.5 : 1 }} onClick={goToSchedule}>
+          <p style={{ fontSize: 11, color: todayAtt.length > 0 ? re : tx3, fontWeight: todayAtt.length > 0 ? 600 : 400, margin: '0 0 6px' }}>오늘 결석·지각</p>
+          <p style={{ fontSize: 24, fontWeight: 700, color: todayAtt.length > 0 ? re : tx, margin: 0 }}>
+            {todayAtt.length}<span style={{ fontSize: 13, fontWeight: 400 }}>명</span>
           </p>
         </div>
       </div>
@@ -281,6 +295,38 @@ export default function DashboardPage(){
               <p style={{ fontSize: 11, color: tx3, margin: '6px 0 0' }}>외 {unreadComments.length - 5}건 더보기</p>
             )}
           </>
+        )}
+      </div>
+
+      {/* 오늘 결석·지각 */}
+      <div className="mc" style={{ marginTop: 16, borderColor: todayAtt.length > 0 ? re + '55' : bd, borderWidth: todayAtt.length > 0 ? 1.5 : 1 }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: 10 }}>
+          <p style={{ fontSize: 13, fontWeight: 700, color: todayAtt.length>0?re:tx, margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}><IconClock size={14} /> 오늘 결석·지각</p>
+          {todayAtt.length > 0 && (
+            <span style={{ fontSize: 12, color: navy, fontWeight: 600, cursor: 'pointer' }} onClick={goToSchedule}>
+              학원일정에서 확인 →
+            </span>
+          )}
+        </div>
+        {loading ? (
+          <p style={{ fontSize: 13, color: tx3, padding: '20px 0', textAlign: 'center' }}>불러오는 중...</p>
+        ) : todayAtt.length === 0 ? (
+          <p style={{ fontSize: 13, color: tx3, padding: '20px 0', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><IconCheck size={14} /> 오늘 등록된 결석·지각이 없습니다</p>
+        ) : (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {todayAtt.map(n => {
+              const isLate = n.type === 'late'
+              return (
+                <span key={n.id} onClick={goToSchedule} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 20, cursor: 'pointer',
+                  background: isLate ? '#F3ECDD' : '#F3E7E4', color: isLate ? '#A67C3D' : '#A85D52', fontSize: 12, fontWeight: 600,
+                }} title={n.reason ?? undefined}>
+                  {isLate && <IconClock size={11} />}
+                  {studentNameOf(n.student_id)} · {isLate ? '지각' : '결석'}
+                </span>
+              )
+            })}
+          </div>
         )}
       </div>
     </div>

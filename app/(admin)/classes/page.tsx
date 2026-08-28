@@ -6,7 +6,7 @@ import { can } from '@/lib/permissions'
 import { useSearchParams } from 'next/navigation'
 import { kstDateStr } from '@/lib/kst'
 import ClassBulkRecordModal from '@/components/ClassBulkRecordModal'
-import { IconBook, IconPencil, IconChat, IconSave, IconX } from '@/components/icons'
+import { IconBook, IconPencil, IconChat, IconSave, IconX, IconClock } from '@/components/icons'
 import { useMobileMode } from '@/context/MobileModeContext'
 
 type Class = { id: number; name: string; days: string; time: string; mode?: string; active?: boolean }
@@ -81,11 +81,21 @@ export default function ClassesPage() {
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
   const [notif, setNotif] = useState<{ msg: string; ok: boolean } | null>(null)
+  // 오늘 등록된 결석/지각 (반 상세에서 소속 학생 중 해당자 표시용)
+  const [todayAttNotices, setTodayAttNotices] = useState<{ student_id: number; type: 'absence' | 'late'; reason: string | null }[]>([])
 
   const searchParams = useSearchParams()
   const openDetailHandled = useRef(false)
 
   useEffect(() => { fetchAll() }, [])
+
+  useEffect(() => {
+    async function fetchTodayAttNotices() {
+      const { data } = await supabase.from('attendance_notices').select('student_id,type,reason').eq('date', kstDateStr())
+      setTodayAttNotices((data ?? []) as { student_id: number; type: 'absence' | 'late'; reason: string | null }[])
+    }
+    fetchTodayAttNotices()
+  }, [])
 
   useEffect(() => {
     if (openDetailHandled.current || classes.length === 0) return
@@ -358,6 +368,9 @@ export default function ClassesPage() {
     return nameMatch && dayMatch
   })
   const detailStus = detailCls ? (csMap[detailCls.id] ?? []).map(id => students.find(s => s.id === id)).filter(Boolean) as Student[] : []
+  // 오늘 이 반 소속 학생 중 결석/지각이 등록된 학생
+  const detailStuIds = new Set(detailStus.map(s => s.id))
+  const classTodayAtt = todayAttNotices.filter(n => detailStuIds.has(n.student_id))
   const alreadyIn = new Set(detailCls ? (csMap[detailCls.id] ?? []) : [])
   const available = students.filter(s =>
     !alreadyIn.has(s.id) &&
@@ -519,6 +532,28 @@ export default function ClassesPage() {
             )}
           </div>
         </div>
+
+        {classTodayAtt.length > 0 && (
+          <div style={{ background: rbg, border: `1px solid ${re}33`, borderRadius: 12, padding: '12px 16px', marginBottom: 16 }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: re, margin: '0 0 8px' }}>오늘 결석·지각 {classTodayAtt.length}명</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {classTodayAtt.map((n, idx) => {
+                const s = students.find(x => x.id === n.student_id)
+                const isLate = n.type === 'late'
+                return (
+                  <span key={idx} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 20,
+                    background: '#fff', border: `1px solid ${isLate ? wa : re}55`, color: isLate ? wa : re, fontSize: 12, fontWeight: 600,
+                  }} title={n.reason ?? undefined}>
+                    {isLate && <IconClock size={11} />}
+                    {s?.name ?? '학생'} · {isLate ? '지각' : '결석'}
+                  </span>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, boxShadow: '0 1px 4px rgba(0,0,0,.06)', overflow: 'hidden' }}>
           <div style={{ padding: '12px 16px', borderBottom: `1px solid ${bd}`, fontSize: 13, fontWeight: 600, color: tx }}>
             소속 학생 <span style={{ fontSize: 12, color: tx3, fontWeight: 400 }}>{detailStus.length}명</span>
