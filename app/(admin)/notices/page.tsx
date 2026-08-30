@@ -61,6 +61,7 @@ export default function NoticesPage() {
   const [loading, setLoading] = useState(true)
   const [modal,   setModal]   = useState(false)
   const [detail,  setDetail]  = useState<Notice | null>(null)
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
   const [form,    setForm]    = useState({ ...EMPTY })
   const [editId,  setEditId]  = useState<number | null>(null)
   const [saving,  setSaving]  = useState(false)
@@ -311,6 +312,8 @@ export default function NoticesPage() {
         .pill.active { border-color:${navy}; background:${navy}; color:#fff; font-weight:700; }
         .chip { display:inline-flex; align-items:center; gap:4px; padding:3px 8px 3px 10px; border-radius:20px; font-size:12px; background:${navyMuted}; color:${navy}; font-weight:500; }
         .chip button { border:none; background:none; cursor:pointer; color:${navy}; font-size:13px; padding:0; line-height:1; display:flex; }
+        .ql-editor img { cursor: zoom-in; transition: opacity .15s; }
+        .ql-editor img:hover { opacity: .85; }
       `}</style>
 
       {/* 토스트 */}
@@ -425,6 +428,7 @@ export default function NoticesPage() {
             </div>
             <div style={{ borderTop: `1px solid ${bd}`, margin: '16px 22px 0' }} />
             <div className="ql-editor" style={{ padding: '16px 22px', fontSize: 14, color: tx, lineHeight: 1.8, overflowWrap: 'break-word' }}
+              onClick={e => { const t = e.target as HTMLElement; if (t.tagName === 'IMG') setLightboxSrc((t as HTMLImageElement).src) }}
               dangerouslySetInnerHTML={{ __html: detail.content }} />
 
             {/* 댓글 · 대댓글 */}
@@ -628,6 +632,17 @@ export default function NoticesPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* 이미지 확대보기 */}
+      {lightboxSrc && (
+        <div onClick={() => setLightboxSrc(null)} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 2000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, cursor: 'zoom-out',
+        }}>
+          <img src={lightboxSrc} alt="" style={{ maxWidth: '92vw', maxHeight: '92vh', borderRadius: 4, boxShadow: '0 10px 40px rgba(0,0,0,.4)' }} />
+          <button onClick={() => setLightboxSrc(null)} style={{ position: 'fixed', top: 18, right: 22, width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,.15)', color: '#fff', fontSize: 20, cursor: 'pointer' }}>×</button>
         </div>
       )}
     </div>

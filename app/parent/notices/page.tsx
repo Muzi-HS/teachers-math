@@ -25,6 +25,7 @@ export default function ParentNotices() {
   const [notices, setNotices]   = useState<Notice[]>([])
   const [loading, setLoading]   = useState(true)
   const [detail,  setDetail]    = useState<Notice | null>(null)
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
   const [search,  setSearch]    = useState('')
 
   const [comments, setComments] = useState<NoticeComment[]>([])
@@ -144,6 +145,10 @@ export default function ParentNotices() {
 
   if (detail) return (
     <div>
+      <style>{`
+        .ql-editor img { cursor: zoom-in; transition: opacity .15s; }
+        .ql-editor img:hover { opacity: .85; }
+      `}</style>
       <button onClick={() => setDetail(null)} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, color: tx2, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', marginBottom: 16 }}>
         <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth={2} d="M15 18l-6-6 6-6"/></svg>
         목록으로
@@ -153,8 +158,19 @@ export default function ParentNotices() {
         <h2 style={{ fontSize: 17, fontWeight: 700, color: tx, marginBottom: 8 }}>{detail.title}</h2>
         <p style={{ fontSize: 12, color: tx3, marginBottom: 16 }}>{kstDateOf(detail.created_at)}</p>
         <div className="ql-editor" style={{ fontSize: 14, color: tx, lineHeight: 1.7, padding: 0, overflowWrap: 'break-word' }}
+          onClick={e => { const t = e.target as HTMLElement; if (t.tagName === 'IMG') setLightboxSrc((t as HTMLImageElement).src) }}
           dangerouslySetInnerHTML={{ __html: detail.content }} />
       </div>
+
+      {lightboxSrc && (
+        <div onClick={() => setLightboxSrc(null)} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 2000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, cursor: 'zoom-out',
+        }}>
+          <img src={lightboxSrc} alt="" style={{ maxWidth: '92vw', maxHeight: '92vh', borderRadius: 4, boxShadow: '0 10px 40px rgba(0,0,0,.4)' }} />
+          <button onClick={() => setLightboxSrc(null)} style={{ position: 'fixed', top: 18, right: 22, width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,.15)', color: '#fff', fontSize: 20, cursor: 'pointer' }}>×</button>
+        </div>
+      )}
 
       {/* 댓글 */}
       <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: 18 }}>
