@@ -146,8 +146,9 @@ export default function ParentNotices() {
   if (detail) return (
     <div>
       <style>{`
-        .ql-editor img { cursor: zoom-in; transition: opacity .15s; }
+        .ql-editor img { max-width: 100%; height: auto; cursor: zoom-in; transition: opacity .15s; }
         .ql-editor img:hover { opacity: .85; }
+        .ql-editor { max-width: 100%; overflow-x: hidden; word-break: break-word; }
       `}</style>
       <button onClick={() => setDetail(null)} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, color: tx2, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', marginBottom: 16 }}>
         <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth={2} d="M15 18l-6-6 6-6"/></svg>

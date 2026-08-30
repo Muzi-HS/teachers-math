@@ -312,8 +312,9 @@ export default function NoticesPage() {
         .pill.active { border-color:${navy}; background:${navy}; color:#fff; font-weight:700; }
         .chip { display:inline-flex; align-items:center; gap:4px; padding:3px 8px 3px 10px; border-radius:20px; font-size:12px; background:${navyMuted}; color:${navy}; font-weight:500; }
         .chip button { border:none; background:none; cursor:pointer; color:${navy}; font-size:13px; padding:0; line-height:1; display:flex; }
-        .ql-editor img { cursor: zoom-in; transition: opacity .15s; }
+        .ql-editor img { max-width: 100%; height: auto; cursor: zoom-in; transition: opacity .15s; }
         .ql-editor img:hover { opacity: .85; }
+        .ql-editor { max-width: 100%; overflow-x: hidden; word-break: break-word; }
       `}</style>
 
       {/* 토스트 */}

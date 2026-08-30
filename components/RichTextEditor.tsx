@@ -73,5 +73,15 @@ export default function RichTextEditor({ value, onChange, onImageUpload, placeho
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  return <div ref={containerRef} style={{ background: '#fff', minHeight }} />
+  return (
+    <div>
+      <style>{`
+        .ql-editor img { max-width: 100%; height: auto; }
+        .ql-container { max-width: 100%; }
+        .ql-editor { max-width: 100%; overflow-x: hidden; word-break: break-word; }
+        .ql-toolbar.ql-snow { flex-wrap: wrap; }
+      `}</style>
+      <div ref={containerRef} style={{ background: '#fff', minHeight, maxWidth: '100%' }} />
+    </div>
+  )
 }
