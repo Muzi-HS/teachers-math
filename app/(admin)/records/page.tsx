@@ -869,7 +869,7 @@ export default function RecordsPage() {
                       <div style={{ width: 3, height: 14, background: navy, borderRadius: 2 }} />
                       <span style={{ fontSize: 13, fontWeight: 600, color: navy }}>수업 피드백</span>
                     </div>
-                    <p style={{ fontSize: 14, color: tx, lineHeight: 1.6 }}>{r.feedback}</p>
+                    <p style={{ fontSize: 14, color: tx, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{r.feedback}</p>
                   </div>
                 )}
 

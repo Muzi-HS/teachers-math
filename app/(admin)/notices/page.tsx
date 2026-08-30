@@ -6,6 +6,7 @@ import { can, Role } from '@/lib/permissions'
 import { kstDateOf, kstDateStr, kstTimeOf } from '@/lib/kst'
 import { IconBell, IconPin } from '@/components/icons'
 import { useMobileMode } from '@/context/MobileModeContext'
+import RichTextEditor from '@/components/RichTextEditor'
 
 type Notice = {
   id: number
@@ -13,7 +14,6 @@ type Notice = {
   content: string
   pinned: boolean
   parent_visible: boolean
-  image_url: string
   created_at: string
 }
 
@@ -28,7 +28,7 @@ type NoticeComment = {
 const SCHOOL_TYPES = ['초등', '중등', '고등']
 
 const EMPTY = {
-  title: '', content: '', pinned: false, parent_visible: true, image_url: '',
+  title: '', content: '', pinned: false, parent_visible: true,
   target_mode: 'all' as 'all' | 'selected', target_student_ids: [] as number[],
 }
 
@@ -123,6 +123,15 @@ export default function NoticesPage() {
     setTimeout(() => setNotif(null), 3000)
   }
 
+  async function uploadNoticeImage(file: File): Promise<string | null> {
+    const ext = file.name.split('.').pop() || 'png'
+    const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+    const { error } = await supabase.storage.from('notice-images').upload(path, file)
+    if (error) { toast('이미지 업로드에 실패했습니다: ' + error.message, false); return null }
+    const { data } = supabase.storage.from('notice-images').getPublicUrl(path)
+    return data.publicUrl
+  }
+
   function openAdd() {
     setEditId(null); setForm({ ...EMPTY }); setPickerSearch(''); setPickerStageFlt([]); setModal(true)
   }
@@ -130,7 +139,7 @@ export default function NoticesPage() {
     setEditId(n.id)
     const targetIds = targetsByNotice[n.id] ?? []
     setForm({
-      title: n.title, content: n.content, pinned: n.pinned, parent_visible: n.parent_visible, image_url: n.image_url ?? '',
+      title: n.title, content: n.content, pinned: n.pinned, parent_visible: n.parent_visible,
       target_mode: targetIds.length > 0 ? 'selected' : 'all',
       target_student_ids: targetIds,
     })
@@ -173,7 +182,7 @@ export default function NoticesPage() {
   async function save() {
     if (!form.title.trim()) return toast('제목을 입력하세요.', false)
     setSaving(true)
-    const payload = { title: form.title, content: form.content, pinned: form.pinned, parent_visible: form.parent_visible, image_url: form.image_url }
+    const payload = { title: form.title, content: form.content, pinned: form.pinned, parent_visible: form.parent_visible }
     let noticeId = editId
     if (editId) {
       await supabase.from('notices').update(payload).eq('id', editId)
@@ -415,14 +424,8 @@ export default function NoticesPage() {
               <button onClick={() => setDetail(null)} style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: bg, cursor: 'pointer', fontSize: 17, color: tx2, flexShrink: 0 }}>×</button>
             </div>
             <div style={{ borderTop: `1px solid ${bd}`, margin: '16px 22px 0' }} />
-            <div style={{ padding: '16px 22px', fontSize: 14, color: tx, lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
-              {detail.content}
-            </div>
-            {detail.image_url && (
-              <div style={{ padding: '0 22px 16px' }}>
-                <img src={detail.image_url} alt="첨부이미지" style={{ width: '100%', borderRadius: 8, border: `1px solid ${bd}` }} />
-              </div>
-            )}
+            <div className="ql-editor" style={{ padding: '16px 22px', fontSize: 14, color: tx, lineHeight: 1.8, overflowWrap: 'break-word' }}
+              dangerouslySetInnerHTML={{ __html: detail.content }} />
 
             {/* 댓글 · 대댓글 */}
             <div style={{ borderTop: `1px solid ${bd}`, margin: '4px 22px 0' }} />
@@ -607,13 +610,11 @@ export default function NoticesPage() {
               {/* 내용 */}
               <div style={{ marginBottom: 14 }}>
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: tx2, marginBottom: 5 }}>내용</label>
-                <textarea
-                  className="fi"
+                <RichTextEditor
                   value={form.content}
-                  onChange={e => setForm(f => ({ ...f, content: e.target.value }))}
-                  placeholder="공지 내용을 입력하세요"
-                  rows={6}
-                  style={{ resize: 'vertical' }}
+                  onChange={html => setForm(f => ({ ...f, content: html }))}
+                  onImageUpload={uploadNoticeImage}
+                  placeholder="공지 내용을 입력하세요 (이미지는 원하는 위치에 커서를 두고 삽입할 수 있어요)"
                 />
               </div>
 
