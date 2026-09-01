@@ -508,7 +508,7 @@ export default function RecordsPage() {
     .ll-dot{width:4px;height:4px;border-radius:50%;background:${gold};margin:2px auto 0;}
     .ll-day.today .ll-dot,.ll-day.selected .ll-dot{background:#fff;}
     .ll-dot-comment{position:absolute;top:2px;right:4px;width:6px;height:6px;border-radius:50%;background:${re};border:1.5px solid #fff;}
-    .rc{background:#fff;border:1px solid ${bd};border-radius:10px;padding:16px;margin-bottom:10px;}
+    .rc{background:#fff;border:1px solid ${bd};border-radius:10px;padding:16px;margin-bottom:10px;min-width:0;box-sizing:border-box;}
     .rch{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid ${bd};}
     .pb{height:6px;background:${bd};border-radius:99px;flex:1;}
     .pf{height:100%;border-radius:99px;}
@@ -574,10 +574,10 @@ export default function RecordsPage() {
       </div>
 
       {/* 2단 레이아웃 (모바일에서는 위아래로) */}
-      <div style={{ display: 'grid', gridTemplateColumns: mobileMode ? '1fr' : '320px 1fr', gap: mobileMode ? 12 : 16, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: mobileMode ? '1fr' : '320px 1fr', gap: mobileMode ? 12 : 16, alignItems: 'start', minWidth: 0 }}>
 
         {/* 달력 */}
-        <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: mobileMode ? 14 : 18, boxShadow: '0 1px 4px rgba(0,0,0,.06)' }}>
+        <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: mobileMode ? 14 : 18, boxShadow: '0 1px 4px rgba(0,0,0,.06)', minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
             <button className={mobileMode ? 'll-nav' : 'bout'} onClick={() => moveLLCal(-1)}>{mobileMode ? '‹' : '◀'}</button>
             <span style={{ fontSize: 14, fontWeight: 700, color: tx }}>{llYear}년 {llMonth + 1}월</span>
@@ -619,7 +619,7 @@ export default function RecordsPage() {
         </div>
 
         {/* 기록 목록 */}
-        <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: 18, boxShadow: '0 1px 4px rgba(0,0,0,.06)' }}>
+        <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: mobileMode ? 14 : 18, boxShadow: '0 1px 4px rgba(0,0,0,.06)', minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
             <span style={{ fontSize: 14, fontWeight: 600, color: tx }}>
               {selDate === today ? `오늘 (${fmtDate(selDate)})` : fmtDate(selDate)} 수업 기록
@@ -652,7 +652,7 @@ export default function RecordsPage() {
                       <span className="badge" style={{ background: gbg, color: gr }}>전체 발송됨</span>
                     )}
                   </div>
-                  <div style={{ display: 'flex', gap: 6 }}>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {clsG && <button className="bout" onClick={() => setBulkModalClsId(clsG.id)}>일괄 수정</button>}
                     <button className="bgrn"
                       onClick={() => sendPushByClass(clsG?.id ?? null)}
@@ -691,7 +691,7 @@ export default function RecordsPage() {
                           </div>
                         </div>
                       </div>
-                      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                         {!(r.push_sent ?? false) && (
                           <button className="bout" style={{ color: gr, borderColor: gr + '66', whiteSpace: 'nowrap' }}
                             disabled={pushingOneId === r.id || !students.find(s => s.id === r.student_id)?.parent_phone}
