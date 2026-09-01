@@ -38,6 +38,10 @@ export async function requestFCMToken(): Promise<string | null> {
   }
 }
 
+export async function isFCMSupported(): Promise<boolean> {
+  try { return await isSupported() } catch { return false }
+}
+
 export async function onForegroundMessage(callback: (payload: any) => void) {
   try {
     const supported = await isSupported()

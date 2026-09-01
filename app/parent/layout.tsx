@@ -4,7 +4,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import Image from 'next/image'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
-import { requestFCMToken, onForegroundMessage } from '@/lib/firebase'
+import { requestFCMToken, onForegroundMessage, isFCMSupported } from '@/lib/firebase'
 
 const navy='#0D2A5E', navyDk='#071A3E', bd='#DDE3EE', bg='#F5F7FA', tx2='#4B5C7E', tx3='#96A4BF'
 
@@ -43,6 +43,11 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
   const [selChild, setSelChild] = useState<number | null>(null)
   const [ready,    setReady]    = useState(false)
 
+  // 알림 권한 배너 — 토큰이 없으면(=권한 미허용) 매 세션마다 다시 안내
+  const [notifPerm, setNotifPerm] = useState<NotificationPermission | null>(null)
+  const [notifBannerDismissed, setNotifBannerDismissed] = useState(false)
+  const [notifRequesting, setNotifRequesting] = useState(false)
+
   // useRef로 초기화 여부 추적 — 리렌더에 영향 없음
   const initDone = useRef(false)
 
@@ -51,6 +56,7 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
       console.log('[FCM] 토큰 등록 시작, parentId:', parentId)
       const token = await requestFCMToken()
       console.log('[FCM] 토큰 발급 결과:', token ? '성공' : '실패(null)')
+      if (typeof Notification !== 'undefined') setNotifPerm(Notification.permission)
       if (!token) return
 
       // register-fcm-token Edge Function 호출 (기존 토큰 삭제 후 새 토큰 저장)
@@ -71,6 +77,20 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
     } catch (e) {
       console.error('[FCM] 토큰 등록 오류:', e)
     }
+  }
+
+  // 배너의 "알림 켜기" 버튼 — 권한이 아직 결정 안 됐으면(default) 다시 허용 팝업을 띄운다
+  // (브라우저는 한 번 "차단"된 권한은 JS로 다시 물어볼 수 없어 안내 문구로 대체)
+  async function enableNotifications() {
+    if (!parent?.parentId || notifRequesting) return
+    setNotifRequesting(true)
+    await registerFCMToken(parent.parentId)
+    setNotifRequesting(false)
+  }
+
+  function dismissNotifBanner() {
+    try { sessionStorage.setItem('notifBannerDismissed', '1') } catch {}
+    setNotifBannerDismissed(true)
   }
 
   useEffect(() => {
@@ -98,6 +118,18 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
 
     setReady(true)
   }, [loading, role, parent])
+
+  // 알림 권한 배너 표시 여부 — 세션마다 다시 확인해서, 꺼둔 채 다음에 들어와도 다시 안내한다
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof Notification === 'undefined') return
+    isFCMSupported().then(supported => {
+      if (!supported) return
+      setNotifPerm(Notification.permission)
+      try {
+        if (sessionStorage.getItem('notifBannerDismissed') === '1') setNotifBannerDismissed(true)
+      } catch {}
+    })
+  }, [])
 
   // 알림 클릭 시 서비스워커가 보내는 이동 요청 처리
   // (client.navigate를 지원하지 않는 구형 브라우저 대비 폴백 — 라우터로 이동시켜야
@@ -196,6 +228,37 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
 
       {/* 본문 */}
       <main className="parent-main" style={{ flex: 1, padding: '16px 16px 80px', maxWidth: 640, width: '100%', margin: '0 auto' }}>
+        {notifPerm && notifPerm !== 'granted' && !notifBannerDismissed && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            background: '#FEF3E2', border: '1px solid #D87E1355', borderRadius: 12,
+            padding: '12px 14px', marginBottom: 14,
+          }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: navyDk }}>
+                {notifPerm === 'denied' ? '알림이 차단되어 있어요' : '알림을 켜주세요'}
+              </p>
+              <p style={{ margin: '3px 0 0', fontSize: 11.5, color: tx2, lineHeight: 1.5 }}>
+                {notifPerm === 'denied'
+                  ? '수업기록·공지사항 알림을 받으려면 휴대폰 설정 → 이 앱(또는 브라우저)의 알림 권한을 허용으로 바꿔주세요.'
+                  : '수업기록이 등록되거나 공지사항이 올라오면 바로 알려드려요.'}
+              </p>
+            </div>
+            {notifPerm !== 'denied' && (
+              <button onClick={enableNotifications} disabled={notifRequesting} style={{
+                flexShrink: 0, border: 'none', borderRadius: 8, padding: '8px 14px',
+                background: navy, color: '#fff', fontWeight: 700, fontSize: 12,
+                cursor: notifRequesting ? 'not-allowed' : 'pointer', opacity: notifRequesting ? .7 : 1,
+                fontFamily: 'inherit',
+              }}>{notifRequesting ? '확인 중...' : '알림 켜기'}</button>
+            )}
+            <button onClick={dismissNotifBanner} aria-label="닫기" style={{
+              flexShrink: 0, border: 'none', background: 'rgba(13,42,94,.08)',
+              color: navyDk, borderRadius: '50%', width: 24, height: 24,
+              cursor: 'pointer', fontSize: 14, lineHeight: 1,
+            }}>×</button>
+          </div>
+        )}
         <ParentChildContext.Provider value={{ selChild, setSelChild, children: childList }}>
           {children}
         </ParentChildContext.Provider>
