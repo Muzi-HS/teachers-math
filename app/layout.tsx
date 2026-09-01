@@ -6,9 +6,9 @@ export const metadata: Metadata = {
   title: '티처스 수학학원',
   description: '티처스 수학학원',
   icons: {
-    icon: [{ url: '/logo3.png', type: 'image/png' }],
-    shortcut: '/logo3.png',
-    apple: '/logo3.png',
+    icon: [{ url: '/logo3-192.png', type: 'image/png' }],
+    shortcut: '/logo3-192.png',
+    apple: '/logo3-192.png',
   },
   manifest: '/manifest.json',
   appleWebApp: {
@@ -34,7 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <link rel="apple-touch-icon" href="/logo3.png" />
+        <link rel="apple-touch-icon" href="/logo3-192.png" />
       </head>
       <body style={{ margin: 0, padding: 0, overflowX: 'hidden', maxWidth: '100vw' }}>
         <AuthProvider>
