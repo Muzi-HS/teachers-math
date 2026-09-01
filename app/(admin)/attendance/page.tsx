@@ -65,10 +65,16 @@ export default function AttendancePage() {
   async function fetchAll() {
     if (!teacher) return
     const from = `${selYear}-${String(selMonth).padStart(2,'0')}-01`
-    const to   = `${selYear}-${String(selMonth).padStart(2,'0')}-31`
-    const { data } = await supabase.from('attendance_log')
+    // 월별 실제 마지막 날짜로 계산 (4/6/9/11월 30일, 2월 28~29일 등) —
+    // "31"로 고정하면 해당 달에 없는 날짜라 DB가 거부하면서 조회가 통째로 실패하고,
+    // 그 결과 이미 저장된 기록이 없는 것처럼 보여 같은 날짜를 다시 저장할 때
+    // UNIQUE(teacher_id, date) 위반으로 "저장 실패" 에러가 발생했다
+    const lastDay = new Date(selYear, selMonth, 0).getDate()
+    const to = `${selYear}-${String(selMonth).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`
+    const { data, error } = await supabase.from('attendance_log')
       .select('*').eq('teacher_id', teacher.userId)
       .gte('date', from).lte('date', to).order('date', {ascending:false})
+    if (error) { toast('출근 기록을 불러오지 못했습니다: ' + error.message, false); return }
     setLogs((data ?? []).map(r => ({ ...r, slots: r.slots ?? [] })))
   }
 

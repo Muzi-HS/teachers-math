@@ -178,9 +178,11 @@ export default function TeachersPage(){
   async function fetchAtt(){
     setLoading(true)
     const from=`${selYear}-${String(selMonth).padStart(2,'0')}-01`
-    const to  =`${selYear}-${String(selMonth).padStart(2,'0')}-31`
-    const {data}=await supabase.from('attendance_log')
+    const lastDay=new Date(selYear,selMonth,0).getDate()
+    const to=`${selYear}-${String(selMonth).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`
+    const {data,error}=await supabase.from('attendance_log')
       .select('*').gte('date',from).lte('date',to).order('date')
+    if (error) { toast('출근 기록을 불러오지 못했습니다: '+error.message, false) }
     setAttLogs((data??[]).map(r=>({...r,slots:r.slots??[],approved:r.approved??false})))
     setLoading(false)
   }
