@@ -131,6 +131,31 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
     })
   }, [])
 
+  // 토큰 등록은 앱 최초 진입 시 딱 한 번만 시도된다. 거부(denied) 상태였다가
+  // 앱을 새로고침/재실행하지 않고 휴대폰 설정에서 바로 "허용"으로 바꾸고 돌아오면
+  // 이 변경을 감지할 방법이 없어 토큰이 끝내 등록되지 않아 "발송 실패"가 계속 나던 문제.
+  // 화면으로 다시 돌아올 때마다 권한을 다시 확인해서, 방금 허용으로 바뀌었으면 등록을 재시도한다.
+  const notifPermRef = useRef<NotificationPermission | null>(null)
+  useEffect(() => { notifPermRef.current = notifPerm }, [notifPerm])
+  useEffect(() => {
+    if (typeof document === 'undefined' || typeof Notification === 'undefined') return
+    function recheck() {
+      if (document.visibilityState !== 'visible') return
+      const current = Notification.permission
+      if (current === notifPermRef.current) return
+      setNotifPerm(current)
+      if (current === 'granted' && notifPermRef.current !== 'granted' && parent?.parentId) {
+        registerFCMToken(parent.parentId)
+      }
+    }
+    document.addEventListener('visibilitychange', recheck)
+    window.addEventListener('focus', recheck)
+    return () => {
+      document.removeEventListener('visibilitychange', recheck)
+      window.removeEventListener('focus', recheck)
+    }
+  }, [parent?.parentId])
+
   // 알림 클릭 시 서비스워커가 보내는 이동 요청 처리
   // (client.navigate를 지원하지 않는 구형 브라우저 대비 폴백 — 라우터로 이동시켜야
   // 대상 페이지가 새로 마운트되어 수업기록 읽음 처리(viewed_at)가 정상적으로 실행된다)
