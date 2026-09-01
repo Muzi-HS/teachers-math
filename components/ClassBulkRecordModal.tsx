@@ -223,13 +223,13 @@ export default function ClassBulkRecordModal({
     .no-spinner::-webkit-outer-spin-button,.no-spinner::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
     .no-spinner[type=number]{-moz-appearance:textfield;}
     .bcr-lb{display:block;font-size:12px;font-weight:500;color:${tx2};margin-bottom:5px;}
-    .bcr-fg{display:flex;flex-direction:column;}
-    .bcr-fr{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-    .bcr-rg{display:flex;gap:14px;margin-top:4px;}
+    .bcr-fg{display:flex;flex-direction:column;min-width:0;}
+    .bcr-fr{display:grid;grid-template-columns:1fr 1fr;gap:12px;min-width:0;}
+    .bcr-rg{display:flex;gap:14px;margin-top:4px;flex-wrap:wrap;}
     .bcr-rg label{display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;}
     .bcr-badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;}
     .bcr-sav{width:30px;height:30px;border-radius:50%;background:${navyM};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:${navy};flex-shrink:0;}
-    .bcr-bulk-form{border:1.5px solid ${bd};border-radius:10px;padding:18px;margin-bottom:14px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.05);}
+    .bcr-bulk-form{border:1.5px solid ${bd};border-radius:10px;padding:18px;margin-bottom:14px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.05);min-width:0;box-sizing:border-box;}
     .bcr-fsel{padding:9px 11px;border:1.5px solid ${bd};border-radius:8px;font-size:13px;font-family:inherit;color:${tx};outline:none;background:#fff;width:100%;}
     .bcr-fsel:focus{border-color:${navy};}
     .bcr-fdv{font-size:11px;font-weight:600;color:${tx3};letter-spacing:1px;margin:16px 0 10px;padding-bottom:7px;border-bottom:1px solid ${bd};}
@@ -339,9 +339,9 @@ export default function ClassBulkRecordModal({
                 </div>
                 <div className="bcr-fr" style={{ marginBottom: 10 }}>
                   <div className="bcr-fg">
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', rowGap: 4, marginBottom: 5 }}>
                       <label className="bcr-lb" style={{ margin: 0 }}>숙제 이행률 (%)</label>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, cursor: 'pointer', color: f.hw_rate_na ? re : tx3 }}>
                           <input type="checkbox" checked={!!f.hw_rate_na}
                             onChange={e => { const c = e.target.checked; setBF(sid, 'hw_rate_na', c); if (c) setBF(sid, 'hw_not_submitted', false) }}
@@ -368,7 +368,7 @@ export default function ClassBulkRecordModal({
                     </div>
                   </div>
                   <div className="bcr-fg">
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', rowGap: 4, marginBottom: 5 }}>
                       <label className="bcr-lb" style={{ margin: 0 }}>숙제 정답률 (%)</label>
                       <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, cursor: 'pointer', color: f.hw_cor_na ? re : tx3 }}>
                         <input type="checkbox" checked={!!f.hw_cor_na}
