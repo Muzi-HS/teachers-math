@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { kstDateStr } from '@/lib/kst'
 import { IconChat, IconBook, IconPencil, IconSave, IconX } from '@/components/icons'
+import AutoGrowTextarea from '@/components/AutoGrowTextarea'
 
 type Student = { id: number; name: string; school?: string }
 type Test = { id: number; name: string; date: string; total: number }
@@ -238,12 +239,24 @@ export default function ClassBulkRecordModal({
     .bcr-bprim{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;background:${navy};color:#fff;font-family:inherit;}
     .bcr-bprim:hover{background:#1A4080;}
     .bcr-bgold{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:none;background:${gold};color:#071A3E;font-family:inherit;}
+    .bcr-modal{width:820px;}
+    .bcr-content-hw{display:flex;flex-direction:column;gap:10px;margin-bottom:10px;}
+    .bcr-grid{display:flex;flex-direction:column;}
+    .bcr-grid > .bcr-bulk-form{width:100%;}
+    @media (min-width:900px){
+      .bcr-content-hw{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+    }
+    @media (min-width:1300px){
+      .bcr-modal{width:1180px;}
+      .bcr-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;}
+      .bcr-grid > .bcr-bulk-form{margin-bottom:0;}
+    }
   `
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.42)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <style>{css}</style>
-      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 12, width: 820, maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
+      <div className="bcr-modal" onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 12, maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
         <div style={{ padding: '18px 22px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: '#fff', zIndex: 1, borderBottom: `1px solid ${bd}`, marginBottom: 0 }}>
           <span style={{ fontSize: 15, fontWeight: 600, color: tx }}>{className} 수업기록 작성</span>
           <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: bg, cursor: 'pointer', fontSize: 17, color: tx2 }}>×</button>
@@ -288,7 +301,7 @@ export default function ClassBulkRecordModal({
           <div style={{ background: bg, borderRadius: 8, padding: 12, marginBottom: 12 }}>
             <label className="bcr-lb"><span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><IconChat size={12} /> 피드백 일괄 작성</span> <span style={{ color: tx3, fontWeight: 400 }}>(선택된 학생 전원의 개별 피드백에 동일하게 입력됩니다)</span></label>
             <div style={{ display: 'flex', gap: 8 }}>
-              <textarea className="bcr-fi" rows={2} style={{ resize: 'vertical', background: '#fff' }} value={bulkFeedbackText} onChange={e => setBulkFeedbackText(e.target.value)} placeholder="예) 이번 주 전반적으로 집중도가 좋았습니다." />
+              <AutoGrowTextarea className="bcr-fi" rows={3} minHeight={76} style={{ background: '#fff' }} value={bulkFeedbackText} onChange={e => setBulkFeedbackText(e.target.value)} placeholder="예) 이번 주 전반적으로 집중도가 좋았습니다." />
               <button type="button" className="bcr-bout" style={{ flexShrink: 0, alignSelf: 'flex-start' }} onClick={applyBulkFeedback}>일괄작성</button>
             </div>
           </div>
@@ -299,7 +312,9 @@ export default function ClassBulkRecordModal({
             <p style={{ color: tx3, fontSize: 13, textAlign: 'center', padding: '20px 0' }}>불러오는 중...</p>
           ) : bulkCheckedSids.length === 0 ? (
             <p style={{ color: tx3, fontSize: 13, textAlign: 'center', padding: '20px 0' }}>선택된 학생이 없습니다.</p>
-          ) : bulkCheckedSids.map(sid => {
+          ) : (
+          <div className="bcr-grid">
+          {bulkCheckedSids.map(sid => {
             const s = students.find(x => x.id === sid)
             if (!s) return null
             const f = bulkForms[sid] || BLANK_REC(sid)
@@ -312,13 +327,15 @@ export default function ClassBulkRecordModal({
                   {bulkRecIds[sid] && <span className="bcr-badge" style={{ background: navyM, color: navy, marginLeft: 'auto' }}>기존 기록 수정</span>}
                   {s.school && !bulkRecIds[sid] && <span className="bcr-badge" style={{ background: navyM, color: navy, marginLeft: 'auto' }}>{s.school}</span>}
                 </div>
-                <div className="bcr-fg" style={{ marginBottom: 10 }}>
-                  <label className="bcr-lb" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><IconBook size={12} /> 수업 내용 (진도)</label>
-                  <textarea className="bcr-fi" rows={2} style={{ resize: 'vertical' }} placeholder="예) 이차함수 그래프 변환 (p.45~52)" value={f.content} onChange={e => setBF(sid, 'content', e.target.value)} />
-                </div>
-                <div className="bcr-fg" style={{ marginBottom: 10 }}>
-                  <label className="bcr-lb" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><IconPencil size={12} /> 숙제</label>
-                  <textarea className="bcr-fi" rows={2} style={{ resize: 'vertical' }} placeholder="예) 교재 p.53~55 연습문제 1~10번" value={f.homework} onChange={e => setBF(sid, 'homework', e.target.value)} />
+                <div className="bcr-content-hw">
+                  <div className="bcr-fg">
+                    <label className="bcr-lb" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><IconBook size={12} /> 수업 내용 (진도)</label>
+                    <AutoGrowTextarea className="bcr-fi" rows={2} placeholder="예) 이차함수 그래프 변환 (p.45~52)" value={f.content} onChange={e => setBF(sid, 'content', e.target.value)} />
+                  </div>
+                  <div className="bcr-fg">
+                    <label className="bcr-lb" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><IconPencil size={12} /> 숙제</label>
+                    <AutoGrowTextarea className="bcr-fi" rows={2} placeholder="예) 교재 p.53~55 연습문제 1~10번" value={f.homework} onChange={e => setBF(sid, 'homework', e.target.value)} />
+                  </div>
                 </div>
                 <div className="bcr-fr" style={{ marginBottom: 10 }}>
                   <div className="bcr-fg">
@@ -420,11 +437,13 @@ export default function ClassBulkRecordModal({
                 </div>
                 <div className="bcr-fg">
                   <label className="bcr-lb" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><IconChat size={12} /> 개별 피드백</label>
-                  <textarea className="bcr-fi" rows={2} style={{ resize: 'vertical' }} placeholder="이 학생에 대한 개별 메모" value={f.feedback} onChange={e => setBF(sid, 'feedback', e.target.value)} />
+                  <AutoGrowTextarea className="bcr-fi" rows={5} minHeight={120} placeholder="이 학생에 대한 개별 메모" value={f.feedback} onChange={e => setBF(sid, 'feedback', e.target.value)} />
                 </div>
               </div>
             )
           })}
+          </div>
+          )}
         </div>
 
         <div style={{ padding: '0 22px 18px', display: 'flex', gap: 8, justifyContent: 'flex-end', position: 'sticky', bottom: 0, background: '#fff', borderTop: `1px solid ${bd}`, paddingTop: 12 }}>

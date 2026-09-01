@@ -6,6 +6,7 @@ import { can } from '@/lib/permissions'
 import { useSearchParams } from 'next/navigation'
 import { kstDateStr } from '@/lib/kst'
 import ClassBulkRecordModal from '@/components/ClassBulkRecordModal'
+import AutoGrowTextarea from '@/components/AutoGrowTextarea'
 import { IconBook, IconPencil, IconChat, IconSave, IconX, IconClock } from '@/components/icons'
 import { useMobileMode } from '@/context/MobileModeContext'
 
@@ -420,6 +421,12 @@ export default function ClassesPage() {
     .fg{display:flex;flex-direction:column;}
     .fsel{padding:9px 11px;border:1.5px solid ${bd};border-radius:8px;font-size:13px;font-family:inherit;color:${tx};outline:none;background:#fff;width:100%;}
     .fsel:focus{border-color:${navy};}
+    .em-modal{width:560px;}
+    .em-content-hw{display:flex;flex-direction:column;gap:0;}
+    @media (min-width:900px){
+      .em-modal{width:760px;}
+      .em-content-hw{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+    }
   `
 
   return (
@@ -1096,7 +1103,7 @@ function RecModal({ stuName, initDate, initRec, initShowTest, editRecId, tests, 
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.42)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 12, width: 560, maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
+      <div className="em-modal" onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 12, maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
         {/* 헤더 */}
         <div style={{ padding: '18px 22px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: '#fff', zIndex: 1, borderBottom: `1px solid ${bd}`, paddingBottom: 12 }}>
           <span style={{ fontSize: 15, fontWeight: 600, color: tx }}>{editRecId ? '수업 기록 수정' : '수업 기록 추가'}</span>
@@ -1118,15 +1125,17 @@ function RecModal({ stuName, initDate, initRec, initShowTest, editRecId, tests, 
           </div>
 
           <div className="fdv">수업 내용</div>
-          <div className="fg" style={{ marginBottom: 10 }}>
-            <label className="lb" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><IconBook size={12} /> 수업 내용 (진도)</label>
-            <textarea className="fi" rows={2} style={{ resize: 'vertical' }} placeholder="예) 이차함수 그래프 변환 (p.45~52)"
-              value={form.content} onChange={e => setF('content', e.target.value)} />
-          </div>
-          <div className="fg" style={{ marginBottom: 0 }}>
-            <label className="lb" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><IconPencil size={12} /> 숙제</label>
-            <textarea className="fi" rows={2} style={{ resize: 'vertical' }} placeholder="예) 교재 p.53~55 연습문제 1~10번"
-              value={form.homework} onChange={e => setF('homework', e.target.value)} />
+          <div className="em-content-hw" style={{ marginBottom: 0 }}>
+            <div className="fg" style={{ marginBottom: 10 }}>
+              <label className="lb" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><IconBook size={12} /> 수업 내용 (진도)</label>
+              <AutoGrowTextarea className="fi" rows={2} placeholder="예) 이차함수 그래프 변환 (p.45~52)"
+                value={form.content} onChange={e => setF('content', e.target.value)} />
+            </div>
+            <div className="fg" style={{ marginBottom: 10 }}>
+              <label className="lb" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><IconPencil size={12} /> 숙제</label>
+              <AutoGrowTextarea className="fi" rows={2} placeholder="예) 교재 p.53~55 연습문제 1~10번"
+                value={form.homework} onChange={e => setF('homework', e.target.value)} />
+            </div>
           </div>
 
           <div className="fdv">숙제 확인</div>
@@ -1233,7 +1242,7 @@ function RecModal({ stuName, initDate, initRec, initShowTest, editRecId, tests, 
           <div className="fdv">수업 피드백</div>
           <div className="fg">
             <label className="lb" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><IconChat size={12} /> 피드백 내용</label>
-            <textarea className="fi" rows={3} style={{ resize: 'vertical' }} placeholder="이번 수업 특이사항 및 종합 의견"
+            <AutoGrowTextarea className="fi" rows={6} minHeight={140} placeholder="이번 수업 특이사항 및 종합 의견"
               value={form.feedback} onChange={e => setF('feedback', e.target.value)} />
           </div>
         </div>

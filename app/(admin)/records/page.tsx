@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { kstDateStr, kstNow, kstTimeOf } from '@/lib/kst'
 import ClassBulkRecordModal from '@/components/ClassBulkRecordModal'
+import AutoGrowTextarea from '@/components/AutoGrowTextarea'
 import { IconBook, IconX, IconSend } from '@/components/icons'
 import { isUnreadParentComment, RecordComment, groupCommentsByRecord } from '@/lib/records'
 import { useMobileMode } from '@/context/MobileModeContext'
@@ -625,6 +626,12 @@ export default function RecordsPage() {
       .hwg-lb{font-size:10px;}
       .hwg{padding:6px 7px;}
     }
+    .em-modal{width:580px;}
+    .em-content-hw{display:flex;flex-direction:column;gap:0;}
+    @media (min-width:900px){
+      .em-modal{width:760px;}
+      .em-content-hw{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+    }
     ${mobileMode ? `
     .rch{flex-wrap:wrap;row-gap:8px;}
     .rc{padding:13px;}
@@ -940,7 +947,7 @@ export default function RecordsPage() {
       {/* ══ 수정 모달 ══ */}
       {editModal && (
         <div onClick={() => setEditModal(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.42)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 12, width: 580, maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
+          <div className="em-modal" onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 12, maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
             <div style={{ padding: '18px 22px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 15, fontWeight: 600, color: tx }}>수업 기록 수정</span>
               <button onClick={() => setEditModal(false)} style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: bg, cursor: 'pointer', fontSize: 17, color: tx2 }}>×</button>
@@ -951,13 +958,15 @@ export default function RecordsPage() {
                 <input type="date" className="fi" value={editRec.date || ''} onChange={e => setEditRec(f => ({ ...f, date: e.target.value }))} />
               </div>
               <div className="fdv">수업 내용</div>
-              <div style={{ marginBottom: 14 }}>
-                <label className="lb">수업 내용 (진도)</label>
-                <textarea className="fi" rows={2} style={{ resize: 'vertical' }} value={editRec.content || ''} onChange={e => setEditRec(f => ({ ...f, content: e.target.value }))} placeholder="예) 이차함수 그래프 변환 (p.45~52)" />
-              </div>
-              <div style={{ marginBottom: 14 }}>
-                <label className="lb">숙제</label>
-                <textarea className="fi" rows={2} style={{ resize: 'vertical' }} value={editRec.homework || ''} onChange={e => setEditRec(f => ({ ...f, homework: e.target.value }))} placeholder="예) 교재 p.53~55 연습문제 1~10번" />
+              <div className="em-content-hw" style={{ marginBottom: 14 }}>
+                <div style={{ marginBottom: 14 }}>
+                  <label className="lb">수업 내용 (진도)</label>
+                  <AutoGrowTextarea className="fi" rows={2} value={editRec.content || ''} onChange={e => setEditRec(f => ({ ...f, content: e.target.value }))} placeholder="예) 이차함수 그래프 변환 (p.45~52)" />
+                </div>
+                <div style={{ marginBottom: 14 }}>
+                  <label className="lb">숙제</label>
+                  <AutoGrowTextarea className="fi" rows={2} value={editRec.homework || ''} onChange={e => setEditRec(f => ({ ...f, homework: e.target.value }))} placeholder="예) 교재 p.53~55 연습문제 1~10번" />
+                </div>
               </div>
               <div className="fdv">숙제 확인</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
@@ -1070,7 +1079,7 @@ export default function RecordsPage() {
               <div className="fdv">수업 피드백</div>
               <div>
                 <label className="lb">피드백 내용</label>
-                <textarea className="fi" rows={3} style={{ resize: 'vertical' }} value={editRec.feedback || ''}
+                <AutoGrowTextarea className="fi" rows={6} minHeight={140} value={editRec.feedback || ''}
                   onChange={e => setEditRec(f => ({ ...f, feedback: e.target.value }))}
                   placeholder="이번 수업 특이사항 및 종합 의견" />
               </div>
