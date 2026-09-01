@@ -5,8 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { kstDateStr, kstNow, kstTimeOf } from '@/lib/kst'
 import ClassBulkRecordModal from '@/components/ClassBulkRecordModal'
-import AutoGrowTextarea from '@/components/AutoGrowTextarea'
-import { IconBook, IconX, IconSend } from '@/components/icons'
+import { IconBook, IconSend } from '@/components/icons'
 import { isUnreadParentComment, RecordComment, groupCommentsByRecord } from '@/lib/records'
 import { useMobileMode } from '@/context/MobileModeContext'
 
@@ -175,11 +174,7 @@ export default function RecordsPage() {
   const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({})
   const [sendingCommentId, setSendingCommentId] = useState<number | null>(null)
   const [loading,  setLoading]  = useState(false)
-  const [editModal,     setEditModal]     = useState(false)
-  const [editId,        setEditId]        = useState<number | null>(null)
-  const [editRec,       setEditRec]       = useState<Partial<Rec> & { date: string }>({ date: todayStr(), attitude: 10, late: false, has_test: false })
-  const [editTestItems, setEditTestItems] = useState<TestItem[]>([])
-  const [saving,   setSaving]   = useState(false)
+  const [singleEditRec, setSingleEditRec] = useState<Rec | null>(null) // 개별 수정 대상 (반관리·수업기록 공용 모달로 열림)
   const [smsModal, setSmsModal] = useState(false)
   const [smsTarget,setSmsTarget]= useState<'all' | number>('all')
   const [sending,  setSending]  = useState(false)
@@ -358,92 +353,6 @@ export default function RecordsPage() {
     setSelDate(dt)
     const [y, m] = dt.split('-').map(Number)
     if (y !== llYear || m !== llMonth + 1) { setLlYear(y); setLlMonth(m - 1) }
-  }
-
-  function openEdit(r: Rec) {
-    setEditId(r.id)
-    setEditRec({
-      date: r.date, content: r.content, homework: r.homework,
-      hw_rate: r.hw_rate, hw_cor: r.hw_cor, attitude: r.attitude ?? 10,
-      late: r.late, has_test: r.has_test, feedback: r.feedback,
-    })
-    // 기존 시험 정보 불러오기
-    const existingItems: TestItem[] = (r.record_test_items ?? []).map(ti => ({
-      testId:   ti.test_id,
-      testName: ti.tests?.name ?? '',
-      tTotal:   ti.t_total,
-      tCor:     ti.t_cor,
-      tScore:   ti.t_score,
-    }))
-    setEditTestItems(existingItems)
-    setEditModal(true)
-  }
-
-  async function saveEdit() {
-    if (!editId) return
-    setSaving(true)
-
-    // student_id를 dayRecs에서 미리 추출 (상태가 바뀌기 전에)
-    const studentId = dayRecs.find(r => r.id === editId)?.student_id
-
-    const row = {
-      date: editRec.date, content: editRec.content, homework: editRec.homework,
-      hw_rate: editRec.hw_rate, hw_cor: editRec.hw_cor, attitude: editRec.attitude,
-      late: editRec.late, has_test: editRec.has_test, feedback: editRec.feedback,
-      is_draft: false,
-    }
-    const { error } = await supabase.from('records').update(row).eq('id', editId)
-    if (error) { toast('수정 실패: ' + error.message, false); setSaving(false); return }
-
-    // 기존 record_test_items 무조건 삭제 (시험 없음/있음 모두)
-    await supabase.from('record_test_items').delete().eq('record_id', editId)
-
-    // 시험 없음으로 변경하거나 editTestItems가 비어 있으면 test_scores도 삭제
-    if (!editRec.has_test || editTestItems.length === 0) {
-      if (studentId) {
-        // 이 학생의 관련 test_scores 삭제 (해당 record에서 기존에 있던 testId 기준)
-        // editTestItems가 비어있으므로 기존 것만 삭제 — openEdit 시점 editTestItems로 삭제
-        // 가장 안전하게: student_id + 기존 test_id 조합으로 삭제
-        // → 이미 record_test_items는 삭제됐으므로 fetchDayRecs로 UI 갱신
-      }
-      setSaving(false); setEditModal(false)
-      toast('수업 기록 수정됨')
-      await fetchDayRecs(); await fetchMonthDates()
-      return
-    }
-
-    // 시험 있음 + editTestItems 있음 → 저장
-    if (studentId) {
-      for (const ti of editTestItems) {
-        if (!ti.testId) continue
-        const t = tests.find(x => x.id === ti.testId)
-        const total = t?.total ?? ti.tTotal ?? 0
-        const autoScore = ti.tScore
-          ? ti.tScore
-          : (total > 0 ? Math.round((ti.tCor ?? 0) / total * 100) : 0)
-
-        // record_test_items 저장
-        await supabase.from('record_test_items').insert({
-          record_id: editId,
-          test_id:   ti.testId,
-          t_total:   total,
-          t_cor:     ti.tCor ?? 0,
-          t_score:   autoScore,
-        })
-
-        // test_scores upsert (테스트 관리에 반영)
-        await supabase.from('test_scores').upsert({
-          test_id:    ti.testId,
-          student_id: studentId,
-          cor:        ti.tCor ?? 0,
-          score:      autoScore,
-        }, { onConflict: 'test_id,student_id' })
-      }
-    }
-
-    setSaving(false); setEditModal(false)
-    toast('수업 기록 수정됨')
-    await fetchDayRecs(); await fetchMonthDates()
   }
 
   async function delRec(id: number) {
@@ -626,15 +535,15 @@ export default function RecordsPage() {
       .hwg-lb{font-size:10px;}
       .hwg{padding:6px 7px;}
     }
-    .em-modal{width:580px;}
-    .em-content-hw{display:flex;flex-direction:column;gap:0;}
-    @media (min-width:900px){
-      .em-modal{width:760px;}
-      .em-content-hw{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
-    }
+    .ll-nav{background:none;border:none;cursor:pointer;padding:4px 10px;color:${tx2};font-size:18px;font-family:inherit;}
+    .ll-nav:hover{color:${navy};}
     ${mobileMode ? `
     .rch{flex-wrap:wrap;row-gap:8px;}
     .rc{padding:13px;}
+    /* 학부모 학원일정 캘린더와 비슷하게 촘촘하고 테두리 없는 달력 */
+    .ll-grid{gap:1px;}
+    .ll-dow{font-size:10px;padding:2px 0;}
+    .ll-day{padding:5px 0;font-size:12px;border-radius:8px;}
     ` : ''}
   `
 
@@ -668,11 +577,11 @@ export default function RecordsPage() {
       <div style={{ display: 'grid', gridTemplateColumns: mobileMode ? '1fr' : '320px 1fr', gap: mobileMode ? 12 : 16, alignItems: 'start' }}>
 
         {/* 달력 */}
-        <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: 18, boxShadow: '0 1px 4px rgba(0,0,0,.06)' }}>
+        <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: mobileMode ? 14 : 18, boxShadow: '0 1px 4px rgba(0,0,0,.06)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-            <button className="bout" onClick={() => moveLLCal(-1)}>◀</button>
+            <button className={mobileMode ? 'll-nav' : 'bout'} onClick={() => moveLLCal(-1)}>{mobileMode ? '‹' : '◀'}</button>
             <span style={{ fontSize: 14, fontWeight: 700, color: tx }}>{llYear}년 {llMonth + 1}월</span>
-            <button className="bout" onClick={() => moveLLCal(1)}>▶</button>
+            <button className={mobileMode ? 'll-nav' : 'bout'} onClick={() => moveLLCal(1)}>{mobileMode ? '›' : '▶'}</button>
           </div>
           <div className="ll-grid">
             {DOW.map((d, i) => (
@@ -790,13 +699,13 @@ export default function RecordsPage() {
                             {pushingOneId === r.id ? '발송 중...' : '개별 발송'}
                           </button>
                         )}
-                        <button className="bout" style={{ whiteSpace: 'nowrap' }} onClick={() => openEdit(r)}>수정</button>
+                        <button className="bout" style={{ whiteSpace: 'nowrap' }} onClick={() => setSingleEditRec(r)}>수정</button>
                         <button className="bdng" style={{ whiteSpace: 'nowrap' }} onClick={() => delRec(r.id)}>삭제</button>
                       </div>
                     </div>
 
-                {/* 이행률 / 정답률 / 태도 — 원형 게이지 */}
-                <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                {/* 이행률 / 정답률 / 태도 — 원형 게이지 (모바일에서는 2열+1행으로, 3칸이 좁아지지 않도록) */}
+                <div style={{ display: 'grid', gridTemplateColumns: mobileMode ? '1fr 1fr' : 'repeat(3, 1fr)', gap: 8, marginBottom: 10 }}>
                   <div className="hwg">
                     <p className="hwg-lb">숙제 이행률</p>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
@@ -834,7 +743,7 @@ export default function RecordsPage() {
                     </div>
                   </div>
                   {r.attitude != null && (
-                    <div className="hwg" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                    <div className="hwg" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gridColumn: mobileMode ? '1 / -1' : undefined }}>
                       <p className="hwg-lb" style={{ margin: '0 0 2px' }}>수업 태도</p>
                       <p style={{ fontSize: 18, fontWeight: 700, color: attColor(r.attitude), margin: 0, lineHeight: 1, whiteSpace: 'nowrap' }}>{r.attitude}<span style={{ fontSize: 11, fontWeight: 400, color: tx2 }}>점</span></p>
                       <span style={{ fontSize: 10, color: attColor(r.attitude), marginTop: 2, whiteSpace: 'nowrap' }}>{attLabel(r.attitude)}</span>
@@ -944,152 +853,21 @@ export default function RecordsPage() {
         </div>
       </div>
 
-      {/* ══ 수정 모달 ══ */}
-      {editModal && (
-        <div onClick={() => setEditModal(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.42)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div className="em-modal" onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 12, maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
-            <div style={{ padding: '18px 22px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 15, fontWeight: 600, color: tx }}>수업 기록 수정</span>
-              <button onClick={() => setEditModal(false)} style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: bg, cursor: 'pointer', fontSize: 17, color: tx2 }}>×</button>
-            </div>
-            <div style={{ padding: '18px 22px' }}>
-              <div style={{ marginBottom: 14 }}>
-                <label className="lb">수업 날짜</label>
-                <input type="date" className="fi" value={editRec.date || ''} onChange={e => setEditRec(f => ({ ...f, date: e.target.value }))} />
-              </div>
-              <div className="fdv">수업 내용</div>
-              <div className="em-content-hw" style={{ marginBottom: 14 }}>
-                <div style={{ marginBottom: 14 }}>
-                  <label className="lb">수업 내용 (진도)</label>
-                  <AutoGrowTextarea className="fi" rows={2} value={editRec.content || ''} onChange={e => setEditRec(f => ({ ...f, content: e.target.value }))} placeholder="예) 이차함수 그래프 변환 (p.45~52)" />
-                </div>
-                <div style={{ marginBottom: 14 }}>
-                  <label className="lb">숙제</label>
-                  <AutoGrowTextarea className="fi" rows={2} value={editRec.homework || ''} onChange={e => setEditRec(f => ({ ...f, homework: e.target.value }))} placeholder="예) 교재 p.53~55 연습문제 1~10번" />
-                </div>
-              </div>
-              <div className="fdv">숙제 확인</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-                <div>
-                  <label className="lb">숙제 이행률 (%)</label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <input type="number" className="fi" min={0} max={100} value={editRec.hw_rate ?? 0}
-                      onChange={e => setEditRec(f => ({ ...f, hw_rate: Math.min(100, Math.max(0, parseInt(e.target.value) || 0)) }))}
-                      style={{ width: 80, textAlign: 'center' }} />
-                    <span style={{ color: tx2 }}>%</span>
-                  </div>
-                </div>
-                <div>
-                  <label className="lb">숙제 정답률 (%)</label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <input type="number" className="fi" min={0} max={100} value={editRec.hw_cor ?? 0}
-                      onChange={e => setEditRec(f => ({ ...f, hw_cor: Math.min(100, Math.max(0, parseInt(e.target.value) || 0)) }))}
-                      style={{ width: 80, textAlign: 'center' }} />
-                    <span style={{ color: tx2 }}>%</span>
-                  </div>
-                </div>
-              </div>
-              <div className="fdv">기타</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-                <div>
-                  <label className="lb">수업 태도 (1~10점)</label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <input type="number" className="fi" min={1} max={10} value={editRec.attitude ?? 10}
-                      onChange={e => setEditRec(f => ({ ...f, attitude: Math.min(10, Math.max(1, parseInt(e.target.value) || 10)) }))}
-                      style={{ width: 80, textAlign: 'center' }} />
-                    <span style={{ color: tx2 }}>점</span>
-                  </div>
-                </div>
-                <div>
-                  <label className="lb">지각 여부</label>
-                  <div style={{ display: 'flex', gap: 16, marginTop: 6 }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, cursor: 'pointer' }}>
-                      <input type="radio" name="eLt" checked={!editRec.late} onChange={() => setEditRec(f => ({ ...f, late: false }))} />정시 등원
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, cursor: 'pointer' }}>
-                      <input type="radio" name="eLt" checked={!!editRec.late} onChange={() => setEditRec(f => ({ ...f, late: true }))} /><span style={{ color: re, fontWeight: 500 }}>지각</span>
-                    </label>
-                  </div>
-                </div>
-              </div>
-              <div style={{ marginBottom: editRec.has_test ? 10 : 14 }}>
-                <label className="lb">시험 여부</label>
-                <div style={{ display: 'flex', gap: 16, marginTop: 6 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, cursor: 'pointer' }}>
-                    <input type="radio" name="eTs" checked={!editRec.has_test}
-                      onChange={() => { setEditRec(f => ({ ...f, has_test: false })); setEditTestItems([]) }} />없음
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, cursor: 'pointer' }}>
-                    <input type="radio" name="eTs" checked={!!editRec.has_test}
-                      onChange={() => {
-                        setEditRec(f => ({ ...f, has_test: true }))
-                        if (editTestItems.length === 0) setEditTestItems([{ testId: null, tTotal: 0, tCor: 0, tScore: 0 }])
-                      }} /><span style={{ color: navy, fontWeight: 500 }}>있음</span>
-                  </label>
-                </div>
-              </div>
-              {editRec.has_test && (
-                <div style={{ marginBottom: 14 }}>
-                  <div className="fdv">시험 정보</div>
-                  {editTestItems.map((item, idx) => (
-                    <div key={idx} className="tst-card" style={{ position: 'relative' }}>
-                      <button onClick={() => setEditTestItems(p => { const a = [...p]; a.splice(idx, 1); return a })}
-                        style={{ position: 'absolute', top: 8, right: 8, padding: '2px 8px', borderRadius: 6, fontSize: 11, border: 'none', background: rbg, color: re, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                        <IconX size={10} /> 제거
-                      </button>
-                      <div style={{ marginBottom: 8 }}>
-                        <label className="lb">테스트 선택</label>
-                        <select className="fsel" value={item.testId || ''}
-                          onChange={e => {
-                            const tid = parseInt(e.target.value) || null
-                            const t = tests.find(x => x.id === tid)
-                            setEditTestItems(p => p.map((x, i) => i === idx ? { ...x, testId: tid, testName: t?.name ?? '', tTotal: t ? t.total : 0 } : x))
-                          }}>
-                          <option value="">테스트 선택</option>
-                          {tests.map(t => <option key={t.id} value={t.id}>{t.name} ({t.date}, {t.total}문항)</option>)}
-                        </select>
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-                        <div>
-                          <label className="lb">총 문제 수</label>
-                          <input type="number" className="fi" value={item.tTotal || ''} readOnly placeholder="자동입력" style={{ textAlign: 'center' }} />
-                        </div>
-                        <div>
-                          <label className="lb">정답 수</label>
-                          <input type="number" className="fi" min={0} value={item.tCor || ''}
-                            onChange={e => setEditTestItems(p => p.map((x, i) => i === idx ? { ...x, tCor: parseInt(e.target.value) || 0 } : x))}
-                            style={{ textAlign: 'center' }} />
-                        </div>
-                        <div>
-                          <label className="lb">점수 (선택)</label>
-                          <input type="number" className="fi" min={0} max={100} value={item.tScore || ''}
-                            onChange={e => setEditTestItems(p => p.map((x, i) => i === idx ? { ...x, tScore: parseInt(e.target.value) || 0 } : x))}
-                            style={{ textAlign: 'center' }} />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  <button onClick={() => setEditTestItems(p => [...p, { testId: null, tTotal: 0, tCor: 0, tScore: 0 }])}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 6, fontSize: 12, border: `1px solid ${bd}`, background: 'transparent', color: tx2, cursor: 'pointer', fontFamily: 'inherit' }}>
-                    <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth={2} d="M12 5v14M5 12h14" /></svg>
-                    시험 추가
-                  </button>
-                </div>
-              )}
-              <div className="fdv">수업 피드백</div>
-              <div>
-                <label className="lb">피드백 내용</label>
-                <AutoGrowTextarea className="fi" rows={6} minHeight={140} value={editRec.feedback || ''}
-                  onChange={e => setEditRec(f => ({ ...f, feedback: e.target.value }))}
-                  placeholder="이번 수업 특이사항 및 종합 의견" />
-              </div>
-            </div>
-            <div style={{ padding: '0 22px 18px', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button onClick={() => setEditModal(false)} style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, border: `1px solid ${bd}`, background: '#fff', cursor: 'pointer', color: tx2, fontFamily: 'inherit' }}>취소</button>
-              <button className="bgold" onClick={saveEdit} disabled={saving} style={{ opacity: saving ? 0.7 : 1 }}>{saving ? '저장 중...' : '저장'}</button>
-            </div>
-          </div>
-        </div>
+      {/* ══ 개별 수정 (반관리·수업기록이 공유하는 동일한 작성 모달) ══ */}
+      {singleEditRec && (
+        <ClassBulkRecordModal
+          classId={recClsId(singleEditRec)}
+          className={classes.find(c => c.id === recClsId(singleEditRec))?.name ?? ''}
+          title={`${students.find(s => s.id === singleEditRec.student_id)?.name ?? '학생'} 수업기록 수정`}
+          students={(() => {
+            const s = students.find(x => x.id === singleEditRec.student_id)
+            return s ? [{ id: s.id, name: s.name }] : []
+          })()}
+          tests={tests}
+          initialDate={singleEditRec.date}
+          onClose={() => setSingleEditRec(null)}
+          onSaved={() => { fetchDayRecs(); fetchMonthDates() }}
+        />
       )}
 
       {/* ══ 반별 일괄 수정 (반관리 > 수업기록 작성과 동일한 공용 컴포넌트) ══ */}

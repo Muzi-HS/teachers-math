@@ -300,7 +300,7 @@ export default function ParentInquiriesPage() {
             <div style={{ marginBottom: 14 }}>
               <label style={{ display: 'block', fontSize: 12, color: tx2, marginBottom: 6 }}>날짜</label>
               <input type="date" value={nDate} onChange={e => setNDate(e.target.value)}
-                style={{ width: '100%', padding: '10px 12px', border: `1.5px solid ${bd}`, borderRadius: 8, fontSize: 14, fontFamily: 'inherit', color: tx, outline: 'none', boxSizing: 'border-box' }} />
+                style={{ width: '100%', maxWidth: '100%', display: 'block', padding: '10px 12px', border: `1.5px solid ${bd}`, borderRadius: 8, fontSize: 14, fontFamily: 'inherit', color: tx, outline: 'none', boxSizing: 'border-box', WebkitAppearance: 'none', appearance: 'none' }} />
             </div>
 
             <div style={{ marginBottom: 16 }}>

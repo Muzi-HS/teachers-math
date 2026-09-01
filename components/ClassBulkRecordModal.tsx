@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { kstDateStr } from '@/lib/kst'
 import { IconChat, IconBook, IconPencil, IconSave, IconX } from '@/components/icons'
 import AutoGrowTextarea from '@/components/AutoGrowTextarea'
+import { useMobileMode } from '@/context/MobileModeContext'
 
 type Student = { id: number; name: string; school?: string }
 type Test = { id: number; name: string; date: string; total: number }
@@ -30,16 +31,23 @@ const re = '#C0392B', gr = '#1A7F4E', gbg = '#E0F5EB'
 // 반 소속 학생 전체를 대상으로 특정 날짜의 수업기록을 일괄 작성/수정하는 공용 팝업.
 // '반관리 > 수업기록 작성'과 '수업기록 > 일괄수정'이 동일한 인터페이스를 쓰도록 공유된다.
 export default function ClassBulkRecordModal({
-  classId, className, students, tests, initialDate, onClose, onSaved,
+  classId, className, students, tests, initialDate, title, onClose, onSaved,
 }: {
-  classId: number
+  classId: number | null
   className: string
   students: Student[]
   tests: Test[]
   initialDate?: string
+  title?: string
   onClose: () => void
   onSaved: () => void
 }) {
+  // '모바일로 보기'는 실제 창 너비와 무관하게 켜고 끌 수 있는 수동 스위치이므로
+  // 반응형 2열 배치는 반드시 이 값으로 분기해야 한다 (CSS 미디어쿼리만으로는 전환되지 않음)
+  const { mobileMode } = useMobileMode()
+  // 반 소속 전체 학생 대상(class_id 있음)이든 개별 학생 1명 대상(class_id 없을 수 있음)이든
+  // 동일한 세션 임시저장 슬롯을 쓸 수 있도록 학생 구성으로 키를 만든다
+  const draftKey = 'bulkDraft_' + (classId ?? 'ind-' + students.map(s => s.id).sort().join('-'))
   const [bulkDate, setBulkDate] = useState(initialDate || kstDateStr())
   const [bulkChks, setBulkChks] = useState<Record<number, boolean>>({})
   const [bulkForms, setBulkForms] = useState<Record<number, RecForm>>({})
@@ -63,7 +71,7 @@ export default function ClassBulkRecordModal({
     const recIds: Record<number, number> = {}
     students.forEach(s => { chks[s.id] = true; forms[s.id] = BLANK_REC(s.id); showT[s.id] = false })
 
-    const { data: recs } = await supabase.from('records').select('*').eq('class_id', classId).eq('date', date).eq('is_draft', false)
+    const { data: recs } = await supabase.from('records').select('*').in('student_id', students.map(s => s.id)).eq('date', date).eq('is_draft', false)
     if (recs && recs.length > 0) {
       const recIdList = recs.map(r => r.id)
       const { data: items } = await supabase.from('record_test_items').select('record_id, test_id, t_total, t_cor, t_score').in('record_id', recIdList)
@@ -86,12 +94,12 @@ export default function ClassBulkRecordModal({
       }
     }
     setBulkChks(chks); setBulkForms(forms); setBulkShowTest(showT); setBulkRecIds(recIds)
-    setHasDraft(!!sessionStorage.getItem('bulkDraft_' + classId))
+    setHasDraft(!!sessionStorage.getItem(draftKey))
     setLoading(false)
   }
 
   function loadBulkDraft() {
-    const raw = sessionStorage.getItem('bulkDraft_' + classId)
+    const raw = sessionStorage.getItem(draftKey)
     if (!raw) return
     try {
       const d = JSON.parse(raw)
@@ -104,11 +112,11 @@ export default function ClassBulkRecordModal({
     } catch { }
   }
   function clearBulkDraft() {
-    sessionStorage.removeItem('bulkDraft_' + classId)
+    sessionStorage.removeItem(draftKey)
     setHasDraft(false)
   }
   function saveBulkDraft() {
-    sessionStorage.setItem('bulkDraft_' + classId, JSON.stringify({ date: bulkDate, chks: bulkChks, forms: bulkForms, showTest: bulkShowTest }))
+    sessionStorage.setItem(draftKey, JSON.stringify({ date: bulkDate, chks: bulkChks, forms: bulkForms, showTest: bulkShowTest }))
     setHasDraft(true)
     toast('반 수업기록이 임시저장되었습니다')
   }
@@ -200,7 +208,7 @@ export default function ClassBulkRecordModal({
       }
       cnt++
     }
-    sessionStorage.removeItem('bulkDraft_' + classId)
+    sessionStorage.removeItem(draftKey)
     setSaving(false)
     setHasDraft(false)
     if (cnt === 0 && errCnt === 0) {
@@ -243,6 +251,7 @@ export default function ClassBulkRecordModal({
     .bcr-content-hw{display:flex;flex-direction:column;gap:10px;margin-bottom:10px;}
     .bcr-grid{display:flex;flex-direction:column;}
     .bcr-grid > .bcr-bulk-form{width:100%;}
+    ${!mobileMode ? `
     @media (min-width:900px){
       .bcr-content-hw{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
     }
@@ -251,18 +260,24 @@ export default function ClassBulkRecordModal({
       .bcr-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;}
       .bcr-grid > .bcr-bulk-form{margin-bottom:0;}
     }
+    ` : `
+    /* 모바일로 보기: 실제 창 너비와 무관하게 항상 1열 바텀시트로 고정, 터치 영역 확대 */
+    .bcr-bulk-form{padding:14px;}
+    .bcr-rg label{padding:4px 0;}
+    input[type=checkbox], input[type=radio]{ width:17px; height:17px; }
+    `}
   `
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.42)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.42)', zIndex: 1000, display: 'flex', alignItems: mobileMode ? 'flex-end' : 'center', justifyContent: 'center', padding: mobileMode ? 0 : 16 }}>
       <style>{css}</style>
-      <div className="bcr-modal" onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 12, maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
-        <div style={{ padding: '18px 22px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: '#fff', zIndex: 1, borderBottom: `1px solid ${bd}`, marginBottom: 0 }}>
-          <span style={{ fontSize: 15, fontWeight: 600, color: tx }}>{className} 수업기록 작성</span>
+      <div className="bcr-modal" onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: mobileMode ? '16px 16px 0 0' : 12, width: mobileMode ? '100%' : undefined, maxWidth: '100%', maxHeight: mobileMode ? '92vh' : '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
+        <div style={{ padding: mobileMode ? '14px 16px 0' : '18px 22px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: '#fff', zIndex: 1, borderBottom: `1px solid ${bd}`, marginBottom: 0 }}>
+          <span style={{ fontSize: 15, fontWeight: 600, color: tx }}>{title ?? `${className} 수업기록 작성`}</span>
           <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: bg, cursor: 'pointer', fontSize: 17, color: tx2 }}>×</button>
         </div>
 
-        <div style={{ padding: '14px 22px' }}>
+        <div style={{ padding: mobileMode ? '12px 16px' : '14px 22px' }}>
           {notif && (
             <div style={{ background: notif.ok ? gbg : '#FDECEA', border: `1px solid ${notif.ok ? gr : re}`, borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 12, color: notif.ok ? gr : re }}>
               {notif.msg}
@@ -446,7 +461,7 @@ export default function ClassBulkRecordModal({
           )}
         </div>
 
-        <div style={{ padding: '0 22px 18px', display: 'flex', gap: 8, justifyContent: 'flex-end', position: 'sticky', bottom: 0, background: '#fff', borderTop: `1px solid ${bd}`, paddingTop: 12 }}>
+        <div style={{ padding: mobileMode ? '0 16px 14px' : '0 22px 18px', display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', position: 'sticky', bottom: 0, background: '#fff', borderTop: `1px solid ${bd}`, paddingTop: 12 }}>
           <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, border: `1px solid ${bd}`, background: '#fff', cursor: 'pointer', color: tx2, fontFamily: 'inherit' }}>취소</button>
           <button onClick={saveBulkDraft} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 13, border: `1px solid ${wa}`, background: 'transparent', cursor: 'pointer', color: wa, fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 5 }}><IconSave size={13} /> 임시저장</button>
           <button className="bcr-bprim" onClick={saveBulkRec} disabled={saving} style={{ opacity: saving ? 0.7 : 1 }}>{saving ? '저장 중...' : '전체 저장'}</button>

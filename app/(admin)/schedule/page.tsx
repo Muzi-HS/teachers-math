@@ -216,6 +216,16 @@ export default function SchedulePage() {
         .cd.om{opacity:.4;cursor:default;}
         .cd.om:hover{background:#fff;}
         .cd.hol{background:rgba(222,53,11,.05);}
+        ${mobileMode ? `
+        /* 학부모 학원일정 캘린더와 동일하게 — 흰 박스/테두리 없는 플랫한 셀 디자인 */
+        .cd{background:none;border:none;border-radius:8px;}
+        .cd:hover{background:rgba(13,42,94,.03);}
+        .cd.tod{border-color:transparent;}
+        .cd.om:hover{background:none;}
+        .cd.hol{background:none;}
+        .bnav{border:none;background:none;color:${tx2};font-size:18px;padding:4px 10px;}
+        .bnav:hover{color:${navy};}
+        ` : ''}
         .ce{font-size:10px;padding:1px 5px;border-radius:3px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}
         .ce.normal{background:${navyM};color:${navy};}
         .ce.holiday{background:rgba(222,53,11,.15);color:${re};}
@@ -259,9 +269,9 @@ export default function SchedulePage() {
             {/* 달력 */}
             <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: mobileMode ? 12 : 22, boxShadow: '0 1px 4px rgba(0,0,0,.06)', marginBottom: mobileMode ? 12 : 18 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                    <button className="bnav" onClick={() => moveMo(-1)}>◀</button>
+                    <button className="bnav" onClick={() => moveMo(-1)}>{mobileMode ? '‹' : '◀'}</button>
                     <span style={{ fontSize: 16, fontWeight: 700, color: tx }}>{yr}년 {mo + 1}월</span>
-                    <button className="bnav" onClick={() => moveMo(1)}>▶</button>
+                    <button className="bnav" onClick={() => moveMo(1)}>{mobileMode ? '›' : '▶'}</button>
                 </div>
 
                 {/* 요일 헤더 */}

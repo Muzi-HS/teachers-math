@@ -6,8 +6,7 @@ import { can } from '@/lib/permissions'
 import { useSearchParams } from 'next/navigation'
 import { kstDateStr } from '@/lib/kst'
 import ClassBulkRecordModal from '@/components/ClassBulkRecordModal'
-import AutoGrowTextarea from '@/components/AutoGrowTextarea'
-import { IconBook, IconPencil, IconChat, IconSave, IconX, IconClock } from '@/components/icons'
+import { IconClock } from '@/components/icons'
 import { useMobileMode } from '@/context/MobileModeContext'
 
 type Class = { id: number; name: string; days: string; time: string; mode?: string; active?: boolean }
@@ -40,13 +39,6 @@ function attColor(v: number) { return v >= 8 ? '#1A7F4E' : v >= 5 ? '#C05621' : 
 function attBg(v: number) { return v >= 8 ? '#E0F5EB' : v >= 5 ? '#FEF3E2' : '#FDECEA' }
 function attLabel(v: number) { return v >= 8 ? '우수' : v >= 5 ? '보통' : '노력필요' }
 
-// hw_rate/hw_cor는 미입력 상태를 NaN으로 표현 (디폴트 값 없이 완전히 빈 입력칸으로 시작)
-const BLANK_REC = (sid: number): RecForm => ({
-  student_id: sid, content: '', homework: '', hw_rate: NaN, hw_cor: NaN, attitude: 10,
-  hw_rate_na: false, hw_not_submitted: false, hw_cor_na: false,
-  late: false, has_test: false, testItems: [], feedback: ''
-})
-
 export default function ClassesPage() {
   const { role } = useAuth()
   const { mobileMode } = useMobileMode()
@@ -71,12 +63,6 @@ export default function ClassesPage() {
   const [s2cSrch, setS2cSrch] = useState('')
   const [selStus, setSelStus] = useState<Set<number>>(new Set())
   const [ageFilter, setAgeFilter] = useState('')
-  // mAddRec (개별 기록 추가/수정)
-  const [recModal, setRecModal] = useState(false)
-  const [editRecId, setEditRecId] = useState<number | null>(null)
-  const [recDate, setRecDate] = useState(() => kstDateStr())
-  const [recF, setRecF] = useState<RecForm>(BLANK_REC(0))
-  const [showTest, setShowTest] = useState(false)
   // mBulkRec (반 수업기록 일괄) — 실제 폼/저장 로직은 ClassBulkRecordModal 컴포넌트가 담당
   const [bulkModal, setBulkModal] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -240,119 +226,6 @@ export default function ClassesPage() {
     setSelStus(new Set()); setStuModal(false); await fetchAll()
   }
 
-  /* ─── mAddRec 열기 (v18: openAddRec / openEdRec) ─── */
-  function openAddRec() {
-    if (!curStu) return
-    setEditRecId(null)
-    const key = 'recDraft_' + curStu.id
-    const draft = sessionStorage.getItem(key)
-    if (draft) {
-      if (confirm('이 학생의 임시저장된 내용이 있습니다. 불러올까요?')) {
-        try {
-          const d = JSON.parse(draft)
-          setRecF({ ...BLANK_REC(curStu.id), ...d })
-          setShowTest(d.has_test || false)
-          sessionStorage.removeItem(key)
-          setRecModal(true); return
-        } catch (e) { }
-      } else sessionStorage.removeItem(key)
-    }
-    setRecF(BLANK_REC(curStu.id))
-    setShowTest(false)
-    setRecDate(kstDateStr())
-    setRecModal(true)
-  }
-  function openEditRec(r: Rec) {
-    setEditRecId(r.id)
-    setRecDate(r.date)
-    const existingTestItems = (r.record_test_items ?? []).map(ti => ({
-      testId: ti.test_id,
-      tTotal: ti.t_total,
-      tCor: ti.t_cor,
-      tScore: 0,
-    }))
-    setRecF({
-      student_id: r.student_id,
-      content: r.content,
-      homework: r.homework,
-      hw_rate: r.hw_rate < 0 ? 0 : r.hw_rate,
-      hw_cor: r.hw_cor < 0 ? 0 : r.hw_cor,
-      hw_rate_na: r.hw_rate === -1,
-      hw_not_submitted: r.hw_rate === -2,
-      hw_cor_na: r.hw_cor < 0,
-      attitude: r.attitude ?? 10,
-      late: r.late,
-      has_test: r.has_test,
-      testItems: existingTestItems,
-      feedback: r.feedback,
-    })
-    setShowTest(r.has_test)
-    setRecModal(true)
-  }
-  function saveRecDraft() {
-    if (!curStu) return
-    sessionStorage.setItem('recDraft_' + curStu.id, JSON.stringify({ ...recF, date: recDate }))
-    toast('임시저장되었습니다')
-  }
-  async function saveRec() {
-    if (!curStu) return
-    setSaving(true)
-    const row = {
-      student_id: curStu.id, date: recDate, class_id: detailCls?.id ?? null,
-      content: recF.content, homework: recF.homework,
-      hw_rate: recF.hw_rate_na ? -1 : recF.hw_not_submitted ? -2 : (Number.isNaN(recF.hw_rate) ? 0 : recF.hw_rate),
-      hw_cor: recF.hw_cor_na ? -1 : (Number.isNaN(recF.hw_cor) ? 0 : recF.hw_cor),
-      attitude: recF.attitude,
-      late: recF.late, has_test: showTest, feedback: recF.feedback, is_draft: false,
-    }
-    let recId: number | null = editRecId
-
-    if (editRecId) {
-      await supabase.from('records').update(row).eq('id', editRecId)
-      // 기존 시험 항목 삭제 후 재저장
-      await supabase.from('record_test_items').delete().eq('record_id', editRecId)
-      toast('수업 기록 수정됨')
-    } else {
-      const { data: rec, error: recErr } = await supabase.from('records').insert(row).select('id').single()
-      if (recErr || !rec) { toast('저장 실패: ' + (recErr?.message || ''), false); setSaving(false); return }
-      recId = rec.id
-      toast('수업 기록 저장됨')
-    }
-
-    // 시험 항목 저장 (여러 개 지원)
-    if (recId && showTest && recF.testItems && recF.testItems.length > 0) {
-      for (const ti of recF.testItems) {
-        if (!ti.testId) continue
-        const t = tests.find(x => x.id === ti.testId)
-        let total = t?.total ?? ti.tTotal ?? 0
-        if (!total) {
-          const { data: td } = await supabase.from('tests').select('total').eq('id', ti.testId).single()
-          if (td?.total) total = td.total
-        }
-        const tCorVal = ti.tCor ?? 0
-        const autoScore = ti.tScore ? ti.tScore : (total > 0 ? Math.round(tCorVal / total * 100) : 0)
-        // record_test_items 저장
-        await supabase.from('record_test_items').insert({
-          record_id: recId, test_id: ti.testId,
-          t_total: total, t_cor: tCorVal, t_score: autoScore,
-        })
-        // test_scores upsert (테스트관리에 자동 반영)
-        await supabase.from('test_scores').upsert({
-          test_id: ti.testId, student_id: curStu.id, cor: tCorVal, score: autoScore,
-        }, { onConflict: 'test_id,student_id' })
-      }
-    }
-
-    sessionStorage.removeItem('recDraft_' + curStu.id)
-    setSaving(false); setRecModal(false)
-    await fetchStuRecs(curStu.id); await fetchAll()
-  }
-  function setTestItem(idx: number, key: keyof TestItem, val: any) {
-    const items = [...recF.testItems]
-    items[idx] = { ...items[idx], [key]: val }
-    if (key === 'testId') { const t = tests.find(x => x.id === Number(val)); items[idx].tTotal = t ? t.total : 0 }
-    setRecF(f => ({ ...f, testItems: items }))
-  }
   async function delRec(id: number) {
     if (!confirm('기록을 삭제하시겠습니까?')) return
     // record_test_items 먼저 삭제 (test_scores 보존을 위해 CASCADE 방지)
@@ -421,12 +294,6 @@ export default function ClassesPage() {
     .fg{display:flex;flex-direction:column;}
     .fsel{padding:9px 11px;border:1.5px solid ${bd};border-radius:8px;font-size:13px;font-family:inherit;color:${tx};outline:none;background:#fff;width:100%;}
     .fsel:focus{border-color:${navy};}
-    .em-modal{width:560px;}
-    .em-content-hw{display:flex;flex-direction:column;gap:0;}
-    @media (min-width:900px){
-      .em-modal{width:760px;}
-      .em-content-hw{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
-    }
   `
 
   return (
@@ -754,72 +621,6 @@ export default function ClassesPage() {
         />
       )}
 
-      {/* ════ mAddRec: 개별 수업기록 추가/수정 ════ */}
-      {recModal && curStu && (
-        <RecModal
-          key={`rec-${editRecId ?? 'new'}-${curStu.id}`}
-          stuName={curStu.name}
-          initDate={recDate}
-          initRec={recF}
-          initShowTest={showTest}
-          editRecId={editRecId}
-          tests={tests}
-          saving={saving}
-          onClose={() => setRecModal(false)}
-          onSave={async (date, form, showT) => {
-            if (!curStu) return
-            setSaving(true)
-            const row = {
-              student_id: curStu.id, date, class_id: detailCls?.id ?? null,
-              content: form.content, homework: form.homework,
-              hw_rate: form.hw_rate_na ? -1 : form.hw_not_submitted ? -2 : (Number.isNaN(form.hw_rate) ? 0 : form.hw_rate),
-              hw_cor: form.hw_cor_na ? -1 : (Number.isNaN(form.hw_cor) ? 0 : form.hw_cor),
-              attitude: form.attitude,
-              late: form.late, has_test: showT, feedback: form.feedback, is_draft: false,
-            }
-            let recId: number | null = editRecId
-            if (editRecId) {
-              await supabase.from('records').update(row).eq('id', editRecId)
-              await supabase.from('record_test_items').delete().eq('record_id', editRecId)
-              toast('수업 기록 수정됨')
-            } else {
-              const { data: rec, error: recErr } = await supabase.from('records').insert(row).select('id').single()
-              if (recErr || !rec) { toast('저장 실패', false); setSaving(false); return }
-              recId = rec.id
-              toast('수업 기록 저장됨')
-
-              // 푸시 알림은 수업기록 메뉴에서 반별로 일괄 발송
-              // if (curStu.parent_phone) {
-              //   fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push`, { ... }).catch(() => {})
-              // }
-            }
-            if (recId && showT && form.testItems.length > 0) {
-              for (const ti of form.testItems) {
-                if (!ti.testId) continue
-                const t = tests.find(x => x.id === ti.testId)
-                let total = t?.total ?? ti.tTotal ?? 0
-                if (!total) {
-                  const { data: td } = await supabase.from('tests').select('total').eq('id', ti.testId).single()
-                  if (td?.total) total = td.total
-                }
-                const tCorVal = ti.tCor ?? 0
-                const autoScore = ti.tScore ? ti.tScore : (total > 0 ? Math.round(tCorVal / total * 100) : 0)
-                await supabase.from('record_test_items').insert({ record_id: recId, test_id: ti.testId, t_total: total, t_cor: tCorVal, t_score: autoScore })
-                await supabase.from('test_scores').upsert({ test_id: ti.testId, student_id: curStu.id, cor: tCorVal, score: autoScore }, { onConflict: 'test_id,student_id' })
-              }
-            }
-            setSaving(false)
-            setRecModal(false)
-            await fetchStuRecs(curStu.id)
-            await fetchAll()
-          }}
-          onDraft={(date, form, showT) => {
-            sessionStorage.setItem('recDraft_' + curStu.id, JSON.stringify({ ...form, date, showTest: showT }))
-            toast('임시저장되었습니다')
-          }}
-        />
-      )}
-
       {/* ════ 반 추가/수정 모달 ════ */}
       {clsModal && (
         <Modal title={editClsId ? '반 편집' : '반 추가'} onClose={() => setClsModal(false)}
@@ -1069,191 +870,3 @@ const Modal = React.memo(function Modal({ onClose, title, children, footer, wide
     </div>
   )
 })
-
-// ── RecModal: 폼 state를 내부에 가져 부모 리렌더에 영향 안 받음 ──
-function RecModal({ stuName, initDate, initRec, initShowTest, editRecId, tests, saving, onClose, onSave, onDraft }: {
-  stuName: string
-  initDate: string
-  initRec: RecForm
-  initShowTest: boolean
-  editRecId: number | null
-  tests: { id: number; name: string; date: string; total: number }[]
-  saving: boolean
-  onClose: () => void
-  onSave: (date: string, form: RecForm, showTest: boolean) => Promise<void>
-  onDraft: (date: string, form: RecForm, showTest: boolean) => void
-}) {
-  const [date, setDate] = useState(initDate)
-  const [form, setForm] = useState<RecForm>(initRec)
-  const [showTest, setShowTest] = useState(initShowTest)
-
-  function setF(key: keyof RecForm, val: any) { setForm(f => ({ ...f, [key]: val })) }
-  function setTestItem(idx: number, key: keyof TestItem, val: any) {
-    setForm(f => {
-      const items = [...f.testItems]
-      if (key === 'testId') {
-        const t = tests.find(x => x.id === val)
-        items[idx] = { ...items[idx], testId: val, tTotal: t ? t.total : 0 }
-      } else {
-        items[idx] = { ...items[idx], [key]: val }
-      }
-      return { ...f, testItems: items }
-    })
-  }
-
-  return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.42)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div className="em-modal" onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 12, maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
-        {/* 헤더 */}
-        <div style={{ padding: '18px 22px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: '#fff', zIndex: 1, borderBottom: `1px solid ${bd}`, paddingBottom: 12 }}>
-          <span style={{ fontSize: 15, fontWeight: 600, color: tx }}>{editRecId ? '수업 기록 수정' : '수업 기록 추가'}</span>
-          <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: bg, cursor: 'pointer', fontSize: 17, color: tx2 }}>×</button>
-        </div>
-
-        {/* 본문 */}
-        <div style={{ padding: '14px 22px' }}>
-          {/* 학생 + 날짜 */}
-          <div className="fr" style={{ marginBottom: 0 }}>
-            <div className="fg">
-              <label className="lb">학생</label>
-              <input className="fi" value={stuName} readOnly style={{ background: bg }} />
-            </div>
-            <div className="fg">
-              <label className="lb">날짜</label>
-              <input type="date" className="fi" value={date} onChange={e => setDate(e.target.value)} />
-            </div>
-          </div>
-
-          <div className="fdv">수업 내용</div>
-          <div className="em-content-hw" style={{ marginBottom: 0 }}>
-            <div className="fg" style={{ marginBottom: 10 }}>
-              <label className="lb" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><IconBook size={12} /> 수업 내용 (진도)</label>
-              <AutoGrowTextarea className="fi" rows={2} placeholder="예) 이차함수 그래프 변환 (p.45~52)"
-                value={form.content} onChange={e => setF('content', e.target.value)} />
-            </div>
-            <div className="fg" style={{ marginBottom: 10 }}>
-              <label className="lb" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><IconPencil size={12} /> 숙제</label>
-              <AutoGrowTextarea className="fi" rows={2} placeholder="예) 교재 p.53~55 연습문제 1~10번"
-                value={form.homework} onChange={e => setF('homework', e.target.value)} />
-            </div>
-          </div>
-
-          <div className="fdv">숙제 확인</div>
-          <div className="fr" style={{ marginBottom: 0 }}>
-            <div className="fg">
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
-                <label className="lb" style={{ margin: 0 }}>숙제 이행률 (%)</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, cursor: 'pointer', color: form.hw_rate_na ? re : tx3 }}>
-                    <input type="checkbox" checked={form.hw_rate_na}
-                      onChange={e => { const c = e.target.checked; setF('hw_rate_na', c); if (c) setF('hw_not_submitted', false) }}
-                      style={{ cursor: 'pointer' }} />숙제 없음
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, cursor: 'pointer', color: form.hw_not_submitted ? re : tx3 }}>
-                    <input type="checkbox" checked={form.hw_not_submitted}
-                      onChange={e => { const c = e.target.checked; setF('hw_not_submitted', c); if (c) setF('hw_rate_na', false) }}
-                      style={{ cursor: 'pointer' }} />숙제 미제출
-                  </label>
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input type="number" className="fi no-spinner" min={0} max={100}
-                  value={form.hw_rate_na || form.hw_not_submitted || Number.isNaN(form.hw_rate) ? '' : form.hw_rate} disabled={form.hw_rate_na || form.hw_not_submitted}
-                  onChange={e => { const v = e.target.value; setF('hw_rate', v === '' ? NaN : Math.min(100, Math.max(0, parseInt(v) || 0))) }}
-                  onWheel={e => (e.target as HTMLInputElement).blur()}
-                  style={{ width: 80, textAlign: 'center', opacity: form.hw_rate_na || form.hw_not_submitted ? 0.4 : 1, background: form.hw_rate_na || form.hw_not_submitted ? bg : '#fff' }}
-                  placeholder={form.hw_rate_na ? '해당없음' : form.hw_not_submitted ? '미제출' : '입력'} />
-                <span style={{ color: form.hw_rate_na || form.hw_not_submitted ? tx3 : tx2 }}>%</span>
-              </div>
-            </div>
-            <div className="fg">
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
-                <label className="lb" style={{ margin: 0 }}>숙제 정답률 (%)</label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, cursor: 'pointer', color: form.hw_cor_na ? re : tx3 }}>
-                  <input type="checkbox" checked={form.hw_cor_na} onChange={e => setF('hw_cor_na', e.target.checked)} style={{ cursor: 'pointer' }} />채점 안함
-                </label>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input type="number" className="fi no-spinner" min={0} max={100}
-                  value={form.hw_cor_na || Number.isNaN(form.hw_cor) ? '' : form.hw_cor} disabled={form.hw_cor_na}
-                  onChange={e => { const v = e.target.value; setF('hw_cor', v === '' ? NaN : Math.min(100, Math.max(0, parseInt(v) || 0))) }}
-                  onWheel={e => (e.target as HTMLInputElement).blur()}
-                  style={{ width: 80, textAlign: 'center', opacity: form.hw_cor_na ? 0.4 : 1, background: form.hw_cor_na ? bg : '#fff' }}
-                  placeholder={form.hw_cor_na ? '해당없음' : '입력'} />
-                <span style={{ color: form.hw_cor_na ? tx3 : tx2 }}>%</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="fdv">기타</div>
-          <div className="fr" style={{ marginBottom: 0 }}>
-            <div className="fg">
-              <label className="lb">수업 태도 (1~10점)</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input type="number" className="fi" min={1} max={10} value={form.attitude}
-                  onChange={e => setF('attitude', Math.min(10, Math.max(1, parseInt(e.target.value) || 10)))}
-                  style={{ width: 80, textAlign: 'center' }} />
-                <span style={{ color: tx2 }}>점 (기본 10점)</span>
-              </div>
-            </div>
-            <div className="fg">
-              <label className="lb">지각 여부</label>
-              <div className="rg">
-                <label><input type="radio" name="rmLt" checked={!form.late} onChange={() => setF('late', false)} />정시</label>
-                <label><input type="radio" name="rmLt" checked={form.late} onChange={() => setF('late', true)} /><span style={{ color: re }}>지각</span></label>
-              </div>
-            </div>
-          </div>
-
-          <div className="fg" style={{ marginBottom: 0 }}>
-            <label className="lb">시험 여부</label>
-            <div className="rg">
-              <label><input type="radio" name="rmTs" checked={!showTest} onChange={() => { setShowTest(false); setF('has_test', false); setF('testItems', []) }} />없음</label>
-              <label><input type="radio" name="rmTs" checked={showTest} onChange={() => { setShowTest(true); setF('has_test', true); if (!form.testItems.length) setF('testItems', [{ testId: null, tTotal: 0, tCor: 0, tScore: 0 }]) }} />
-                <span style={{ color: navy, fontWeight: 500 }}>있음</span>
-              </label>
-            </div>
-            {showTest && (
-              <div style={{ marginTop: 8 }}>
-                {form.testItems.map((item, idx) => (
-                  <div key={idx} style={{ background: bg, borderRadius: 8, padding: 10, marginBottom: 6, position: 'relative' }}>
-                    <button style={{ position: 'absolute', top: 6, right: 6, padding: '2px 7px', border: 'none', background: rbg, color: re, borderRadius: 5, cursor: 'pointer', display: 'flex' }}
-                      onClick={() => setForm(f => { const a = [...f.testItems]; a.splice(idx, 1); return { ...f, testItems: a } })}><IconX size={10} /></button>
-                    <div className="fg" style={{ marginBottom: 6 }}>
-                      <select className="fsel fi-sm" value={item.testId || ''} onChange={e => setTestItem(idx, 'testId', parseInt(e.target.value) || null)}>
-                        <option value="">테스트 선택</option>
-                        {tests.map(t => <option key={t.id} value={t.id}>{t.name} ({t.date}, {t.total}문항)</option>)}
-                      </select>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-                      <div className="fg"><label className="lb" style={{ fontSize: 10 }}>총 문제 수</label><input type="number" className="fi fi-sm" value={item.tTotal || ''} readOnly placeholder="자동입력" /></div>
-                      <div className="fg"><label className="lb" style={{ fontSize: 10 }}>정답 수</label><input type="number" className="fi fi-sm" min={0} value={item.tCor || ''} onChange={e => setTestItem(idx, 'tCor', parseInt(e.target.value) || 0)} /></div>
-                      <div className="fg"><label className="lb" style={{ fontSize: 10 }}>점수 (선택)</label><input type="number" className="fi fi-sm" min={0} max={100} value={item.tScore || ''} onChange={e => setTestItem(idx, 'tScore', parseInt(e.target.value) || 0)} /></div>
-                    </div>
-                  </div>
-                ))}
-                <button className="bout" style={{ marginTop: 4, fontSize: 12 }} onClick={() => setForm(f => ({ ...f, testItems: [...f.testItems, { testId: null, tTotal: 0, tCor: 0, tScore: 0 }] }))}>
-                  <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth={2} d="M12 5v14M5 12h14" /></svg> 시험 추가
-                </button>
-              </div>
-            )}
-          </div>
-
-          <div className="fdv">수업 피드백</div>
-          <div className="fg">
-            <label className="lb" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><IconChat size={12} /> 피드백 내용</label>
-            <AutoGrowTextarea className="fi" rows={6} minHeight={140} placeholder="이번 수업 특이사항 및 종합 의견"
-              value={form.feedback} onChange={e => setF('feedback', e.target.value)} />
-          </div>
-        </div>
-
-        {/* 푸터 */}
-        <div style={{ padding: '12px 22px 18px', display: 'flex', gap: 8, justifyContent: 'flex-end', position: 'sticky', bottom: 0, background: '#fff', borderTop: `1px solid ${bd}` }}>
-          <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, border: `1px solid ${bd}`, background: '#fff', cursor: 'pointer', color: tx2, fontFamily: 'inherit' }}>취소</button>
-          <button onClick={() => onDraft(date, form, showTest)} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 13, border: `1px solid ${wa}`, background: 'transparent', cursor: 'pointer', color: wa, fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 5 }}><IconSave size={13} /> 임시저장</button>
-          <button className="bgold" onClick={() => onSave(date, form, showTest)} disabled={saving} style={{ opacity: saving ? 0.7 : 1 }}>{saving ? '저장 중...' : '저장'}</button>
-        </div>
-      </div>
-    </div>
-  )
-}
