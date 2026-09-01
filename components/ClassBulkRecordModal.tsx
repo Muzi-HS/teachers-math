@@ -355,7 +355,7 @@ export default function ClassBulkRecordModal({
                 </div>
                 <div className="bcr-fr" style={{ marginBottom: 10 }}>
                   <div className="bcr-fg">
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', rowGap: 4, marginBottom: 5 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 5 }}>
                       <label className="bcr-lb" style={{ margin: 0 }}>숙제 이행률 (%)</label>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, cursor: 'pointer', color: f.hw_rate_na ? re : tx3 }}>
@@ -384,9 +384,9 @@ export default function ClassBulkRecordModal({
                     </div>
                   </div>
                   <div className="bcr-fg">
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', rowGap: 4, marginBottom: 5 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 5 }}>
                       <label className="bcr-lb" style={{ margin: 0 }}>숙제 정답률 (%)</label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, cursor: 'pointer', color: f.hw_cor_na ? re : tx3 }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, cursor: 'pointer', color: f.hw_cor_na ? re : tx3, width: 'fit-content' }}>
                         <input type="checkbox" checked={!!f.hw_cor_na}
                           onChange={e => setBF(sid, 'hw_cor_na', e.target.checked)}
                           style={{ cursor: 'pointer' }} />
@@ -410,7 +410,7 @@ export default function ClassBulkRecordModal({
                     <label className="bcr-lb">수업 태도 (1~10점)</label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <input type="number" className="bcr-fi" min={1} max={10} value={f.attitude} onChange={e => setBF(sid, 'attitude', Math.min(10, Math.max(1, parseInt(e.target.value) || 10)))} style={{ width: 80, textAlign: 'center' }} />
-                      <span style={{ color: tx2 }}>점 (기본 10점)</span>
+                      <span style={{ color: tx2 }}>점</span>
                     </div>
                   </div>
                   <div className="bcr-fg">

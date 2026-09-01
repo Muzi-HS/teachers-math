@@ -174,7 +174,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
       {/* 사이드바 + 본문 */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         {!mobileMode && <Sidebar />}
-        <main style={{ flex: 1, background: '#F5F7FA', overflowY: 'auto', minHeight: 0 }}>
+        <main style={{ flex: 1, background: '#F5F7FA', overflowY: 'auto', minHeight: 0, minWidth: 0 }}>
           {children}
         </main>
       </div>
