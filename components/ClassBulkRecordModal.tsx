@@ -284,11 +284,12 @@ export default function ClassBulkRecordModal({
             </div>
           )}
 
-          {/* 날짜 + 학생 선택 */}
-          <div className="bcr-fr" style={{ marginBottom: 8 }}>
+          {/* 날짜 + 학생 선택 — 모바일에서는 좁은 반쪽 칸에 학생 목록이 눌리지 않도록 세로로 쌓는다 */}
+          <div className="bcr-fr" style={{ marginBottom: 8, ...(mobileMode ? { display: 'flex', flexDirection: 'column', gap: 12 } : {}) }}>
             <div className="bcr-fg">
               <label className="bcr-lb">날짜</label>
-              <input type="date" className="bcr-fi" value={bulkDate} onChange={e => setBulkDate(e.target.value)} />
+              <input type="date" className="bcr-fi" value={bulkDate} onChange={e => setBulkDate(e.target.value)}
+                style={{ maxWidth: '100%', display: 'block', WebkitAppearance: 'none', appearance: 'none' }} />
             </div>
             <div className="bcr-fg">
               <label className="bcr-lb">소속 학생 선택</label>

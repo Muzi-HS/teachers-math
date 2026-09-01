@@ -70,9 +70,15 @@ export default function ParentInquiriesPage() {
     setNotices((data ?? []) as AttNotice[])
   }
 
+  const didInitialScrollRef = useRef(false)
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [msgs.length])
+    if (loading) return
+    // 최초 진입 시에는 애니메이션 없이 즉시 맨 아래로 위치시켜, 로딩 후 화면이
+    // 스르륵 아래로 밀리는 것처럼 보이는 현상을 없앤다 (이후 새 메시지는 부드럽게 스크롤)
+    const isFirst = !didInitialScrollRef.current
+    didInitialScrollRef.current = true
+    bottomRef.current?.scrollIntoView({ behavior: isFirst ? 'auto' : 'smooth' })
+  }, [msgs.length, loading])
 
   async function send() {
     if (!parent?.parentId || !input.trim() || sending) return
