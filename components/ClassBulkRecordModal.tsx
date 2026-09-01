@@ -253,7 +253,7 @@ export default function ClassBulkRecordModal({
     .bcr-content-hw{display:flex;flex-direction:column;gap:10px;margin-bottom:10px;}
     .bcr-grid{display:flex;flex-direction:column;}
     .bcr-grid > .bcr-bulk-form{width:100%;}
-    ${!mobileMode ? `
+    ${!mobileMode && !isSingleStudent ? `
     @media (min-width:900px){
       .bcr-content-hw{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
     }
@@ -262,12 +262,13 @@ export default function ClassBulkRecordModal({
       .bcr-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;}
       .bcr-grid > .bcr-bulk-form{margin-bottom:0;}
     }
-    ` : `
+    ` : ''}
+    ${mobileMode ? `
     /* 모바일로 보기: 실제 창 너비와 무관하게 항상 1열 바텀시트로 고정, 터치 영역 확대 */
     .bcr-bulk-form{padding:14px;}
     .bcr-rg label{padding:4px 0;}
     input[type=checkbox], input[type=radio]{ width:17px; height:17px; }
-    `}
+    ` : ''}
   `
 
   return (
