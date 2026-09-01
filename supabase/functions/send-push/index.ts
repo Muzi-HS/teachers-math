@@ -127,6 +127,7 @@ serve(async (req) => {
         })
         const json = await r.json()
         console.log('FCM 응답:', JSON.stringify(json))
+        if (!r.ok) throw new Error(json?.error?.message || 'FCM 전송 실패')
         return json
       })
     )

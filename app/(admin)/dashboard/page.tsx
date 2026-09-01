@@ -31,6 +31,7 @@ export default function DashboardPage(){
   const [csMap,      setCsMap]      = useState<Record<number, number[]>>({}) // class_id -> student_ids
   const [students,   setStudents]   = useState<Student[]>([])
   const [unsentRecs, setUnsentRecs] = useState<{ id:number; student_id:number; date:string; push_sent:boolean }[]>([])
+  const [unsentTotal, setUnsentTotal] = useState(0)
   const [unreadInq,     setUnreadInq]     = useState<InqMsg[]>([])
   const [unreadInqTotal,setUnreadInqTotal]= useState(0)
   const [unreadComments,setUnreadComments]= useState<UnreadRecComment[]>([])
@@ -42,11 +43,11 @@ export default function DashboardPage(){
 
   async function fetchAll(){
     setLoading(true)
-    const [{ data:cls },{ data:cs },{ data:stu },{ data:unsent },{ data:inq, count:inqCount },{ data:par },{ data:comments },{ data:att }] = await Promise.all([
+    const [{ data:cls },{ data:cs },{ data:stu },{ data:unsent, count:unsentCount },{ data:inq, count:inqCount },{ data:par },{ data:comments },{ data:att }] = await Promise.all([
       supabase.from('classes').select('id,name,days,time').order('name'),
       supabase.from('class_students').select('class_id,student_id'),
       supabase.from('students').select('id,name'),
-      supabase.from('records').select('id,student_id,date,push_sent').eq('push_sent',false).eq('is_draft',false).order('date',{ascending:false}).limit(10),
+      supabase.from('records').select('id,student_id,date,push_sent',{count:'exact'}).eq('push_sent',false).eq('is_draft',false).order('date',{ascending:false}).limit(10),
       supabase.from('inquiry_messages').select('id,parent_id,content,created_at',{count:'exact'}).eq('sender_type','parent').eq('is_read',false).order('created_at',{ascending:false}).limit(10),
       supabase.from('parents').select('id, parent_students(students(name))'),
       supabase.from('records').select('id,student_id,date,parent_comment,parent_comment_at,parent_comment_read_at')
@@ -62,6 +63,7 @@ export default function DashboardPage(){
     setCsMap(map)
     setStudents(stu??[])
     setUnsentRecs(unsent??[])
+    setUnsentTotal(unsentCount ?? (unsent??[]).length)
     setUnreadInq(inq??[])
     setUnreadInqTotal(inqCount ?? (inq??[]).length)
     setUnreadComments((comments??[]).filter(isUnreadParentComment) as UnreadRecComment[])
@@ -151,10 +153,10 @@ export default function DashboardPage(){
             {students.length}<span style={{ fontSize: 13, fontWeight: 400, color: tx2 }}>명</span>
           </p>
         </div>
-        <div className="mc" style={{ borderColor: unsentRecs.length > 0 ? re + '55' : bd, borderWidth: unsentRecs.length > 0 ? 1.5 : 1 }}>
-          <p style={{ fontSize: 11, color: unsentRecs.length > 0 ? re : tx3, fontWeight: unsentRecs.length > 0 ? 600 : 400, margin: '0 0 6px' }}>미발송 푸시 알림</p>
-          <p style={{ fontSize: 24, fontWeight: 700, color: unsentRecs.length > 0 ? re : tx, margin: 0 }}>
-            {unsentRecs.length}<span style={{ fontSize: 13, fontWeight: 400 }}>건</span>
+        <div className="mc" style={{ borderColor: unsentTotal > 0 ? re + '55' : bd, borderWidth: unsentTotal > 0 ? 1.5 : 1 }}>
+          <p style={{ fontSize: 11, color: unsentTotal > 0 ? re : tx3, fontWeight: unsentTotal > 0 ? 600 : 400, margin: '0 0 6px' }}>미발송 푸시 알림</p>
+          <p style={{ fontSize: 24, fontWeight: 700, color: unsentTotal > 0 ? re : tx, margin: 0 }}>
+            {unsentTotal}<span style={{ fontSize: 13, fontWeight: 400 }}>건</span>
           </p>
         </div>
         <div className="mc" style={{ cursor: 'pointer', borderColor: unreadInqTotal > 0 ? re + '55' : bd, borderWidth: unreadInqTotal > 0 ? 1.5 : 1 }} onClick={goToInquiries}>
@@ -204,8 +206,8 @@ export default function DashboardPage(){
         {/* 우측: 미발송 푸시 알림 */}
         <div className="mc">
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: 10 }}>
-            <p style={{ fontSize: 13, fontWeight: 700, color: unsentRecs.length>0?re:tx, margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}><IconBell size={14} /> 미발송 푸시 알림</p>
-            {unsentRecs.length > 0 && (
+            <p style={{ fontSize: 13, fontWeight: 700, color: unsentTotal>0?re:tx, margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}><IconBell size={14} /> 미발송 푸시 알림</p>
+            {unsentTotal > 0 && (
               <span style={{ fontSize: 12, color: navy, fontWeight: 600, cursor: 'pointer' }} onClick={goToRecordsMenu}>
                 수업기록에서 발송 →
               </span>
@@ -213,7 +215,7 @@ export default function DashboardPage(){
           </div>
           {loading ? (
             <p style={{ fontSize: 13, color: tx3, padding: '20px 0', textAlign: 'center' }}>불러오는 중...</p>
-          ) : unsentRecs.length === 0 ? (
+          ) : unsentTotal === 0 ? (
             <p style={{ fontSize: 13, color: tx3, padding: '20px 0', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><IconCheck size={14} /> 미발송 알림이 없습니다</p>
           ) : (
             <>
@@ -225,8 +227,8 @@ export default function DashboardPage(){
                   </span>
                 </div>
               ))}
-              {unsentRecs.length > 5 && (
-                <p style={{ fontSize: 11, color: tx3, margin: '6px 0 0' }}>외 {unsentRecs.length - 5}명 더보기</p>
+              {unsentTotal > 5 && (
+                <p style={{ fontSize: 11, color: tx3, margin: '6px 0 0' }}>외 {unsentTotal - 5}명 더보기</p>
               )}
             </>
           )}

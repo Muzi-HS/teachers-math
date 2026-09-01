@@ -468,7 +468,7 @@ export default function RecordsPage() {
     const dows = ['일', '월', '화', '수', '목', '금', '토']
     const dateStr = `${parseInt(mm)}월 ${parseInt(dd)}일(${dows[kd.getUTCDay()]})`
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -480,6 +480,10 @@ export default function RecordsPage() {
           body: `[${dateStr}] ${stu.name}학생의 수업기록이 등록됐습니다!`,
         }),
       })
+      const result = await res.json().catch(() => null)
+      // 학부모 미존재/FCM 토큰 미등록 시에도 200이 오므로 실제 발송 건수(sent)까지 확인해야
+      // "미발송"이 잘못 "발송됨"으로 집계되는 것을 막을 수 있다
+      if (!res.ok || !result || (result.sent ?? 0) <= 0) return false
       await supabase.from('records').update({ push_sent: true, push_sent_at: new Date().toISOString() }).eq('id', r.id)
       return true
     } catch { return false }
@@ -499,7 +503,7 @@ export default function RecordsPage() {
       if (await sendPushForRecord(r)) sent++
     }
     setPushing(false)
-    toast(sent > 0 ? `${sent}명 푸시 발송 완료` : '발송할 학부모 연락처가 없습니다.', sent > 0)
+    toast(sent > 0 ? `${sent}명 푸시 발송 완료` : '발송 가능한 대상이 없습니다. (연락처 또는 알림 미등록)', sent > 0)
     if (sent > 0) await fetchDayRecs()
   }
 
