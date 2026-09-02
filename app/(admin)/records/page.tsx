@@ -22,6 +22,7 @@ type Rec = {
   parent_comment_read_at: string | null
   // sms_sent: boolean; sms_sent_at: string | null;
   push_sent: boolean; push_sent_at: string | null; viewed_at: string | null
+  released_to_parent: boolean
   is_draft: boolean
   record_test_items?: {
     test_id: number; t_total: number; t_cor: number; t_score: number
@@ -371,6 +372,12 @@ export default function RecordsPage() {
 
   // 기록 1건에 대해 실제로 푸시를 보내고 push_sent를 true로 남긴다 (개별/일괄 발송 공용)
   async function sendPushForRecord(r: Rec): Promise<boolean> {
+    // 발송을 시도한 시점에 학부모 공개 처리 — 실제 푸시 성공 여부(push_sent)와는 분리해서
+    // 관리한다. 학부모가 알림을 허용하지 않았거나 발송이 실패해도 수업기록 자체는
+    // "발송"을 누른 이상 볼 수 있어야 하고, 미발송/개별발송 표시만 별도로 남는다.
+    if (!r.released_to_parent) {
+      await supabase.from('records').update({ released_to_parent: true }).eq('id', r.id)
+    }
     const stu = students.find(s => s.id === r.student_id)
     if (!stu?.parent_phone) return false
     const [, mm, dd] = r.date.split('-')

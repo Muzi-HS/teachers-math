@@ -41,22 +41,27 @@ serve(async (req) => {
       )
     }
 
-    // 기존 토큰 전부 삭제 후 새 토큰으로 교체 (중복 푸시 방지)
+    // 새 토큰을 먼저 저장하고, 저장이 확실히 성공한 뒤에만 그 parent의 나머지(오래된)
+    // 토큰을 정리한다 — 예전에는 삭제 후 삽입 순서였는데, 삭제는 성공하고 삽입이
+    // 실패하면(일시적 오류 등) 그 학부모의 토큰이 통째로 사라져 버려서 알림이 영구히
+    // 안 가는 문제가 있었다 (강서현 학생 학부모 사례로 확인됨)
+    const { error: insertError } = await supabase
+      .from('fcm_tokens')
+      .insert({ parent_id, token })
+
+    if (insertError) {
+      return new Response(
+        JSON.stringify({ error: insertError.message }),
+        { status: 500, headers: { ...CORS, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // 새 토큰 저장 확인 후 같은 parent의 다른 토큰들만 정리 (중복 푸시 방지)
     await supabase
       .from('fcm_tokens')
       .delete()
       .eq('parent_id', parent_id)
-
-    const { error } = await supabase
-      .from('fcm_tokens')
-      .insert({ parent_id, token })
-
-    if (error) {
-      return new Response(
-        JSON.stringify({ error: error.message }),
-        { status: 500, headers: { ...CORS, 'Content-Type': 'application/json' } }
-      )
-    }
+      .neq('token', token)
 
     return new Response(
       JSON.stringify({ success: true }),

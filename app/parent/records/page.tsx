@@ -111,7 +111,7 @@ export default function ParentRecords() {
       .select('*')
       .eq('student_id', stuId)
       .eq('is_draft', false)
-      .eq('push_sent', true) // 알림 발송 전에는 학부모에게 노출되지 않음
+      .eq('released_to_parent', true) // 관리자가 "발송"을 누른 기록만 노출 (실제 푸시 성공 여부와는 무관)
       .order('date', { ascending: false })
 
     if (!recsData || recsData.length === 0) { setRecs([]); setComments([]); setLoading(false); return }
