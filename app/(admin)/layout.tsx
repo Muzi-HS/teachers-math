@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
-import { requestFCMToken } from '@/lib/firebase'
+import { requestFCMToken, onForegroundMessage } from '@/lib/firebase'
 import Sidebar from '@/components/Sidebar'
 import { menuAccess, Role } from '@/lib/permissions'
 import { MobileModeProvider, useMobileMode } from '@/context/MobileModeContext'
@@ -123,6 +123,32 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
       router.replace('/attendance')
     }
   }, [pathname])
+
+  // 알림 클릭(백그라운드) 또는 앱을 보고 있는 중 푸시 수신(포그라운드) 시 해당 메뉴로 이동
+  // 학부모 화면(app/parent/layout.tsx)에는 이미 있었는데 관리자 화면에는 빠져있어서,
+  // 서비스워커가 postMessage로 보내는 이동 요청을 받을 곳이 없어 그냥 포커스만 되고
+  // 원래 열려있던 페이지(예: 수업기록)에 머물러 있던 것처럼 보였다.
+  function navigateToLink(link: string) {
+    if (link === window.location.pathname) window.location.reload()
+    else router.push(link)
+  }
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !navigator.serviceWorker) return
+    function onMessage(e: MessageEvent) {
+      if (e.data?.type !== 'push-navigate' || !e.data.link) return
+      navigateToLink(e.data.link)
+    }
+    navigator.serviceWorker.addEventListener('message', onMessage)
+    return () => navigator.serviceWorker.removeEventListener('message', onMessage)
+  }, [router])
+  useEffect(() => {
+    let unsub: (() => void) | undefined
+    onForegroundMessage(payload => {
+      const link: string | undefined = payload?.data?.link
+      if (link) navigateToLink(link)
+    }).then(fn => { unsub = fn })
+    return () => { if (typeof unsub === 'function') unsub() }
+  }, [router])
 
   if (loading) return (
     <div style={{ minHeight: '100vh', background: '#F5F7FA', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
