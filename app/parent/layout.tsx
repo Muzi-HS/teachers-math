@@ -156,21 +156,34 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
     }
   }, [parent?.parentId])
 
-  // 알림 클릭 시 서비스워커가 보내는 이동 요청 처리
-  // (client.navigate를 지원하지 않는 구형 브라우저 대비 폴백 — 라우터로 이동시켜야
-  // 대상 페이지가 새로 마운트되어 수업기록 읽음 처리(viewed_at)가 정상적으로 실행된다)
+  // 알림 클릭(백그라운드) 또는 앱이 열려있는 중에 푸시 수신(포그라운드) 시
+  // 해당 메뉴로 바로 이동 — 이미 그 페이지에 머물러 있으면 router.push는 아무 효과가
+  // 없으므로(리마운트 안 됨) 새로고침으로 강제 리마운트시켜 읽음 처리가 정상 실행되게 한다
+  function navigateToLink(link: string) {
+    if (link === window.location.pathname) window.location.reload()
+    else router.push(link)
+  }
+
+  // 백그라운드(앱이 닫혀있거나 다른 탭)에서 알림을 클릭했을 때 — 서비스워커가 보내는 이동 요청 처리
   useEffect(() => {
     if (typeof navigator === 'undefined' || !navigator.serviceWorker) return
     function onMessage(e: MessageEvent) {
       if (e.data?.type !== 'push-navigate' || !e.data.link) return
-      const link: string = e.data.link
-      // 이미 그 페이지에 머물러 있으면 router.push는 아무 효과가 없으므로(리마운트 안 됨)
-      // 새로고침으로 강제 리마운트시켜 읽음 처리가 다시 실행되게 한다
-      if (link === window.location.pathname) window.location.reload()
-      else router.push(link)
+      navigateToLink(e.data.link)
     }
     navigator.serviceWorker.addEventListener('message', onMessage)
     return () => navigator.serviceWorker.removeEventListener('message', onMessage)
+  }, [router])
+
+  // 포그라운드(앱을 이미 보고 있는 중)에 알림이 도착했을 때 — 배경 알림과 동일하게 바로 이동
+  // (포그라운드 메시지는 OS 알림 배너 없이 SDK로만 전달되므로 별도 처리 필요)
+  useEffect(() => {
+    let unsub: (() => void) | undefined
+    onForegroundMessage(payload => {
+      const link: string | undefined = payload?.data?.link
+      if (link) navigateToLink(link)
+    }).then(fn => { unsub = fn })
+    return () => { if (typeof unsub === 'function') unsub() }
   }, [router])
 
   // /parent 루트 접근 시 수업기록으로 리다이렉트 (별도 effect, pathname만 의존)

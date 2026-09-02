@@ -53,6 +53,8 @@ export default function ClassBulkRecordModal({
   const [bulkForms, setBulkForms] = useState<Record<number, RecForm>>({})
   const [bulkRecIds, setBulkRecIds] = useState<Record<number, number>>({})
   const [bulkShowTest, setBulkShowTest] = useState<Record<number, boolean>>({})
+  const [bulkContentText, setBulkContentText] = useState('')
+  const [bulkHomeworkText, setBulkHomeworkText] = useState('')
   const [bulkFeedbackText, setBulkFeedbackText] = useState('')
   const [hasDraft, setHasDraft] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -142,17 +144,17 @@ export default function ClassBulkRecordModal({
     setBulkForms(p => { const items = [...(p[sid]?.testItems || [])]; items.splice(idx, 1); return { ...p, [sid]: { ...p[sid], testItems: items } } })
   }
 
-  function applyBulkFeedback() {
-    if (!bulkFeedbackText.trim()) return toast('일괄 작성할 피드백 내용을 입력하세요.', false)
+  function applyBulkField(field: 'content' | 'homework' | 'feedback', value: string, label: string) {
+    if (!value.trim()) return toast(`일괄 작성할 ${label} 내용을 입력하세요.`, false)
     setBulkForms(p => {
       const next = { ...p }
       for (const sid of Object.keys(bulkChks).map(Number)) {
         if (!bulkChks[sid]) continue
-        next[sid] = { ...(next[sid] || BLANK_REC(sid)), feedback: bulkFeedbackText }
+        next[sid] = { ...(next[sid] || BLANK_REC(sid)), [field]: value }
       }
       return next
     })
-    toast('개별 피드백에 일괄 반영되었습니다')
+    toast(`개별 ${label}에 일괄 반영되었습니다`)
   }
 
   async function saveBulkRec() {
@@ -316,12 +318,28 @@ export default function ClassBulkRecordModal({
             </div>
           )}
 
-          {/* 일괄 피드백 작성 */}
-          <div style={{ background: bg, borderRadius: 8, padding: 12, marginBottom: 12 }}>
-            <label className="bcr-lb"><span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><IconChat size={12} /> 피드백 일괄 작성</span> <span style={{ color: tx3, fontWeight: 400 }}>(선택된 학생 전원의 개별 피드백에 동일하게 입력됩니다)</span></label>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <AutoGrowTextarea className="bcr-fi" rows={3} minHeight={76} style={{ background: '#fff' }} value={bulkFeedbackText} onChange={e => setBulkFeedbackText(e.target.value)} placeholder="예) 이번 주 전반적으로 집중도가 좋았습니다." />
-              <button type="button" className="bcr-bout" style={{ flexShrink: 0, alignSelf: 'flex-start' }} onClick={applyBulkFeedback}>일괄작성</button>
+          {/* 일괄 작성 — 수업 내용/숙제/피드백을 선택된 학생 전원에게 한 번에 반영 */}
+          <div style={{ background: bg, borderRadius: 8, padding: 12, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div>
+              <label className="bcr-lb"><span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><IconBook size={12} /> 수업 내용(진도) 일괄 작성</span> <span style={{ color: tx3, fontWeight: 400 }}>(선택된 학생 전원에게 동일하게 입력됩니다)</span></label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <AutoGrowTextarea className="bcr-fi" rows={2} minHeight={56} style={{ background: '#fff' }} value={bulkContentText} onChange={e => setBulkContentText(e.target.value)} placeholder="예) 이차함수 그래프 변환 (p.45~52)" />
+                <button type="button" className="bcr-bout" style={{ flexShrink: 0, alignSelf: 'flex-start' }} onClick={() => applyBulkField('content', bulkContentText, '수업 내용')}>일괄작성</button>
+              </div>
+            </div>
+            <div>
+              <label className="bcr-lb"><span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><IconPencil size={12} /> 숙제 일괄 작성</span> <span style={{ color: tx3, fontWeight: 400 }}>(선택된 학생 전원에게 동일하게 입력됩니다)</span></label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <AutoGrowTextarea className="bcr-fi" rows={2} minHeight={56} style={{ background: '#fff' }} value={bulkHomeworkText} onChange={e => setBulkHomeworkText(e.target.value)} placeholder="예) 교재 p.53~55 연습문제 1~10번" />
+                <button type="button" className="bcr-bout" style={{ flexShrink: 0, alignSelf: 'flex-start' }} onClick={() => applyBulkField('homework', bulkHomeworkText, '숙제')}>일괄작성</button>
+              </div>
+            </div>
+            <div>
+              <label className="bcr-lb"><span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><IconChat size={12} /> 피드백 일괄 작성</span> <span style={{ color: tx3, fontWeight: 400 }}>(선택된 학생 전원의 개별 피드백에 동일하게 입력됩니다)</span></label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <AutoGrowTextarea className="bcr-fi" rows={3} minHeight={76} style={{ background: '#fff' }} value={bulkFeedbackText} onChange={e => setBulkFeedbackText(e.target.value)} placeholder="예) 이번 주 전반적으로 집중도가 좋았습니다." />
+                <button type="button" className="bcr-bout" style={{ flexShrink: 0, alignSelf: 'flex-start' }} onClick={() => applyBulkField('feedback', bulkFeedbackText, '피드백')}>일괄작성</button>
+              </div>
             </div>
           </div>
 

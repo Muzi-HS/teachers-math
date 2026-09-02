@@ -42,11 +42,11 @@ export async function isFCMSupported(): Promise<boolean> {
   try { return await isSupported() } catch { return false }
 }
 
-export async function onForegroundMessage(callback: (payload: any) => void) {
+export async function onForegroundMessage(callback: (payload: any) => void): Promise<(() => void) | undefined> {
   try {
     const supported = await isSupported()
-    if (!supported) return
+    if (!supported) return undefined
     const messaging = getMessaging(app)
-    onMessage(messaging, callback)
-  } catch (e) {}
+    return onMessage(messaging, callback)
+  } catch (e) { return undefined }
 }
