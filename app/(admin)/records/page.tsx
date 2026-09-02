@@ -45,9 +45,12 @@ function attBg(v: number) { return v >= 8 ? '#E0F5EB' : v >= 5 ? '#FEF3E2' : '#F
 function attLabel(v: number) { return v >= 8 ? '우수' : v >= 5 ? '보통' : '노력필요' }
 // 발송/읽음 상태를 배지 하나로 통합 (미발송 / 발송됨·안읽음 / 읽음·시각)
 function pushStatus(r: { push_sent?: boolean; viewed_at: string | null }) {
+  // 읽음 여부는 push_sent와 무관하게 독립적으로 확인한다 — released_to_parent 도입 이후
+  // 푸시가 미발송이어도 학부모가 직접 열람할 수 있으므로, 미발송이라고 항상 안읽음으로
+  // 단정하면 안 된다 (읽었으면 읽음이 우선 표시되어야 함)
+  if (r.viewed_at) return { label: `읽음 · ${kstTimeOf(r.viewed_at)}`, bg: gbg, color: gr }
   if (!(r.push_sent ?? false)) return { label: '미발송', bg, color: tx3, border: bd }
-  if (!r.viewed_at) return { label: '발송됨 · 안읽음', bg: navyM, color: navy }
-  return { label: `읽음 · ${kstTimeOf(r.viewed_at)}`, bg: gbg, color: gr }
+  return { label: '발송됨 · 안읽음', bg: navyM, color: navy }
 }
 function todayStr() { return kstDateStr() }
 function fmtDate(dt: string) {
