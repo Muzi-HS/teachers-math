@@ -49,7 +49,7 @@ function pushStatus(r: { push_sent?: boolean; viewed_at: string | null }) {
   // 푸시가 미발송이어도 학부모가 직접 열람할 수 있으므로, 미발송이라고 항상 안읽음으로
   // 단정하면 안 된다 (읽었으면 읽음이 우선 표시되어야 함)
   if (r.viewed_at) return { label: `읽음 · ${kstTimeOf(r.viewed_at)}`, bg: gbg, color: gr }
-  if (!(r.push_sent ?? false)) return { label: '미발송', bg, color: tx3, border: bd }
+  if (!(r.push_sent ?? false)) return { label: '미발송 · 안읽음', bg, color: tx3, border: bd }
   return { label: '발송됨 · 안읽음', bg: navyM, color: navy }
 }
 function todayStr() { return kstDateStr() }
