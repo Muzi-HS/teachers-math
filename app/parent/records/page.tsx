@@ -23,7 +23,8 @@ function attLabel(v: number)  { return v >= 8  ? '우수' : v >= 5 ? '보통' : 
 function TestResultCard({ testName, score, cor, total, pct, testId }: {
   testName: string; score: number; cor: number; total: number; pct: number; testId: number
 }) {
-  const [stats, setStats] = useState<{ avg: number; max: number; rank: number; totalCnt: number } | null>(null)
+  // 등수는 관리자 화면에서만 노출 — 학부모에게는 시험평균/최고점만 보여준다
+  const [stats, setStats] = useState<{ avg: number; max: number } | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -48,11 +49,9 @@ function TestResultCard({ testName, score, cor, total, pct, testId }: {
         }
       }
       if (list.length === 0) return
-      list.sort((a, b) => b.score - a.score)
       const avg = Math.round(list.reduce((a, b) => a + b.score, 0) / list.length)
-      const max = list[0].score
-      const rankIdx = list.findIndex(s => s.score === score)
-      setStats({ avg, max, rank: rankIdx >= 0 ? rankIdx + 1 : 0, totalCnt: list.length })
+      const max = Math.max(...list.map(s => s.score))
+      setStats({ avg, max })
     }
     load()
   }, [testId, score])
@@ -65,11 +64,6 @@ function TestResultCard({ testName, score, cor, total, pct, testId }: {
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, marginBottom: 2 }}>
         <span style={{ fontSize: 26, fontWeight: 700, color: navy, lineHeight: 1 }}>{score}</span>
         <span style={{ fontSize: 13, color: tx2 }}>점</span>
-        {stats && stats.totalCnt > 0 && (
-          <span style={{ marginLeft: 'auto', background: gbg, color: gr, fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 20 }}>
-            {stats.rank}등 / {stats.totalCnt}명
-          </span>
-        )}
       </div>
       <p style={{ fontSize: 11, color: tx2, margin: '0 0 10px' }}>{cor}/{total}문항 정답 (정답률 {pct}%)</p>
 
