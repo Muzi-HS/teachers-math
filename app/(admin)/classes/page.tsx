@@ -241,7 +241,10 @@ export default function ClassesPage() {
     const dayMatch = !dayFlt || (c.days ?? '').split(',').map(d => d.trim()).includes(dayFlt)
     return nameMatch && dayMatch
   })
-  const detailStus = detailCls ? (csMap[detailCls.id] ?? []).map(id => students.find(s => s.id === id)).filter(Boolean) as Student[] : []
+  const detailStus = detailCls
+    ? ((csMap[detailCls.id] ?? []).map(id => students.find(s => s.id === id)).filter(Boolean) as Student[])
+        .sort((a, b) => a.name.localeCompare(b.name, 'ko'))
+    : []
   // 오늘 이 반 소속 학생 중 결석/지각이 등록된 학생
   const detailStuIds = new Set(detailStus.map(s => s.id))
   const classTodayAtt = todayAttNotices.filter(n => detailStuIds.has(n.student_id))
