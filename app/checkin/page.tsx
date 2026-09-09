@@ -5,9 +5,9 @@ import { teacherLogin } from '@/lib/auth'
 import { useAuth } from '@/context/AuthContext'
 
 // 태블릿 키오스크 전용 화면 — 어떤 메뉴/버튼에서도 링크로 연결되지 않고
-// 이 URL(/checkin)을 직접 입력해야만 들어올 수 있다. 관리자/선생님/조교 중
-// 아무 계정으로나 로그인해야 체크인 화면이 보이고, 자동 로그인은 지원하지 않는다
-// (탭/브라우저를 닫으면 로그인이 풀리고 다시 로그인해야 한다).
+// 이 URL(/checkin)을 직접 입력해야만 들어올 수 있다. role이 'admin'인 계정으로만
+// 로그인해야 체크인 화면이 보이고(선생님/조교 계정은 거부), 자동 로그인은 지원하지
+// 않는다 (탭/브라우저를 닫으면 로그인이 풀리고 다시 로그인해야 한다).
 
 const navyDk = '#071A3E', navy = '#0D2A5E', gold = '#D87E13'
 const re = '#C0392B', gr = '#1A7F4E'
@@ -26,6 +26,10 @@ function KioskLoginGate({ children }: { children: React.ReactNode }) {
       // 이 화면은 자동 로그인을 쓰지 않는다 — 탭/브라우저를 닫으면 다시 로그인해야 한다
       localStorage.removeItem(TEACHER_AUTO_LOGIN_KEY)
       const teacher = await teacherLogin(email, password)
+      if (teacher.role !== 'admin') {
+        await supabase.auth.signOut()
+        throw new Error('관리자 계정만 로그인할 수 있습니다.')
+      }
       loginAsTeacher(teacher)
     } catch (e: any) {
       setErr(e.message)
@@ -42,7 +46,7 @@ function KioskLoginGate({ children }: { children: React.ReactNode }) {
     )
   }
 
-  if (role === 'admin' || role === 'teacher' || role === 'assistant') {
+  if (role === 'admin') {
     return <>{children}</>
   }
 
