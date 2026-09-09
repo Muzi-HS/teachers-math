@@ -73,6 +73,15 @@ export default function ClassBulkRecordModal({
     const recIds: Record<number, number> = {}
     students.forEach(s => { chks[s.id] = true; forms[s.id] = BLANK_REC(s.id); showT[s.id] = false })
 
+    // 태블릿 키오스크(/checkin) 등원 체크인 기록으로 지각/정시를 자동 반영 — 아직 저장된
+    // 기록이 없는 학생만 적용하고, 이미 저장된 기록이 있으면 그 값이 그대로 우선한다.
+    const { data: checkins } = await supabase
+      .from('student_checkins').select('student_id, late')
+      .eq('date', date).in('student_id', students.map(s => s.id))
+    for (const c of (checkins ?? [])) {
+      if (forms[c.student_id]) forms[c.student_id] = { ...forms[c.student_id], late: c.late }
+    }
+
     const { data: recs } = await supabase.from('records').select('*').in('student_id', students.map(s => s.id)).eq('date', date).eq('is_draft', false)
     if (recs && recs.length > 0) {
       const recIdList = recs.map(r => r.id)
