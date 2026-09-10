@@ -1,6 +1,5 @@
 'use client'
 import { useEffect, useState } from 'react'
-import * as XLSX from 'xlsx-js-style'
 import { supabase } from '@/lib/supabase'
 import { kstDateStr, kstNow } from '@/lib/kst'
 import AutoGrowTextarea from '@/components/AutoGrowTextarea'
@@ -16,55 +15,6 @@ const tx = '#0D1B36', tx2 = '#4B5C7E', tx3 = '#96A4BF'
 const re = '#C0392B', gr = '#1A7F4E'
 
 const DOW = ['일', '월', '화', '수', '목', '금', '토']
-
-// ── 엑셀 스타일(반관리 > 선생님 출근부 다운로드와 동일한 방식: xlsx-js-style로 셀 단위 스타일 지정) ──
-const XLSX_FONT = '맑은 고딕'
-function setCell(ws: XLSX.WorkSheet, r: number, c: number, style: XLSX.CellStyle) {
-  const addr = XLSX.utils.encode_cell({ r, c })
-  if (!ws[addr]) ws[addr] = { t: 's', v: '' }
-  ws[addr].s = style
-}
-function titleStyle(): XLSX.CellStyle {
-  return { font: { name: XLSX_FONT, sz: 16, bold: true, color: { rgb: '0D2A5E' } }, fill: { fgColor: { rgb: 'E8EEF8' }, patternType: 'solid' }, alignment: { horizontal: 'center', vertical: 'center' }, border: allBorder() }
-}
-function sectionStyle(): XLSX.CellStyle {
-  return { font: { name: XLSX_FONT, sz: 12, bold: true, color: { rgb: '0D2A5E' } }, fill: { fgColor: { rgb: 'E8EEF8' }, patternType: 'solid' }, alignment: { horizontal: 'left', vertical: 'center' }, border: allBorder() }
-}
-function bodyStyle(): XLSX.CellStyle {
-  return { font: { name: XLSX_FONT, sz: 11, color: { rgb: '1A1A1A' } }, alignment: { horizontal: 'left', vertical: 'top', wrapText: true }, border: allBorder() }
-}
-function infoLabelStyle(): XLSX.CellStyle {
-  return { font: { name: XLSX_FONT, sz: 11, bold: true, color: { rgb: 'D87E13' } }, fill: { fgColor: { rgb: 'FEF3E2' }, patternType: 'solid' }, alignment: { horizontal: 'center', vertical: 'center' }, border: allBorder() }
-}
-function infoValueStyle(): XLSX.CellStyle {
-  return { font: { name: XLSX_FONT, sz: 12, bold: true, color: { rgb: '1A1A1A' } }, alignment: { horizontal: 'center', vertical: 'center' }, border: allBorder() }
-}
-function noteStyle(): XLSX.CellStyle {
-  return { font: { name: XLSX_FONT, sz: 9, color: { rgb: '96A4BF' } }, alignment: { horizontal: 'left', vertical: 'center' } }
-}
-function allBorder() {
-  const line = { style: 'thin' as const, color: { rgb: 'CCCCCC' } }
-  return { top: line, bottom: line, left: line, right: line }
-}
-function sheetName(name: string, used: Set<string>) {
-  const base = (name.replace(/[\\/?*[\]:]/g, '').trim() || '학생').slice(0, 31)
-  let candidate = base, n = 2
-  while (used.has(candidate)) {
-    const suffix = '_' + n
-    candidate = base.slice(0, 31 - suffix.length) + suffix
-    n++
-  }
-  used.add(candidate)
-  return candidate
-}
-
-const NOTE_LINES = [
-  '- 숙제를 해 오지 않을 시 원활한 수업이 어렵습니다.',
-  '- 숙제만큼은 책임감을 갖고 수행할 것!!!',
-  '- 중단원 종료 후 10문항 테스트',
-  '- 대단원 종료 후 22문항 테스트',
-  '- 당일 숙제는 부담이 큽니다. 계획을 세워서 분산시켜 공부하세요.',
-]
 
 // 반관리·수업기록에서 공유하는 '수업 준비' 팝업 — 학생별 지난 숙제를 자동으로 불러와 보여주고,
 // 오늘의 진도를 입력해 학생별 "오늘의 공부" 안내문(엑셀, 한 시트=한 학생)을 생성한다.
@@ -142,55 +92,34 @@ export default function ClassPrepModal({
       const { error: saveErr } = await supabase.from('class_prep_progress').upsert(rows, { onConflict: 'student_id,date' })
       if (saveErr) { toast('저장 실패: ' + saveErr.message, false); setGenerating(false); return }
 
-      // 2) 학생별 한 시트씩 "오늘의 공부" 안내문 생성
-      const wb = XLSX.utils.book_new()
-      const used = new Set<string>()
-      for (const s of checkedStudents) {
-        const aoa: (string | number)[][] = [
-          ['오늘의 공부', '', '', '', '', '', '', '', '', ''],
-          ['날짜', dateLabel, '', '', '', '', '학교', s.school || '', '', ''],
-          ['', '', '', '', '', '', '이름', s.name, '', ''],
-          ['', '', '', '', '', '', '', '', '', ''],
-          ['1. 숙제 채점 및 오답 정리', '', '', '', '', '', '', '', '', ''],
-          [prevHomework[s.id] || '(지난 숙제 없음)', '', '', '', '', '', '', '', '', ''],
-          ['', '', '', '', '', '', '', '', '', ''],
-          ['2. 오늘의 진도', '', '', '', '', '', '', '', '', ''],
-          [progress[s.id] || '', '', '', '', '', '', '', '', '', ''],
-          ...Array.from({ length: 12 }, () => ['', '', '', '', '', '', '', '', '', '']),
-          ['참고', '', '', '', '', '', '', '', '', ''],
-          ...NOTE_LINES.map(l => [l, '', '', '', '', '', '', '', '', '']),
-        ]
-        const ws = XLSX.utils.aoa_to_sheet(aoa)
-        ws['!merges'] = [
-          { s: { r: 0, c: 0 }, e: { r: 0, c: 9 } },
-          { s: { r: 1, c: 1 }, e: { r: 1, c: 5 } },
-          { s: { r: 1, c: 7 }, e: { r: 1, c: 9 } },
-          { s: { r: 2, c: 0 }, e: { r: 2, c: 6 } },
-          { s: { r: 2, c: 7 }, e: { r: 2, c: 9 } },
-          { s: { r: 4, c: 0 }, e: { r: 4, c: 9 } },
-          { s: { r: 5, c: 0 }, e: { r: 5, c: 9 } },
-          { s: { r: 7, c: 0 }, e: { r: 7, c: 9 } },
-          { s: { r: 8, c: 0 }, e: { r: 8, c: 9 } },
-          { s: { r: 20, c: 0 }, e: { r: 20, c: 9 } },
-          ...NOTE_LINES.map((_, i) => ({ s: { r: 21 + i, c: 0 }, e: { r: 21 + i, c: 9 } })),
-        ]
-        ws['!cols'] = Array.from({ length: 10 }, () => ({ wch: 9 }))
-        ws['!rows'] = aoa.map((_, i) => (i === 5 || i === 8 ? { hpt: 60 } : undefined)) as any
-
-        setCell(ws, 0, 0, titleStyle())
-        setCell(ws, 1, 0, infoLabelStyle()); setCell(ws, 1, 1, infoValueStyle())
-        setCell(ws, 1, 7, infoLabelStyle()); setCell(ws, 1, 8, infoValueStyle())
-        setCell(ws, 2, 0, infoLabelStyle()); setCell(ws, 2, 7, infoLabelStyle()); setCell(ws, 2, 8, infoValueStyle())
-        setCell(ws, 4, 0, sectionStyle())
-        setCell(ws, 5, 0, bodyStyle())
-        setCell(ws, 7, 0, sectionStyle())
-        setCell(ws, 8, 0, bodyStyle())
-        setCell(ws, 20, 0, sectionStyle())
-        NOTE_LINES.forEach((_, i) => setCell(ws, 21 + i, 0, noteStyle()))
-
-        XLSX.utils.book_append_sheet(wb, ws, sheetName(s.name, used))
+      // 2) 학생별로 today study.xlsx 원본 양식을 100% 그대로 복제해서 안내문 생성
+      //    (서버에서 원본 파일의 sharedStrings 5곳만 실제 값으로 치환 — 스타일/로고/
+      //    인쇄설정 등은 전혀 건드리지 않는다) → 학생별 파일을 zip으로 묶어 다운로드
+      const res = await fetch('/api/class-prep', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          className, dateLabel,
+          students: checkedStudents.map(s => ({
+            name: s.name, school: s.school || '',
+            prevHomework: prevHomework[s.id] || '', progress: progress[s.id] || '',
+          })),
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => null)
+        toast('생성 실패: ' + (err?.error ?? res.statusText), false)
+        return
       }
-      XLSX.writeFile(wb, `오늘의공부_${className}_${today}.xlsx`)
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `오늘의공부_${className}_${today}.zip`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
       toast(`${checkedStudents.length}명 안내문 생성 완료`)
     } catch (e: any) {
       toast('생성 실패: ' + e.message, false)
@@ -227,7 +156,8 @@ export default function ClassPrepModal({
           )}
 
           <p style={{ fontSize: 12, color: tx3, marginBottom: 14 }}>
-            학생을 선택하고 오늘의 진도를 입력하면, 학생별 "오늘의 공부" 안내문(엑셀)이 한 시트씩 생성됩니다.
+            학생을 선택하고 오늘의 진도를 입력하면, 학생별 "오늘의 공부" 안내문(엑셀, 원본 양식 그대로)이
+            한 명당 한 파일씩 생성되어 zip으로 묶여 다운로드됩니다.
             입력한 진도는 오늘 날짜의 수업기록 작성 시 수업 내용(진도)에 자동으로 반영됩니다.
           </p>
 
