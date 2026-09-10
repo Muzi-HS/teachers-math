@@ -135,9 +135,12 @@ export async function POST(req: NextRequest) {
         `<mergeCells count="${mergesPerBlock * students.length}">${mergeBlocks.join('')}</mergeCells>`,
       )
       .replace(/<dimension ref="A1:J\d+"\/>/, `<dimension ref="A1:J${totalRows}"/>`)
-      // fitToPage(전체를 1페이지로 압축) 상태에서 fitToHeight를 명시적으로 0으로 두어
-      // 세로로는 압축하지 않고(가로만 1페이지 폭에 맞춤) 페이지 나누기가 그대로 반영되게 한다.
-      .replace(/<pageSetup ([^/]*)\/>/, (_, attrs) => `<pageSetup ${attrs} fitToWidth="1" fitToHeight="0"/>`)
+      // 원본 템플릿은 fitToPage(1페이지에 맞춤)로 46행을 정확히 1페이지에 압축하도록 되어 있다.
+      // fitToHeight를 0(무제한)으로 두면 실제 행 높이 기준으로 자연 페이지 나누기가 발생해
+      // 우리가 넣은 강제 나누기(46행 단위)와 어긋나면서 빈 페이지가 생긴다.
+      // 대신 "1페이지 폭 × 학생 수만큼의 세로 페이지"에 맞추도록 지정하면 총 콘텐츠가
+      // 정확히 학생 수만큼의 페이지에 맞는 배율로 압축되어, 46행 단위 강제 나누기와 일치한다.
+      .replace(/<pageSetup ([^/]*)\/>/, (_, attrs) => `<pageSetup ${attrs} fitToWidth="1" fitToHeight="${students.length}"/>`)
 
     // 학생 블록 경계마다 강제 페이지 나누기 삽입 (마지막 블록 뒤는 제외)
     if (students.length > 1) {

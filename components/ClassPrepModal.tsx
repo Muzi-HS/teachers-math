@@ -16,6 +16,14 @@ const re = '#C0392B', gr = '#1A7F4E'
 
 const DOW = ['일', '월', '화', '수', '목', '금', '토']
 
+// 지난 숙제·오늘의 진도 입력란은 항상 맨 앞에 스페이스 2칸이 들어간 상태로 입력하도록 한다.
+function withLeadingSpaces(v: string) {
+  return '  ' + (v ?? '').replace(/^ +/, '')
+}
+function hasContent(v?: string) {
+  return !!(v && v.trim())
+}
+
 // 반관리·수업기록에서 공유하는 '수업 준비' 팝업 — 학생별 지난 숙제를 자동으로 불러와 보여주고,
 // 오늘의 진도를 입력해 학생별 "오늘의 공부" 안내문(엑셀, 한 시트=한 학생)을 생성한다.
 // 여기서 입력한 진도는 class_prep_progress에 저장되어, 같은 날짜로 "수업기록 작성"을 열면
@@ -54,7 +62,7 @@ export default function ClassPrepModal({
       .order('date', { ascending: false })
     const prevHw: Record<number, string> = {}
     for (const r of (recs ?? [])) {
-      if (!(r.student_id in prevHw)) prevHw[r.student_id] = r.homework ?? ''
+      if (!(r.student_id in prevHw)) prevHw[r.student_id] = withLeadingSpaces(r.homework ?? '')
     }
 
     // 이미 오늘자로 준비해둔 진도가 있으면 이어서 편집 가능하도록 불러오기
@@ -62,10 +70,12 @@ export default function ClassPrepModal({
       .from('class_prep_progress').select('student_id, progress, prev_homework')
       .in('student_id', ids).eq('date', today)
     const progInit: Record<number, string> = {}
+    students.forEach(s => { progInit[s.id] = '  ' })
     for (const p of (preps ?? [])) {
-      progInit[p.student_id] = p.progress ?? ''
-      if (p.prev_homework) prevHw[p.student_id] = p.prev_homework
+      progInit[p.student_id] = withLeadingSpaces(p.progress ?? '')
+      if (hasContent(p.prev_homework)) prevHw[p.student_id] = withLeadingSpaces(p.prev_homework)
     }
+    students.forEach(s => { if (!(s.id in prevHw)) prevHw[s.id] = '  ' })
 
     setChks(chksInit)
     setPrevHomework(prevHw)
@@ -86,7 +96,8 @@ export default function ClassPrepModal({
       // 1) class_prep_progress에 저장 — 수업기록 작성 시 진도 자동 반영용
       const rows = checkedStudents.map(s => ({
         student_id: s.id, date: today,
-        progress: progress[s.id] ?? '', prev_homework: prevHomework[s.id] ?? '',
+        progress: hasContent(progress[s.id]) ? progress[s.id] : '',
+        prev_homework: hasContent(prevHomework[s.id]) ? prevHomework[s.id] : '',
         updated_at: new Date().toISOString(),
       }))
       const { error: saveErr } = await supabase.from('class_prep_progress').upsert(rows, { onConflict: 'student_id,date' })
@@ -102,7 +113,8 @@ export default function ClassPrepModal({
           className, dateLabel,
           students: checkedStudents.map(s => ({
             name: s.name, school: s.school || '',
-            prevHomework: prevHomework[s.id] || '', progress: progress[s.id] || '',
+            prevHomework: hasContent(prevHomework[s.id]) ? prevHomework[s.id] : '',
+            progress: hasContent(progress[s.id]) ? progress[s.id] : '',
           })),
         }),
       })
@@ -172,11 +184,11 @@ export default function ClassPrepModal({
               </label>
               <div style={{ marginBottom: 8 }}>
                 <label className="cp-lb" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><IconPencil size={12} /> 지난 숙제 (자동 입력됨 — 수정 가능)</label>
-                <AutoGrowTextarea className="cp-fi" rows={2} value={prevHomework[s.id] ?? ''} onChange={e => setPrevHomework(p => ({ ...p, [s.id]: e.target.value }))} placeholder="이전 숙제 내용" />
+                <AutoGrowTextarea className="cp-fi" rows={2} value={prevHomework[s.id] ?? '  '} onChange={e => setPrevHomework(p => ({ ...p, [s.id]: withLeadingSpaces(e.target.value) }))} placeholder="이전 숙제 내용" />
               </div>
               <div>
                 <label className="cp-lb" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><IconBook size={12} /> 오늘의 진도</label>
-                <AutoGrowTextarea className="cp-fi" rows={2} value={progress[s.id] ?? ''} onChange={e => setProgress(p => ({ ...p, [s.id]: e.target.value }))} placeholder="예) 이차함수 그래프 변환 (p.45~52)" />
+                <AutoGrowTextarea className="cp-fi" rows={2} value={progress[s.id] ?? '  '} onChange={e => setProgress(p => ({ ...p, [s.id]: withLeadingSpaces(e.target.value) }))} placeholder="예) 이차함수 그래프 변환 (p.45~52)" />
               </div>
             </div>
           ))}
