@@ -82,6 +82,15 @@ export default function ClassBulkRecordModal({
       if (forms[c.student_id]) forms[c.student_id] = { ...forms[c.student_id], late: c.late }
     }
 
+    // 반관리 '수업 준비'에서 미리 입력해둔 오늘의 진도를 자동 반영 — 아직 저장된
+    // 기록이 없는 학생만 적용하고, 이미 저장된 기록이 있으면 그 값이 그대로 우선한다.
+    const { data: preps } = await supabase
+      .from('class_prep_progress').select('student_id, progress')
+      .eq('date', date).in('student_id', students.map(s => s.id))
+    for (const p of (preps ?? [])) {
+      if (forms[p.student_id] && p.progress) forms[p.student_id] = { ...forms[p.student_id], content: p.progress }
+    }
+
     const { data: recs } = await supabase.from('records').select('*').in('student_id', students.map(s => s.id)).eq('date', date).eq('is_draft', false)
     if (recs && recs.length > 0) {
       const recIdList = recs.map(r => r.id)

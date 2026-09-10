@@ -6,6 +6,7 @@ import { can } from '@/lib/permissions'
 import { useSearchParams } from 'next/navigation'
 import { kstDateStr } from '@/lib/kst'
 import ClassBulkRecordModal from '@/components/ClassBulkRecordModal'
+import ClassPrepModal from '@/components/ClassPrepModal'
 import { IconClock } from '@/components/icons'
 import { useMobileMode } from '@/context/MobileModeContext'
 
@@ -65,6 +66,7 @@ export default function ClassesPage() {
   const [ageFilter, setAgeFilter] = useState('')
   // mBulkRec (반 수업기록 일괄) — 실제 폼/저장 로직은 ClassBulkRecordModal 컴포넌트가 담당
   const [bulkModal, setBulkModal] = useState(false)
+  const [prepModal, setPrepModal] = useState(false)
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
   const [notif, setNotif] = useState<{ msg: string; ok: boolean } | null>(null)
@@ -397,6 +399,10 @@ export default function ClassesPage() {
           </div>
           {/* v18: bprim 수업기록작성 + bgold 학생추가 (학생추가는 admin만) */}
           <div style={{ display: 'flex', gap: 8 }}>
+            <button className="bout" onClick={() => setPrepModal(true)}>
+              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth={2} d="M9 12h6M9 16h6M9 8h6M5 4h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1z" /></svg>
+              수업 준비
+            </button>
             <button className="bprim" onClick={() => setBulkModal(true)}>
               <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth={2} d="M11 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-4M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
               수업기록 작성
@@ -621,6 +627,16 @@ export default function ClassesPage() {
           tests={tests}
           onClose={() => setBulkModal(false)}
           onSaved={fetchAll}
+        />
+      )}
+
+      {/* ════ 수업 준비: 학생별 "오늘의 공부" 안내문 생성 ════ */}
+      {prepModal && detailCls && (
+        <ClassPrepModal
+          classId={detailCls.id}
+          className={detailCls.name}
+          students={detailStus}
+          onClose={() => setPrepModal(false)}
         />
       )}
 
