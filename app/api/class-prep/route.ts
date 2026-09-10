@@ -4,22 +4,19 @@ import path from 'path'
 import JSZip from 'jszip'
 
 // today study.xlsx 원본 양식을 100% 그대로 복제해서(스타일/로고/머리말/인쇄설정 등 전부 유지),
-// 학생마다 시트를 하나씩 추가한 "한 개의 워크북(여러 시트)"을 생성한다.
+// 시트 1개 안에 학생별 블록(원본과 동일한 46행 레이아웃)을 세로로 이어 붙이고,
+// 블록 경계마다 강제 페이지 나누기를 넣어 인쇄 시 학생별로 페이지가 나뉘도록 만든다.
 // sharedStrings.xml은 워크북 전체에서 공유되므로, 학생별로 필요한 5개 문구
-// (날짜/학교명/이름/지난숙제/오늘의진도)를 각각 새 항목으로 추가하고,
-// 원본 시트(xl/worksheets/sheet1.xml)를 복제한 시트에서 해당 셀이 그 새 인덱스를
-// 참조하도록 바꿔치기한다.
+// (날짜/학교명/이름/지난숙제/오늘의진도)를 각각 새 항목으로 추가하고
+// 해당 블록의 셀이 그 새 인덱스를 참조하도록 patch한다.
 const TEMPLATE_PATH = path.join(process.cwd(), 'lib', 'templates', 'today-study-template.xlsx')
+
+// 원본 시트 1블록의 높이(행 수) — dimension ref="A1:J46" 기준
+const ROWS_PER_BLOCK = 46
 
 // 원본 시트에서 5개 문구가 들어가는 셀 좌표(A5=날짜, H5=학교명, H7=이름, A12=지난숙제, A17=오늘의 진도)
 const CELL_REFS = { date: 'A5', school: 'H5', name: 'H7', prevHomework: 'A12', progress: 'A17' } as const
 
-// 원본 sharedStrings.xml에서 위 셀들이 가리키는 최초 인덱스(0-indexed) — 1번째(첫) 학생 시트는 그대로 재사용
-const SI_DATE = 1
-const SI_SCHOOL = 2
-const SI_NAME = 3
-const SI_PREV_HW = 7
-const SI_PROGRESS = 8
 const ORIGINAL_UNIQUE_COUNT = 14 // 원본 sharedStrings.xml의 <si> 총 개수
 
 function escapeXml(s: string) {
@@ -28,35 +25,39 @@ function escapeXml(s: string) {
     .replace(/"/g, '&quot;').replace(/\r\n/g, '\n')
 }
 
-function patchSharedStringsInPlace(xml: string, replacements: Record<number, string>): string {
-  let idx = -1
-  return xml.replace(/<si>[\s\S]*?<\/si>/g, (block) => {
-    idx++
-    if (!(idx in replacements)) return block
-    const text = escapeXml(replacements[idx] ?? '')
-    return block.replace(/<t[^>]*>[\s\S]*?<\/t>/, `<t xml:space="preserve">${text}</t>`)
-  })
-}
-
 function sanitizeFileName(name: string) {
   return name.replace(/[\\/:*?"<>|]/g, '').trim() || '학생'
 }
 
-// 엑셀 시트명 규칙: \ / ? * [ ] : 사용 불가, 31자 이하, 공백만으로는 불가
 function sanitizeSheetName(name: string) {
   const cleaned = name.replace(/[\\/?*[\]:]/g, '').trim() || '학생'
   return cleaned.slice(0, 31)
 }
 
-function dedupeSheetNames(names: string[]): string[] {
-  const seen = new Map<string, number>()
-  return names.map(n => {
-    const count = seen.get(n) ?? 0
-    seen.set(n, count + 1)
-    if (count === 0) return n
-    const suffix = `_${count + 1}`
-    return n.slice(0, 31 - suffix.length) + suffix
-  })
+// <row r="N" ...>...<c r="A5" .../>...</row> 형태의 행 번호(r 속성)를 offset만큼 밀어준다.
+function shiftRowRefs(xml: string, offset: number): string {
+  if (offset === 0) return xml
+  return xml
+    .replace(/(<row r=")(\d+)(")/g, (_, a, n, b) => a + (Number(n) + offset) + b)
+    .replace(/(<c r="[A-Z]+)(\d+)(")/g, (_, a, n, b) => a + (Number(n) + offset) + b)
+}
+
+// <mergeCell ref="A1:J4"/> 형태의 좌표를 offset만큼 밀어준다.
+function shiftMergeRefs(xml: string, offset: number): string {
+  if (offset === 0) return xml
+  return xml.replace(/([A-Z]+)(\d+):([A-Z]+)(\d+)/g, (_, c1, r1, c2, r2) =>
+    `${c1}${Number(r1) + offset}:${c2}${Number(r2) + offset}`)
+}
+
+// 지정한 셀(A5 등, offset 적용 전 원본 좌표 기준)의 <v> 값을 새 shared string 인덱스로 바꾼다.
+function patchCellValue(blockXml: string, ref: string, offset: number, newIndex: number): string {
+  const shiftedRow = Number(ref.match(/\d+/)![0]) + offset
+  const col = ref.match(/[A-Z]+/)![0]
+  const shiftedRef = `${col}${shiftedRow}`
+  return blockXml.replace(
+    new RegExp(`(<c r="${shiftedRef}"[^>]*><v>)\\d+(</v></c>)`),
+    `$1${newIndex}$2`,
+  )
 }
 
 type StudentInput = { name: string; school: string; prevHomework: string; progress: string }
@@ -73,42 +74,29 @@ export async function POST(req: NextRequest) {
     const templateBuf = await readFile(TEMPLATE_PATH)
     const zip = await JSZip.loadAsync(templateBuf)
 
-    const sheet1XmlOriginal = await zip.file('xl/worksheets/sheet1.xml')?.async('string')
-    const sheet1RelsOriginal = await zip.file('xl/worksheets/_rels/sheet1.xml.rels')?.async('string')
+    const sheetXmlOriginal = await zip.file('xl/worksheets/sheet1.xml')?.async('string')
     let sharedStringsXml = await zip.file('xl/sharedStrings.xml')?.async('string')
     let workbookXml = await zip.file('xl/workbook.xml')?.async('string')
-    let workbookRelsXml = await zip.file('xl/_rels/workbook.xml.rels')?.async('string')
-    let contentTypesXml = await zip.file('[Content_Types].xml')?.async('string')
-    if (!sheet1XmlOriginal || !sheet1RelsOriginal || !sharedStringsXml || !workbookXml || !workbookRelsXml || !contentTypesXml) {
+    if (!sheetXmlOriginal || !sharedStringsXml || !workbookXml) {
       return NextResponse.json({ error: '템플릿 파일을 읽을 수 없습니다.' }, { status: 500 })
     }
 
-    const sheetNames = dedupeSheetNames(students.map(s => sanitizeSheetName(s.name)))
-
-    // 1) 첫 번째 학생 — 기존 sheet1.xml/시트1 그대로 사용, sharedStrings의 원래 인덱스만 치환
-    const first = students[0]
-    sharedStringsXml = patchSharedStringsInPlace(sharedStringsXml, {
-      [SI_DATE]: dateLabel,
-      [SI_SCHOOL]: first.school || '',
-      [SI_NAME]: first.name,
-      [SI_PREV_HW]: first.prevHomework || '(지난 숙제 없음)',
-      [SI_PROGRESS]: first.progress || '',
-    })
-    // workbook.xml의 첫 시트 이름을 학생 이름으로 변경
-    workbookXml = workbookXml.replace(/<sheet name="Sheet1"/, `<sheet name="${escapeXml(sheetNames[0])}"`)
+    const sheetDataMatch = sheetXmlOriginal.match(/<sheetData>([\s\S]*?)<\/sheetData>/)
+    const mergeCellsMatch = sheetXmlOriginal.match(/<mergeCells count="(\d+)">([\s\S]*?)<\/mergeCells>/)
+    if (!sheetDataMatch || !mergeCellsMatch) {
+      return NextResponse.json({ error: '원본 시트 구조를 해석할 수 없습니다.' }, { status: 500 })
+    }
+    const sheetDataTemplate = sheetDataMatch[1]
+    const mergeCellsTemplate = mergeCellsMatch[2]
+    const mergesPerBlock = Number(mergeCellsMatch[1])
 
     let nextSiIndex = ORIGINAL_UNIQUE_COUNT
     const newSiBlocks: string[] = []
-    const newSheetEntries: string[] = []
-    const newRelEntries: string[] = []
-    const newContentTypeEntries: string[] = []
-    let nextRelId = 5 // rId1~4는 워크북 레벨에서 이미 사용 중(sheet1/theme/styles/sharedStrings)
-    let nextSheetId = 2
+    const blocks: string[] = []
+    const mergeBlocks: string[] = []
 
-    // 2) 두 번째 학생부터 — 시트를 복제하고 필요한 5개 문구를 새 shared string으로 추가
-    for (let i = 1; i < students.length; i++) {
-      const s = students[i]
-      const sheetNum = i + 1
+    students.forEach((s, i) => {
+      const offset = i * ROWS_PER_BLOCK
       const idxDate = nextSiIndex++
       const idxSchool = nextSiIndex++
       const idxName = nextSiIndex++
@@ -123,45 +111,49 @@ export async function POST(req: NextRequest) {
         `<si><t xml:space="preserve">${escapeXml(s.progress || '')}</t></si>`,
       )
 
-      let sheetXml = sheet1XmlOriginal
-      const cellPatches: Array<[string, number]> = [
-        [CELL_REFS.date, idxDate],
-        [CELL_REFS.school, idxSchool],
-        [CELL_REFS.name, idxName],
-        [CELL_REFS.prevHomework, idxPrevHw],
-        [CELL_REFS.progress, idxProgress],
-      ]
-      for (const [ref, idx] of cellPatches) {
-        sheetXml = sheetXml.replace(
-          new RegExp(`(<c r="${ref}"[^>]*><v>)\\d+(</v></c>)`),
-          `$1${idx}$2`,
-        )
-      }
+      let block = shiftRowRefs(sheetDataTemplate, offset)
+      block = patchCellValue(block, CELL_REFS.date, offset, idxDate)
+      block = patchCellValue(block, CELL_REFS.school, offset, idxSchool)
+      block = patchCellValue(block, CELL_REFS.name, offset, idxName)
+      block = patchCellValue(block, CELL_REFS.prevHomework, offset, idxPrevHw)
+      block = patchCellValue(block, CELL_REFS.progress, offset, idxProgress)
+      blocks.push(block)
 
-      zip.file(`xl/worksheets/sheet${sheetNum}.xml`, sheetXml)
-      zip.file(`xl/worksheets/_rels/sheet${sheetNum}.xml.rels`, sheet1RelsOriginal)
+      mergeBlocks.push(shiftMergeRefs(mergeCellsTemplate, offset))
+    })
 
-      const relId = `rId${nextRelId++}`
-      const sheetId = nextSheetId++
-      newSheetEntries.push(`<sheet name="${escapeXml(sheetNames[i])}" sheetId="${sheetId}" r:id="${relId}"/>`)
-      newRelEntries.push(`<Relationship Id="${relId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${sheetNum}.xml"/>`)
-      newContentTypeEntries.push(`<Override PartName="/xl/worksheets/sheet${sheetNum}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`)
+    const totalRows = students.length * ROWS_PER_BLOCK
+    const newCount = ORIGINAL_UNIQUE_COUNT + newSiBlocks.length
+    sharedStringsXml = sharedStringsXml
+      .replace(/count="\d+" uniqueCount="\d+"/, `count="${newCount}" uniqueCount="${newCount}"`)
+      .replace('</sst>', newSiBlocks.join('') + '</sst>')
+
+    let sheetXml = sheetXmlOriginal
+      .replace(/<sheetData>[\s\S]*?<\/sheetData>/, `<sheetData>${blocks.join('')}</sheetData>`)
+      .replace(
+        /<mergeCells count="\d+">[\s\S]*?<\/mergeCells>/,
+        `<mergeCells count="${mergesPerBlock * students.length}">${mergeBlocks.join('')}</mergeCells>`,
+      )
+      .replace(/<dimension ref="A1:J\d+"\/>/, `<dimension ref="A1:J${totalRows}"/>`)
+      // fitToPage(전체를 1페이지로 압축) 상태에서 fitToHeight를 명시적으로 0으로 두어
+      // 세로로는 압축하지 않고(가로만 1페이지 폭에 맞춤) 페이지 나누기가 그대로 반영되게 한다.
+      .replace(/<pageSetup ([^/]*)\/>/, (_, attrs) => `<pageSetup ${attrs} fitToWidth="1" fitToHeight="0"/>`)
+
+    // 학생 블록 경계마다 강제 페이지 나누기 삽입 (마지막 블록 뒤는 제외)
+    if (students.length > 1) {
+      const breaks = Array.from({ length: students.length - 1 }, (_, i) =>
+        `<brk id="${(i + 1) * ROWS_PER_BLOCK}" max="16383" man="1"/>`).join('')
+      const rowBreaksXml = `<rowBreaks count="${students.length - 1}" manualBreakCount="${students.length - 1}">${breaks}</rowBreaks>`
+      sheetXml = sheetXml.includes('</headerFooter>')
+        ? sheetXml.replace('</headerFooter>', '</headerFooter>' + rowBreaksXml)
+        : sheetXml.replace('<legacyDrawingHF', rowBreaksXml + '<legacyDrawingHF')
     }
 
-    if (newSiBlocks.length > 0) {
-      const newCount = ORIGINAL_UNIQUE_COUNT + newSiBlocks.length
-      sharedStringsXml = sharedStringsXml
-        .replace(/count="\d+" uniqueCount="\d+"/, `count="${newCount}" uniqueCount="${newCount}"`)
-        .replace('</sst>', newSiBlocks.join('') + '</sst>')
-      workbookXml = workbookXml.replace('</sheets>', newSheetEntries.join('') + '</sheets>')
-      workbookRelsXml = workbookRelsXml.replace('</Relationships>', newRelEntries.join('') + '</Relationships>')
-      contentTypesXml = contentTypesXml.replace('</Types>', newContentTypeEntries.join('') + '</Types>')
-    }
+    workbookXml = workbookXml.replace(/<sheet name="[^"]*"/, `<sheet name="${escapeXml(sanitizeSheetName(className))}"`)
 
+    zip.file('xl/worksheets/sheet1.xml', sheetXml)
     zip.file('xl/sharedStrings.xml', sharedStringsXml)
     zip.file('xl/workbook.xml', workbookXml)
-    zip.file('xl/_rels/workbook.xml.rels', workbookRelsXml)
-    zip.file('[Content_Types].xml', contentTypesXml)
 
     const xlsxBuf = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } })
     const fileName = `오늘의공부_${sanitizeFileName(className)}.xlsx`

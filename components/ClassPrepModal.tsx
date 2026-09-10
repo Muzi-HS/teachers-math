@@ -92,9 +92,9 @@ export default function ClassPrepModal({
       const { error: saveErr } = await supabase.from('class_prep_progress').upsert(rows, { onConflict: 'student_id,date' })
       if (saveErr) { toast('저장 실패: ' + saveErr.message, false); setGenerating(false); return }
 
-      // 2) today study.xlsx 원본 양식을 100% 그대로 복제해서 학생별 시트를 담은
-      //    엑셀 워크북 한 개(시트 여러 장)를 생성 — 스타일/로고/인쇄설정 등은
-      //    전혀 건드리지 않고, 서버에서 시트별로 필요한 값만 채워 넣는다.
+      // 2) today study.xlsx 원본 양식을 100% 그대로 복제해서 시트 1개 안에
+      //    학생별 블록을 이어 붙인 엑셀 파일을 생성 — 블록 경계마다 강제
+      //    페이지 나누기를 넣어 인쇄 시 학생별로 페이지가 나뉘도록 한다.
       const res = await fetch('/api/class-prep', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -157,7 +157,7 @@ export default function ClassPrepModal({
 
           <p style={{ fontSize: 12, color: tx3, marginBottom: 14 }}>
             학생을 선택하고 오늘의 진도를 입력하면, 학생별 "오늘의 공부" 안내문(엑셀, 원본 양식 그대로)이
-            한 워크북에 학생별 시트로 담겨 파일 1개로 다운로드됩니다.
+            시트 1개에 학생별 페이지로 담겨 파일 1개로 다운로드됩니다. (인쇄 시 학생별로 페이지가 나뉩니다)
             입력한 진도는 오늘 날짜의 수업기록 작성 시 수업 내용(진도)에 자동으로 반영됩니다.
           </p>
 
