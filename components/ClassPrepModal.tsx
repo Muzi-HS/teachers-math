@@ -40,6 +40,7 @@ export default function ClassPrepModal({
   const [chks, setChks] = useState<Record<number, boolean>>({})
   const [prevHomework, setPrevHomework] = useState<Record<number, string>>({})
   const [progress, setProgress] = useState<Record<number, string>>({})
+  const [bulkProgress, setBulkProgress] = useState('')
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [notif, setNotif] = useState<{ msg: string; ok: boolean } | null>(null)
@@ -84,6 +85,17 @@ export default function ClassPrepModal({
   }
 
   const checkedStudents = students.filter(s => chks[s.id])
+
+  function applyBulkProgress() {
+    if (checkedStudents.length === 0) return toast('학생을 1명 이상 선택하세요.', false)
+    const value = withLeadingSpaces(bulkProgress)
+    setProgress(p => {
+      const next = { ...p }
+      for (const s of checkedStudents) next[s.id] = value
+      return next
+    })
+    toast(`${checkedStudents.length}명에게 오늘의 진도를 일괄 적용했습니다.`)
+  }
 
   async function generate() {
     if (checkedStudents.length === 0) return toast('학생을 1명 이상 선택하세요.', false)
@@ -172,6 +184,18 @@ export default function ClassPrepModal({
             시트 1개에 학생별 페이지로 담겨 파일 1개로 다운로드됩니다. (인쇄 시 학생별로 페이지가 나뉩니다)
             입력한 진도는 오늘 날짜의 수업기록 작성 시 수업 내용(진도)에 자동으로 반영됩니다.
           </p>
+
+          {!loading && (
+            <div className="cp-card" style={{ background: bg }}>
+              <label className="cp-lb" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><IconBook size={12} /> 오늘의 진도 일괄입력 (선택된 학생 전체에 동일하게 적용)</label>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                <AutoGrowTextarea className="cp-fi" rows={2} value={bulkProgress} onChange={e => setBulkProgress(e.target.value)} placeholder="예) 이차함수 그래프 변환 (p.45~52)" />
+                <button onClick={applyBulkProgress} style={{ flexShrink: 0, padding: '9px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600, border: `1px solid ${navy}`, background: '#fff', color: navy, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  전체 적용
+                </button>
+              </div>
+            </div>
+          )}
 
           {loading ? (
             <p style={{ textAlign: 'center', color: tx3, fontSize: 13, padding: '30px 0' }}>불러오는 중...</p>
