@@ -681,12 +681,12 @@ export default function RecordsPage() {
                   <div key={r.id} className="rc" style={isHighlighted(r) ? { border: `2px solid ${hlYellow}` } : undefined}>
                     {/* 카드 헤더 */}
                     <div className="rch">
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, flexShrink: 0 }}>
                         <div className="sav">{stu?.name[0] ?? '?'}</div>
                         <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <b style={{ fontSize: 13, color: navy }}>{stu?.name ?? '알 수 없음'}</b>
-                            {cls && <span className="badge" style={{ background: navyM, color: navy }}>{cls.name}</span>}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'nowrap' }}>
+                            <b style={{ fontSize: 13, color: navy, whiteSpace: 'nowrap' }}>{stu?.name ?? '알 수 없음'}</b>
+                            {cls && <span className="badge" style={{ background: navyM, color: navy, whiteSpace: 'nowrap' }}>{cls.name}</span>}
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', marginTop: 4 }}>
                             {r.late
