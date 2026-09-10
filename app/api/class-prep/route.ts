@@ -135,12 +135,12 @@ export async function POST(req: NextRequest) {
         `<mergeCells count="${mergesPerBlock * students.length}">${mergeBlocks.join('')}</mergeCells>`,
       )
       .replace(/<dimension ref="A1:J\d+"\/>/, `<dimension ref="A1:J${totalRows}"/>`)
-      // 원본 템플릿의 fitToPage(1페이지에 맞춤)는 워크북/인쇄 시점마다 배율을 동적으로
-      // 다시 계산하기 때문에, 강제 페이지 나누기(46행 단위)와 fitToHeight 기반 자동
-      // 페이지 나누기가 서로 어긋나면서 빈 페이지가 생겼다. 원본 46행은 이미 A4 1페이지
-      // 높이에 거의 정확히 맞는 분량이므로, 동적 맞춤 대신 고정 배율(100%)을 쓰고
-      // 강제 페이지 나누기만으로 학생별 경계를 나누도록 한다.
-      .replace(/<pageSetup ([^/]*)\/>/, (_, attrs) => `<pageSetup ${attrs} scale="100"/>`)
+      // 원본 46행의 실제 높이 합(약 761.25pt)이 A4 세로 여백을 뺀 본문 영역(약 759.48pt)보다
+      // 미세하게(약 1.77pt) 더 크다 — 100% 배율로는 마지막 한두 행이 다음 페이지로 흘러넘쳐
+      // (거의 빈) 페이지가 하나 더 생긴다. fitToPage(동적 맞춤)는 강제 페이지 나누기와
+      // 서로 어긋나 같은 문제를 일으키므로, 대신 여유를 둔 고정 배율(96%)로 46행이
+      // 확실히 한 페이지 안에 들어가게 하고, 페이지 경계는 강제 페이지 나누기로만 정한다.
+      .replace(/<pageSetup ([^/]*)\/>/, (_, attrs) => `<pageSetup ${attrs} scale="96"/>`)
       .replace(/<pageSetUpPr fitToPage="1"\/>/, '<pageSetUpPr fitToPage="0"/>')
 
     // 학생 블록 경계마다 강제 페이지 나누기 삽입 (마지막 블록 뒤는 제외)
