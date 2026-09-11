@@ -15,7 +15,7 @@ const DOW = ['일', '월', '화', '수', '목', '금', '토']
 
 // 등원 체크인을 실제로 수행한다. 두 경로에서 호출된다:
 // - 태블릿 키오스크(/checkin): 관리자가 학생을 특정한 뒤 student_id로 호출
-// - 학생 개인 NFC 태그(/tag-checkin): 학생이 자기 태그를 폰에 대면 nfc_token으로 호출 (로그인 불필요)
+// - 공용 NFC 카드(/tag-checkin): 학부모 로그인(자동 로그인 포함)으로 학생을 특정한 뒤 student_id로 호출 (관리자 로그인 불필요)
 // - 오늘 요일에 해당하는 수업 시간과 비교해 지각/정시를 자동 판정해 student_checkins에 남긴다
 //   (반관리 > 수업기록 작성 시 이 값을 그대로 불러와 지각 여부를 자동 반영한다)
 // - 문의하기 스레드에 관리자 명의로 등원 완료 메시지를 남기고 학부모에게 푸시를 보낸다
@@ -25,29 +25,22 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
   try {
-    const body = await req.json()
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-
-    let student: { id: number; name: string } | null = null
-    if (body.nfc_token) {
-      const { data } = await supabase
-        .from('students').select('id, name').eq('nfc_token', body.nfc_token).maybeSingle()
-      student = data
-    } else if (body.student_id) {
-      const { data } = await supabase
-        .from('students').select('id, name').eq('id', body.student_id).maybeSingle()
-      student = data
-    } else {
-      return new Response(JSON.stringify({ error: 'student_id 또는 nfc_token이 필요합니다.' }), {
+    const { student_id } = await req.json()
+    if (!student_id) {
+      return new Response(JSON.stringify({ error: 'student_id가 필요합니다.' }), {
         status: 400, headers: { ...CORS, 'Content-Type': 'application/json' },
       })
     }
-    if (!student) {
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+
+    const { data: student, error: stuErr } = await supabase
+      .from('students').select('id, name').eq('id', student_id).single()
+    if (stuErr || !student) {
       return new Response(JSON.stringify({ error: '학생을 찾을 수 없습니다.' }), {
         status: 404, headers: { ...CORS, 'Content-Type': 'application/json' },
       })
     }
-    const student_id = student.id
 
     // KST 기준 오늘 날짜/현재 시각 ("HH:MM" 문자열 — 반관리 반 시간 형식과 동일해서 문자열 비교로 지각 판정 가능)
     const kstNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }))
@@ -55,7 +48,7 @@ serve(async (req) => {
     const nowTimeStr = `${String(kstNow.getHours()).padStart(2, '0')}:${String(kstNow.getMinutes()).padStart(2, '0')}`
     const todayDow = DOW[kstNow.getDay()]
 
-    // 개인 NFC 태그는 접촉 한 번으로 즉시 동작해 실수로 여러 번 태그하기 쉽다.
+    // NFC 카드는 접촉 한 번으로 즉시 동작해 실수로 여러 번 태그하기 쉽다.
     // 오늘 이미 등원 처리가 있으면 중복 기록/중복 알림 없이 기존 처리 결과만 돌려준다.
     const { data: existing } = await supabase
       .from('student_checkins').select('late').eq('student_id', student_id).eq('date', dateStr).maybeSingle()
