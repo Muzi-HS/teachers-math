@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { can } from '@/lib/permissions'
 import { kstDateStr, kstNow } from '@/lib/kst'
 import { IconUsers, IconLightbulb } from '@/components/icons'
+import { QRCodeCanvas } from 'qrcode.react'
 import { useMobileMode } from '@/context/MobileModeContext'
 
 type Student = {
@@ -16,6 +17,7 @@ type Student = {
   phone: string
   parent_phone: string
   reg_date: string
+  nfc_token?: string | null   // 개인 NFC 태그 등원 체크인용 고유 토큰 (/tag-checkin?t=)
 }
 
 type Class = { id: number; name: string; active: boolean }
@@ -79,8 +81,11 @@ export default function StudentsPage() {
   const [schoolHigh,       setSchoolHigh]       = useState('')
   const [noSchoolMap, setNoSchoolMap] = useState<Record<SchoolKey, boolean>>({ '초등': false, '중등': false, '고등': false })
   const [parentPinMap, setParentPinMap] = useState<Record<string, string>>({})
+  const [nfcBusy, setNfcBusy] = useState(false)
+  const [siteOrigin, setSiteOrigin] = useState('')
 
   useEffect(() => { fetchAll() }, [])
+  useEffect(() => { setSiteOrigin(window.location.origin) }, [])
   useEffect(() => { if (role === 'admin') fetchParentPins() }, [role])
 
   async function fetchParentPins() {
@@ -218,6 +223,20 @@ export default function StudentsPage() {
     if (error) return toast('PIN 초기화 실패: ' + error.message, false)
     setParentPinMap(m => ({ ...m, [normalized]: '0000' }))
     toast(`${studentName} 학부모 PIN이 초기화됐습니다`)
+  }
+
+  // 학생 개인 NFC 태그(등원 체크인) 발급/재발급 — 고유 토큰을 새로 만들어 students.nfc_token에 저장한다.
+  // 기존 태그가 있었다면 재발급 즉시 무효화된다(예전 스티커는 더 이상 동작하지 않음).
+  async function issueNfcTag(student: Student) {
+    if (student.nfc_token && !confirm(`${student.name} 학생의 NFC 태그를 재발급하시겠습니까?\n기존에 만든 스티커는 더 이상 동작하지 않습니다.`)) return
+    setNfcBusy(true)
+    const token = crypto.randomUUID()
+    const { error } = await supabase.from('students').update({ nfc_token: token }).eq('id', student.id)
+    setNfcBusy(false)
+    if (error) return toast('NFC 태그 발급 실패: ' + error.message, false)
+    setStudents(list => list.map(s => s.id === student.id ? { ...s, nfc_token: token } : s))
+    setDetailStu(d => d && d.id === student.id ? { ...d, nfc_token: token } : d)
+    toast(`${student.name} 학생 NFC 태그가 발급됐습니다`)
   }
 
   async function remove(id: number, name: string) {
@@ -775,6 +794,36 @@ export default function StudentsPage() {
                       </button>
                     )}
                   </div>
+                </div>
+              )}
+
+              {/* NFC 등원 태그 (admin만) */}
+              {isAdmin && (
+                <div style={{ background:bg,borderRadius:10,padding:'14px 16px',marginTop:14 }}>
+                  <p style={{ fontSize:11,fontWeight:700,color:tx3,letterSpacing:1,margin:'0 0 10px' }}>NFC 등원 태그</p>
+                  {detailStu.nfc_token && siteOrigin ? (
+                    <div style={{ display:'flex', gap:14, alignItems:'center', flexWrap:'wrap' }}>
+                      <QRCodeCanvas value={`${siteOrigin}/tag-checkin?t=${detailStu.nfc_token}`} size={84} level="M" marginSize={2} fgColor={navyDk} bgColor="#fff" />
+                      <div style={{ flex:1, minWidth:160 }}>
+                        <p style={{ fontSize:11,color:tx3,margin:'0 0 6px' }}>이 주소를 NFC 스티커 쓰기 앱(예: NFC Tools)으로 학생의 태그에 기록하세요.</p>
+                        <p style={{ fontSize:12,color:tx,margin:'0 0 8px',wordBreak:'break-all',fontFamily:'monospace' }}>{`${siteOrigin}/tag-checkin?t=${detailStu.nfc_token}`}</p>
+                        <div style={{ display:'flex', gap:6 }}>
+                          <button className="bdng" onClick={() => {
+                            navigator.clipboard.writeText(`${siteOrigin}/tag-checkin?t=${detailStu.nfc_token}`)
+                            toast('주소가 복사됐습니다')
+                          }}>주소 복사</button>
+                          <button className="bdng" disabled={nfcBusy} onClick={() => issueNfcTag(detailStu)}>재발급</button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                      <p style={{ fontSize:13,color:tx3,margin:0 }}>아직 발급된 태그가 없습니다</p>
+                      <button className="bdng" disabled={nfcBusy} onClick={() => issueNfcTag(detailStu)}>
+                        {nfcBusy ? '발급 중...' : '태그 발급'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
