@@ -48,17 +48,6 @@ serve(async (req) => {
     const nowTimeStr = `${String(kstNow.getHours()).padStart(2, '0')}:${String(kstNow.getMinutes()).padStart(2, '0')}`
     const todayDow = DOW[kstNow.getDay()]
 
-    // NFC 카드는 접촉 한 번으로 즉시 동작해 실수로 여러 번 태그하기 쉽다.
-    // 오늘 이미 등원 처리가 있으면 중복 기록/중복 알림 없이 기존 처리 결과만 돌려준다.
-    const { data: existing } = await supabase
-      .from('student_checkins').select('late').eq('student_id', student_id).eq('date', dateStr).maybeSingle()
-    if (existing) {
-      return new Response(
-        JSON.stringify({ success: true, studentName: student.name, late: existing.late, notified: false, already: true }),
-        { status: 200, headers: { ...CORS, 'Content-Type': 'application/json' } }
-      )
-    }
-
     // 오늘 요일에 해당하는 수업(여러 개면 시작 시간이 가장 빠른 것)을 찾아 지각/정시 판정
     const { data: csRows } = await supabase
       .from('class_students').select('class_id').eq('student_id', student_id)
@@ -79,9 +68,23 @@ serve(async (req) => {
       }
     }
 
-    await supabase.from('student_checkins').insert({
-      student_id, class_id: matchedClassId, date: dateStr, late,
-    })
+    // NFC 카드는 접촉 한 번으로 즉시 동작해 실수로 여러 번 태그하기 쉽다. student_checkins에
+    // (student_id, date) 유니크 제약이 있어 upsert(ignoreDuplicates)가 원자적으로 중복을 막아준다.
+    // 이번 요청이 실제로 새로 넣은 것인지는 반환된 행 유무로 판단한다(select-후-insert 방식은
+    // 두 태그가 거의 동시에 들어오면 경쟁 상태로 중복이 생길 수 있어 이 방식으로 바꿨다).
+    const { data: inserted } = await supabase
+      .from('student_checkins')
+      .upsert({ student_id, class_id: matchedClassId, date: dateStr, late }, { onConflict: 'student_id,date', ignoreDuplicates: true })
+      .select('late')
+
+    if (!inserted || inserted.length === 0) {
+      const { data: existing } = await supabase
+        .from('student_checkins').select('late').eq('student_id', student_id).eq('date', dateStr).maybeSingle()
+      return new Response(
+        JSON.stringify({ success: true, studentName: student.name, late: existing?.late ?? late, notified: false, already: true }),
+        { status: 200, headers: { ...CORS, 'Content-Type': 'application/json' } }
+      )
+    }
 
     // 학부모 연락 — 정보가 없으면 등원 기록만 남기고 메시지/알림은 건너뜀
     const { data: ps } = await supabase
