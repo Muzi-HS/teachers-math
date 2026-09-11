@@ -891,7 +891,8 @@ export default function RecordsPage() {
         <ClassBulkRecordModal
           classId={bulkModalClsId}
           className={classes.find(c => c.id === bulkModalClsId)?.name ?? ''}
-          students={(clsStudentsMap[bulkModalClsId] ?? []).map(sid => students.find(s => s.id === sid)).filter(Boolean) as Student[]}
+          students={((clsStudentsMap[bulkModalClsId] ?? []).map(sid => students.find(s => s.id === sid)).filter(Boolean) as Student[])
+            .sort((a, b) => a.name.localeCompare(b.name, 'ko'))}
           tests={tests}
           initialDate={selDate}
           onClose={() => setBulkModalClsId(null)}
