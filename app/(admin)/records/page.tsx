@@ -494,10 +494,16 @@ export default function RecordsPage() {
       if (!seen.has(clsId)) {
         seen.add(clsId)
         const cls = clsId !== null ? (classes.find(c => c.id === clsId) ?? null) : null
-        // 학부모 의견을 아직 확인하지 않은 카드를 그 반 안에서 맨 앞으로 (나머지는 기존 순서 유지)
+        // 학부모 의견이 남은 카드를 그 반 안에서 맨 앞으로, 그 외에는 학생 이름순 정렬
         const recsForCls = dayRecs.filter(rec => recClsId(rec) === clsId)
           .slice()
-          .sort((a, b) => Number(isHighlighted(b)) - Number(isHighlighted(a)))
+          .sort((a, b) => {
+            const hl = Number(isHighlighted(b)) - Number(isHighlighted(a))
+            if (hl !== 0) return hl
+            const an = students.find(s => s.id === a.student_id)?.name ?? ''
+            const bn = students.find(s => s.id === b.student_id)?.name ?? ''
+            return an.localeCompare(bn, 'ko')
+          })
         groups.push({ cls, recs: recsForCls })
       }
     }
