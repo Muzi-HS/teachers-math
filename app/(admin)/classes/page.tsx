@@ -255,7 +255,7 @@ export default function ClassesPage() {
     !alreadyIn.has(s.id) &&
     (s.name.includes(s2cSrch) || s.school.includes(s2cSrch)) &&
     (ageFilter === '' || String(ageOf(s.birth_year)) === ageFilter)
-  )
+  ).sort((a, b) => a.name.localeCompare(b.name, 'ko'))
   const availableAges = [...new Set(students.filter(s => !alreadyIn.has(s.id)).map(s => ageOf(s.birth_year)))].sort((a, b) => a - b)
 
   const css = `
