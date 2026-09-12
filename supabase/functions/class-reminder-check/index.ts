@@ -67,32 +67,17 @@ serve(async (req) => {
         continue
       }
 
-      const { data: parentLinks } = await supabase
-        .from('parent_students').select('student_id, parent_id').in('student_id', studentIds)
-      const parentIds = [...new Set((parentLinks ?? []).map(r => r.parent_id))]
-      let parentPhones: string[] = []
-      if (parentIds.length > 0) {
-        const { data: parents } = await supabase.from('parents').select('phone').in('id', parentIds)
-        parentPhones = (parents ?? []).map(p => p.phone).filter(Boolean)
-      }
-
+      // 학생 본인에게만 보낸다(학부모는 제외) — 등원 완료 알림과 달리 수업 전 알림은
+      // 학생이 스스로 챙기라는 용도라 학부모 쪽에는 보내지 않는다.
       const body = `${cls.start} ${cls.name} 수업이 곧 시작합니다!`
 
-      const pushes: Promise<any>[] = []
-      for (const studentId of studentIds) {
-        pushes.push(fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
+      const pushes: Promise<any>[] = studentIds.map(studentId =>
+        fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ANON_KEY}` },
           body: JSON.stringify({ student_id: studentId, title: '티처스 수학학원', body, link: '/student/records' }),
-        }).catch(() => {}))
-      }
-      for (const phone of parentPhones) {
-        pushes.push(fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ANON_KEY}` },
-          body: JSON.stringify({ parent_phone: phone, title: '티처스 수학학원', body, link: '/parent/records' }),
-        }).catch(() => {}))
-      }
+        }).catch(() => {})
+      )
       await Promise.allSettled(pushes)
       sentCount += pushes.length
 
