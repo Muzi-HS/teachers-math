@@ -15,7 +15,7 @@ type Rec = {
   id: number; date: string; content: string; homework: string
   hw_rate: number; hw_cor: number; attitude: number
   late: boolean; has_test: boolean; feedback: string
-  viewed_at: string | null
+  viewed_at: string | null; class_id: number | null
   record_test_items?: { test_id: number; t_total: number; t_cor: number; t_score: number; tests: { name: string } | null }[]
 }
 
@@ -32,6 +32,7 @@ export default function ParentRecords() {
   const [sendingId, setSendingId] = useState<number | null>(null)
   const [commentErr, setCommentErr] = useState<Record<number, string>>({})
   const [showStats, setShowStats] = useState(false)
+  const [classNames, setClassNames] = useState<Record<number, string>>({})
 
   useEffect(() => {
     if (!selChild) return
@@ -49,6 +50,15 @@ export default function ParentRecords() {
       .order('date', { ascending: false })
 
     if (!recsData || recsData.length === 0) { setRecs([]); setComments([]); setLoading(false); return }
+
+    // 반이 2개 이상인 학생은 기록마다 어느 반 숙제인지 배지로 구분해서 보여준다
+    const classIds = [...new Set(recsData.map((r: any) => r.class_id).filter((id: any): id is number => id != null))]
+    if (classIds.length > 0) {
+      const { data: classesData } = await supabase.from('classes').select('id,name').in('id', classIds)
+      const cmap: Record<number, string> = {}
+      for (const c of (classesData ?? [])) cmap[c.id] = c.name
+      setClassNames(cmap)
+    }
 
     const recIds = recsData.map(r => r.id)
     const [{ data: items }, { data: commentsData }] = await Promise.all([
@@ -174,6 +184,9 @@ export default function ParentRecords() {
                 {/* 헤더 */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, paddingBottom: 10, borderBottom: `1px solid ${bd}` }}>
                   <b style={{ fontSize: 14, color: tx }}>{r.date}</b>
+                  {r.class_id != null && classNames[r.class_id] && (
+                    <span style={{ background: bg, color: tx2, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>{classNames[r.class_id]}</span>
+                  )}
                   {r.late
                     ? <span style={{ background: rbg, color: re, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>지각</span>
                     : <span style={{ background: gbg, color: gr, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>정시 등원</span>
