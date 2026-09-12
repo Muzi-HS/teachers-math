@@ -5,6 +5,8 @@ import { useParentChild } from '../layout'
 import { IconArrowUp, IconInbox, IconSend } from '@/components/icons'
 import { RecordComment, groupCommentsByRecord } from '@/lib/records'
 import TestResultCard from '@/components/TestResultCard'
+import HomeworkStatsView from '@/components/HomeworkStatsView'
+import TodayClassBanner from '@/components/TodayClassBanner'
 
 const navy='#0D2A5E', gold='#D87E13', tx='#0D1B36', tx2='#4B5C7E', tx3='#96A4BF'
 const bd='#DDE3EE', bg='#F5F7FA', re='#C0392B', rbg='#FDECEA', gr='#1A7F4E', gbg='#E0F5EB'
@@ -29,6 +31,7 @@ export default function ParentRecords() {
   const [commentDrafts, setCommentDrafts] = useState<Record<number, string>>({})
   const [sendingId, setSendingId] = useState<number | null>(null)
   const [commentErr, setCommentErr] = useState<Record<number, string>>({})
+  const [showStats, setShowStats] = useState(false)
 
   useEffect(() => {
     if (!selChild) return
@@ -135,18 +138,29 @@ export default function ParentRecords() {
         </div>
       ) : (
         <>
+          <TodayClassBanner studentId={selChild} />
+
           {/* 학생 헤더 */}
           <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: '14px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ width: 42, height: 42, borderRadius: '50%', background: navy, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
               {curChild?.name[0]}
             </div>
-            <div>
+            <div style={{ flex: 1 }}>
               <p style={{ fontSize: 15, fontWeight: 700, color: tx, margin: 0 }}>{curChild?.name}</p>
               <p style={{ fontSize: 12, color: tx3, margin: '2px 0 0' }}>수업기록 {recs.length}개</p>
             </div>
+            <button onClick={() => setShowStats(s => !s)} style={{
+              flexShrink: 0, padding: '7px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+              border: `1.5px solid ${showStats ? navy : bd}`, background: showStats ? navy : '#fff',
+              color: showStats ? '#fff' : tx2, cursor: 'pointer', fontFamily: 'inherit',
+            }}>
+              {showStats ? '기록 보기' : '통계 보기'}
+            </button>
           </div>
 
-          {loading ? (
+          {showStats ? (
+            <HomeworkStatsView recs={recs} />
+          ) : loading ? (
             <p style={{ textAlign: 'center', color: tx3, padding: '40px 0' }}>불러오는 중...</p>
           ) : recs.length === 0 ? (
             <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: '60px 0', textAlign: 'center', color: tx3 }}>
