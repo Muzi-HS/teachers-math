@@ -3,13 +3,14 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { supabase, TEACHER_AUTO_LOGIN_KEY } from '@/lib/supabase'
-import { teacherLogin, parentLookup, parentLoginWithPin } from '@/lib/auth'
+import { teacherLogin, parentLookup, parentLoginWithPin, studentLookup, studentLoginWithPin } from '@/lib/auth'
 import { useAuth } from '@/context/AuthContext'
 
-type Tab      = 'parent' | 'teacher'
-type PStep    = 'phone' | 'pin' | 'pin-setup'  // 학부모 로그인 단계
+type Tab      = 'parent' | 'student' | 'teacher'
+type PStep    = 'phone' | 'pin' | 'pin-setup'  // 학부모/학생 로그인 단계 (동일한 흐름을 공유)
 
 const AUTO_KEY = 'parent_auto_login'
+const STUDENT_AUTO_KEY = 'student_auto_login'
 
 function AutoLoginToggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -25,22 +26,25 @@ function AutoLoginToggle({ checked, onChange }: { checked: boolean; onChange: (v
 
 export default function LoginPage() {
   const router = useRouter()
-  const { role, loading: authLoading, loginAsTeacher, loginAsParent } = useAuth()
+  const { role, loading: authLoading, loginAsTeacher, loginAsParent, loginAsStudent } = useAuth()
 
   useEffect(() => {
     if (authLoading) return
     if (role === 'admin' || role === 'teacher' || role === 'assistant') router.replace('/dashboard')
     else if (role === 'parent') router.replace('/parent/records')
+    else if (role === 'student') router.replace('/student/records')
   }, [role, authLoading])
 
-  // 자동로그인 복원
+  // 자동로그인 복원 (학부모/학생 각각 독립된 저장소)
   useEffect(() => {
     if (authLoading || role) return
     try {
       const raw = localStorage.getItem(AUTO_KEY)
-      if (!raw) return
-      const saved = JSON.parse(raw)
-      loginAsParent(saved.session)
+      if (raw) { loginAsParent(JSON.parse(raw).session); return }
+    } catch {}
+    try {
+      const raw = localStorage.getItem(STUDENT_AUTO_KEY)
+      if (raw) loginAsStudent(JSON.parse(raw).session)
     } catch {}
   }, [authLoading])
 
@@ -85,12 +89,12 @@ export default function LoginPage() {
     } catch(e:any) { setError(e.message); setLoading(false) }
   }
 
-  // ── 학부모 1단계: 전화번호 확인 ──
+  // ── 학부모/학생 1단계: 전화번호 확인 (같은 흐름을 tab으로 분기) ──
   async function handlePhoneCheck() {
     setError(''); setLoading(true)
     try {
       if (!phone) throw new Error('전화번호를 입력하세요.')
-      const data = await parentLookup(phone)
+      const data = tab === 'student' ? await studentLookup(phone) : await parentLookup(phone)
       setParentData(data)
       setPin('')
       setPStep('pin')
@@ -138,11 +142,13 @@ export default function LoginPage() {
     )
   }
 
-  // ── 학부모 2단계: PIN 검증 ──
+  // ── 학부모/학생 2단계: PIN 검증 ──
   async function handlePinSubmit(submittedPin: string) {
     setError(''); setLoading(true)
     try {
-      const result = await parentLoginWithPin(phone, submittedPin)
+      const result = tab === 'student'
+        ? await studentLoginWithPin(phone, submittedPin)
+        : await parentLoginWithPin(phone, submittedPin)
       if (result.isDefaultPin) {
         setParentData(result)
         setNewPin(''); setNewPin2('')
@@ -150,14 +156,19 @@ export default function LoginPage() {
         setLoading(false)
         return
       }
-      const session = { parentId: result.parentId, phone: result.phone, children: result.children }
-      if (autoLogin) {
-        localStorage.setItem(AUTO_KEY, JSON.stringify({
-          session
-        }))
+      if (tab === 'student') {
+        const r = result as Awaited<ReturnType<typeof studentLoginWithPin>>
+        const session = { studentId: r.studentId, phone: r.phone, name: r.name }
+        if (autoLogin) localStorage.setItem(STUDENT_AUTO_KEY, JSON.stringify({ session }))
+        sessionStorage.setItem('student_session', JSON.stringify(session))
+        loginAsStudent(session)
+      } else {
+        const r = result as Awaited<ReturnType<typeof parentLoginWithPin>>
+        const session = { parentId: r.parentId, phone: r.phone, children: r.children }
+        if (autoLogin) localStorage.setItem(AUTO_KEY, JSON.stringify({ session }))
+        sessionStorage.setItem('parent_session', JSON.stringify(session))
+        loginAsParent(session)
       }
-      sessionStorage.setItem('parent_session', JSON.stringify(session))
-      loginAsParent(session)
     } catch(e:any) {
       setError(e.message)
       setPin('')
@@ -176,13 +187,23 @@ export default function LoginPage() {
     setLoading(true)
     try {
       // 직접 supabase 호출 (anon UPDATE 정책 사용)
+      const table = tab === 'student' ? 'students' : 'parents'
+      const idKey = tab === 'student' ? 'studentId' : 'parentId'
       const { error: updateErr } = await supabase
-        .from('parents')
+        .from(table)
         .update({ pin: newPin })
-        .eq('id', parentData.parentId)
+        .eq('id', parentData[idKey])
       if (updateErr) throw new Error('PIN 저장 실패: ' + updateErr.message)
 
       // 업데이트 성공 후 바로 세션 생성
+      if (tab === 'student') {
+        const session = { studentId: parentData.studentId, phone: parentData.phone, name: parentData.name }
+        if (autoLogin) localStorage.setItem(STUDENT_AUTO_KEY, JSON.stringify({ session }))
+        sessionStorage.setItem('student_session', JSON.stringify(session))
+        loginAsStudent(session)
+        setLoading(false)
+        return
+      }
       const session = { parentId: parentData.parentId, phone: parentData.phone, children: parentData.children }
       if (autoLogin) {
         localStorage.setItem(AUTO_KEY, JSON.stringify({
@@ -226,7 +247,7 @@ export default function LoginPage() {
         input:focus { border-color: #D87E13 !important; }
       `}</style>
 
-      <div style={{ minHeight: (!showSignup && tab==='parent' && (pStep==='pin'||pStep==='pin-setup')) ? '130vh' : '100vh', background:'#071A3E', display:'flex', alignItems:'center', justifyContent:'center', padding:'0 16px' }}>
+      <div style={{ minHeight: (!showSignup && (tab==='parent'||tab==='student') && (pStep==='pin'||pStep==='pin-setup')) ? '130vh' : '100vh', background:'#071A3E', display:'flex', alignItems:'center', justifyContent:'center', padding:'0 16px' }}>
         <div style={{ width:'100%', maxWidth:380, padding:'48px 20px' }}>
 
           {/* 로고 */}
@@ -239,7 +260,7 @@ export default function LoginPage() {
           </div>
 
           {/* ── 학부모 PIN 단계 ── */}
-          {!showSignup && tab === 'parent' && pStep === 'pin' && (
+          {!showSignup && (tab === 'parent' || tab === 'student') && pStep === 'pin' && (
             <>
               <button onClick={() => { setPStep('phone'); setPin(''); setError('') }}
                 style={{ background:'none', border:'none', color:'rgba(255,255,255,.4)', fontSize:12, cursor:'pointer', marginBottom:16, fontFamily:'inherit', display:'flex', alignItems:'center', gap:4 }}>
@@ -261,7 +282,7 @@ export default function LoginPage() {
           )}
 
           {/* ── PIN 설정 단계 ── */}
-          {!showSignup && tab === 'parent' && pStep === 'pin-setup' && (
+          {!showSignup && (tab === 'parent' || tab === 'student') && pStep === 'pin-setup' && (
             <>
               <p style={{ fontSize:18, fontWeight:700, color:'#fff', marginBottom:4 }}>PIN 설정</p>
               <p style={{ fontSize:13, color:'rgba(255,255,255,.4)', marginBottom:16 }}>처음 로그인하셨습니다. 새 PIN을 설정해주세요</p>
@@ -299,7 +320,7 @@ export default function LoginPage() {
 
               {/* 탭 */}
               <div style={{ display:'flex', gap:8, marginBottom:24 }}>
-                {([{key:'parent',label:'학부모'},{key:'teacher',label:'선생님'}] as const).map(({key,label}) => (
+                {([{key:'parent',label:'학부모'},{key:'student',label:'학생'},{key:'teacher',label:'선생님'}] as const).map(({key,label}) => (
                   <button key={key} onClick={() => { setTab(key); setError('') }} style={{
                     flex:1, padding:'12px 0', borderRadius:8,
                     border:`1.5px solid ${tab===key?'#D87E13':'rgba(255,255,255,.15)'}`,
@@ -328,9 +349,9 @@ export default function LoginPage() {
                 </>
               )}
 
-              {tab === 'parent' && pStep === 'phone' && (
+              {(tab === 'parent' || tab === 'student') && pStep === 'phone' && (
                 <div style={{ marginBottom:14 }}>
-                  <label style={{ display:'block', fontSize:12, color:'rgba(255,255,255,.5)', marginBottom:7 }}>전화번호</label>
+                  <label style={{ display:'block', fontSize:12, color:'rgba(255,255,255,.5)', marginBottom:7 }}>{tab === 'student' ? '학생 본인 전화번호' : '전화번호'}</label>
                   <input type="tel" value={phone} onChange={e=>setPhone(e.target.value)}
                     onKeyDown={e=>e.key==='Enter'&&handlePhoneCheck()} placeholder="전화번호 입력" style={iStyle}/>
                   <p style={{ fontSize:12, color:'rgba(255,255,255,.3)', marginTop:7 }}>하이픈(-) 없이 숫자만 입력하세요</p>
@@ -345,7 +366,7 @@ export default function LoginPage() {
 
               <button onClick={tab==='teacher'?handleTeacherLogin:handlePhoneCheck} disabled={loading}
                 style={{ width:'100%', marginTop:8, padding:14, borderRadius:8, border:'none', background:loading?'#a86010':'#D87E13', color:'#071A3E', fontSize:15, fontWeight:700, fontFamily:"'Noto Sans KR',sans-serif", cursor:loading?'not-allowed':'pointer' }}>
-                {loading ? '확인 중...' : tab==='parent' ? '다음' : '로그인'}
+                {loading ? '확인 중...' : tab!=='teacher' ? '다음' : '로그인'}
               </button>
 
               <div style={{ textAlign:'center', marginTop:10 }}>

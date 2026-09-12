@@ -16,24 +16,34 @@ type ParentSession = {
   children: { id: number; name: string; birth_year: number; school: string }[]
 }
 
+type StudentSession = {
+  studentId: number
+  phone: string
+  name: string
+}
+
 type AuthContextType = {
   teacher: TeacherSession | null
   parent: ParentSession | null
-  role: 'admin' | 'teacher' | 'assistant' | 'parent' | null
+  student: StudentSession | null
+  role: 'admin' | 'teacher' | 'assistant' | 'parent' | 'student' | null
   loading: boolean
   logout: () => Promise<void>
   loginAsTeacher: (t: TeacherSession) => void
   loginAsParent: (p: ParentSession) => void
+  loginAsStudent: (s: StudentSession) => void
 }
 
 const AuthContext = createContext<AuthContextType>({
   teacher: null,
   parent: null,
+  student: null,
   role: null,
   loading: true,
   logout: async () => {},
   loginAsTeacher: () => {},
   loginAsParent: () => {},
+  loginAsStudent: () => {},
 })
 
 async function fetchTeacherProfile(userId: string): Promise<TeacherSession | null> {
@@ -51,6 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter()
   const [teacher, setTeacher] = useState<TeacherSession | null>(null)
   const [parent,  setParent]  = useState<ParentSession | null>(null)
+  const [student, setStudent] = useState<StudentSession | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -74,6 +85,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (raw) {
           const parsed = JSON.parse(raw)
           setParent(parsed)
+          setLoading(false)
+          return
+        }
+      } catch {}
+
+      // 3. 학생 세션 확인 (sessionStorage)
+      try {
+        const raw = sessionStorage.getItem('student_session')
+        if (raw) {
+          const parsed = JSON.parse(raw)
+          setStudent(parsed)
         }
       } catch {}
 
@@ -90,10 +112,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (profile) {
             setTeacher({ ...profile, email: session.user.email! })
             setParent(null)
+            setStudent(null)
           }
         } else if (event === 'SIGNED_OUT') {
           setTeacher(null)
           setParent(null)
+          setStudent(null)
         }
       }
     )
@@ -104,28 +128,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   function loginAsTeacher(t: TeacherSession) {
     setTeacher(t)
     setParent(null)
+    setStudent(null)
   }
 
   function loginAsParent(p: ParentSession) {
     setParent(p)
     setTeacher(null)
+    setStudent(null)
+  }
+
+  function loginAsStudent(s: StudentSession) {
+    setStudent(s)
+    setTeacher(null)
+    setParent(null)
   }
 
   async function logout() {
     setLoading(true)
     setTeacher(null)
     setParent(null)
+    setStudent(null)
     sessionStorage.removeItem('parent_session')
     localStorage.removeItem('parent_auto_login')
+    sessionStorage.removeItem('student_session')
+    localStorage.removeItem('student_auto_login')
     await supabase.auth.signOut()
     setLoading(false)
     router.replace('/')
   }
 
-  const role = teacher?.role ?? (parent ? 'parent' : null)
+  const role = teacher?.role ?? (parent ? 'parent' : student ? 'student' : null)
 
   return (
-    <AuthContext.Provider value={{ teacher, parent, role, loading, logout, loginAsTeacher, loginAsParent }}>
+    <AuthContext.Provider value={{ teacher, parent, student, role, loading, logout, loginAsTeacher, loginAsParent, loginAsStudent }}>
       {children}
     </AuthContext.Provider>
   )

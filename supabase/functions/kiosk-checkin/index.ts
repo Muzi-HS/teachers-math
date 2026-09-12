@@ -116,6 +116,21 @@ serve(async (req) => {
       }
     }
 
+    // 학생 본인 알림 — 학생 계정으로 로그인해 알림을 켜둔 경우, 본인이 태그(등원)됐음을
+    // 바로 확인할 수 있도록 별도로 푸시를 보낸다 (학부모 알림과는 무관하게 항상 시도).
+    const hour = kstNow.getHours()
+    const minute = String(kstNow.getMinutes()).padStart(2, '0')
+    await fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ANON_KEY}` },
+      body: JSON.stringify({
+        student_id,
+        title: '티처스 수학학원',
+        body: `${hour}시 ${minute}분에 등원 체크인되었습니다.`,
+        link: '/student/records',
+      }),
+    }).catch(() => {})
+
     return new Response(
       JSON.stringify({ success: true, studentName: student.name, late, notified }),
       { status: 200, headers: { ...CORS, 'Content-Type': 'application/json' } }

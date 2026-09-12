@@ -56,11 +56,15 @@ export default function ClassPrepModal({
     const chksInit: Record<number, boolean> = {}
     students.forEach(s => { chksInit[s.id] = true })
 
-    // 학생별 '바로 직전' 숙제 — 오늘 이전 날짜 중 가장 최근 기록의 숙제 내용
-    const { data: recs } = await supabase
+    // 학생별 '바로 직전' 숙제 — 오늘 이전 날짜 중 이 반에서 작성된 가장 최근 기록의 숙제 내용.
+    // class_id로 걸러야 한다 — 학생이 A반, B반을 연달아 들을 때 반 구분 없이 가장 최근
+    // 기록을 가져오면 B반 수업 준비에 A반 숙제가 잘못 표시되는 문제가 있었다.
+    let recsQuery = supabase
       .from('records').select('student_id, date, homework')
       .in('student_id', ids).eq('is_draft', false).lt('date', today)
       .order('date', { ascending: false })
+    if (classId != null) recsQuery = recsQuery.eq('class_id', classId)
+    const { data: recs } = await recsQuery
     const prevHw: Record<number, string> = {}
     for (const r of (recs ?? [])) {
       if (!(r.student_id in prevHw)) prevHw[r.student_id] = withLeadingSpaces(r.homework ?? '')

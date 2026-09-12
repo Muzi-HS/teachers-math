@@ -1,4 +1,4 @@
-export type Role = 'admin' | 'teacher' | 'assistant' | 'parent'
+export type Role = 'admin' | 'teacher' | 'assistant' | 'parent' | 'student'
 
 export const can = {
   // 공지사항 — 전원 열람, 작성/수정/삭제는 admin만
@@ -52,8 +52,8 @@ export const menuAccess: Record<string, (role: Role) => boolean> = {
   students:   (r) => r === 'admin',
   records:    (r) => r === 'admin' || r === 'teacher', // 수업기록 — admin+teacher (assistant는 접근 불가)
   tests:      (r) => r === 'admin' || r === 'teacher' || r === 'assistant',
-  notices:    (r) => r !== 'parent', // parent는 별도 /parent 화면에서 열람
-  schedule:   (r) => r !== 'parent', // parent는 별도 /parent 화면에서 열람
+  notices:    (r) => r !== 'parent' && r !== 'student', // parent/student는 각자 별도 화면에서 열람
+  schedule:   (r) => r !== 'parent' && r !== 'student', // parent/student는 각자 별도 화면에서 열람
   stats:      (r) => r === 'admin' || r === 'teacher' || r === 'assistant',
   teachers:   (r) => r === 'admin',                                        // 선생님 관리 — admin만
   attendance: (r) => r === 'admin' || r === 'teacher' || r === 'assistant', // 출근부 — admin+teacher+assistant
@@ -61,4 +61,6 @@ export const menuAccess: Record<string, (role: Role) => boolean> = {
   inquiries:  (r) => r === 'admin' || r === 'parent',                      // 문의하기 — admin+parent만 (teacher/assistant 접근 불가)
   // 학부모 전용
   parent:     (r) => r === 'parent',
+  // 학생 전용
+  student:    (r) => r === 'student',
 }

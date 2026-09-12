@@ -105,7 +105,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   // 1) 인증 체크 — loading/role이 바뀔 때만 실행
   useEffect(() => {
     if (loading) return
-    if (!role || role === 'parent') {
+    if (!role || role === 'parent' || role === 'student') {
       router.replace('/')
       return
     }
@@ -160,7 +160,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     </div>
   )
 
-  if (!role || role === 'parent') return null
+  if (!role || role === 'parent' || role === 'student') return null
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', fontFamily: "'Noto Sans KR',sans-serif" }}>

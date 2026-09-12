@@ -79,6 +79,49 @@ export async function updateParentPin(parentId: number, newPin: string) {
   if (error) throw new Error('PIN 변경에 실패했습니다.')
 }
 
+// ── 학생 전화번호 확인 (1단계) — 학부모 로그인과 동일한 방식, students.phone 기준 ──
+export async function studentLookup(phone: string) {
+  const normalized = phone.replace(/-/g, '').replace(/\s/g, '')
+
+  const { data: student, error } = await supabase
+    .from('students')
+    .select('id, name, phone, pin')
+    .eq('phone', normalized)
+    .maybeSingle()
+
+  if (error || !student) {
+    throw new Error('등록되지 않은 전화번호입니다. 담당 선생님에게 문의하세요.')
+  }
+
+  return {
+    studentId: student.id,
+    name: student.name,
+    phone: student.phone,
+    pin: student.pin ?? '0000',
+  }
+}
+
+// ── 학생 PIN 검증 (2단계) ──
+export async function studentLoginWithPin(phone: string, pin: string) {
+  const data = await studentLookup(phone)
+  if (data.pin !== pin) throw new Error('PIN이 올바르지 않습니다.')
+  return {
+    studentId: data.studentId,
+    name: data.name,
+    phone: data.phone,
+    isDefaultPin: data.pin === '0000',
+  }
+}
+
+// ── 학생 PIN 변경 ──
+export async function updateStudentPin(studentId: number, newPin: string) {
+  const { error } = await supabase
+    .from('students')
+    .update({ pin: newPin })
+    .eq('id', studentId)
+  if (error) throw new Error('PIN 변경에 실패했습니다.')
+}
+
 // ── 학부모 로그인 (전화번호만) - 기존 호환용 ──
 export async function parentLogin(phone: string) {
   // 전화번호 정규화: 하이픈 제거해서 DB 저장 형식(01012341234)에 맞춤
