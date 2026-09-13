@@ -1,63 +1,68 @@
 'use client'
-import { useEffect, useState } from 'react'
-import { parentLookup, parentLoginWithPin } from '@/lib/auth'
-import { useAuth } from '@/context/AuthContext'
+import { useState } from 'react'
+import { supabase } from '@/lib/supabase'
 
 // 공용 NFC 카드 등원 체크인 — 로그인 없이 접근 가능한 공개 페이지.
 // 학원 입구에 놓인 NFC 카드 1개를 학생이 자기 폰으로 태그하면 이 페이지가 열린다.
-// 그 폰이 학부모 포털에 "자동 로그인"이 남아있으면(app/page.tsx와 동일한 방식으로 복원)
-// 추가 입력 없이 바로 등원 처리되고, 처음 태그하는 폰이면 전화번호+PIN을 한 번만 입력한다
-// (이후 자동 로그인을 켜두면 다음 태그부터는 바로 처리된다).
-// 등원 처리 자체는 태블릿 키오스크(/checkin)와 동일한 kiosk-checkin 함수를 사용한다.
-
-const AUTO_KEY = 'parent_auto_login'
+//
+// 처음에는 "자동 로그인(localStorage)" 방식으로 만들었으나, 아이폰에서 NFC 태그를
+// 열 때 뜨는 미리보기 화면은 일반 사파리가 아니라 애플이 의도적으로 매번 새로
+// 시작하는 임시 웹뷰라서, 저장한 로그인 정보가 태그할 때마다 사라져 계속 재로그인이
+// 필요해지는 문제가 있었다. 그래서 태블릿 키오스크(/checkin)와 동일하게 "학부모
+// 휴대폰 번호 뒷 4자리 입력" 방식으로 바꿨다 — 아무것도 저장/복원하지 않으므로
+// 임시 웹뷰에서도 항상 동일하게 동작한다.
 const navyDk = '#071A3E', navy = '#0D2A5E', gold = '#D87E13'
 const re = '#C0392B', gr = '#1A7F4E'
 
-type Child = { id: number; name: string; birth_year: number; school: string }
+type Candidate = { studentId: number; studentName: string; school: string | null }
 
-type Screen =
-  | { kind: 'loading' }
-  | { kind: 'phone' }
-  | { kind: 'pin'; phone: string }
-  | { kind: 'select'; children: Child[] }
-  | { kind: 'success'; name: string; late: boolean; already: boolean }
-  | { kind: 'error'; message: string }
+type Screen = { kind: 'input' } | { kind: 'select'; candidates: Candidate[] } | { kind: 'confirm'; c: Candidate }
+  | { kind: 'success'; name: string; late: boolean; already: boolean } | { kind: 'error'; message: string }
 
 export default function TagCheckinPage() {
-  const { parent, role, loading: authLoading, loginAsParent } = useAuth()
-  const [screen, setScreen] = useState<Screen>({ kind: 'loading' })
-  const [phone, setPhone] = useState('')
-  const [pin, setPin] = useState('')
-  const [pinErr, setPinErr] = useState('')
-  const [autoLogin, setAutoLogin] = useState(true)
+  const [digits, setDigits] = useState('')
+  const [screen, setScreen] = useState<Screen>({ kind: 'input' })
   const [busy, setBusy] = useState(false)
-  const [restoreDone, setRestoreDone] = useState(false)
 
-  // 자동 로그인 복원 (app/page.tsx의 로그인 페이지와 동일한 방식)
-  useEffect(() => {
-    if (authLoading || role) { setRestoreDone(true); return }
-    try {
-      const raw = localStorage.getItem(AUTO_KEY)
-      if (raw) loginAsParent(JSON.parse(raw).session)
-    } catch {}
-    setRestoreDone(true)
-  }, [authLoading, role]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // 로그인 상태가 확정되면(복원되었거나, 원래 없었거나) 바로 다음 단계로 진행
-  useEffect(() => {
-    if (!restoreDone || authLoading) return
-    if (role === 'parent' && parent) proceedWithChildren(parent.children as Child[])
-    else if (role !== 'parent') setScreen({ kind: 'phone' })
-  }, [restoreDone, authLoading, role, parent]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  function proceedWithChildren(children: Child[]) {
-    if (children.length === 0) setScreen({ kind: 'error', message: '연결된 학생 정보가 없습니다. 선생님께 문의하세요.' })
-    else if (children.length === 1) doCheckin(children[0])
-    else setScreen({ kind: 'select', children })
+  function reset() {
+    setDigits('')
+    setScreen({ kind: 'input' })
   }
 
-  async function doCheckin(child: Child) {
+  async function search(last4: string) {
+    setBusy(true)
+    try {
+      const { data, error } = await supabase
+        .from('parents')
+        .select('id, phone, parent_students(student_id, students(id, name, school))')
+        .like('phone', `%${last4}`)
+
+      if (error || !data || data.length === 0) {
+        setScreen({ kind: 'error', message: '일치하는 학부모 전화번호가 없습니다.' })
+        return
+      }
+
+      const candidates: Candidate[] = []
+      for (const p of data as any[]) {
+        for (const ps of (p.parent_students ?? [])) {
+          if (!ps.students) continue
+          candidates.push({ studentId: ps.students.id, studentName: ps.students.name, school: ps.students.school ?? null })
+        }
+      }
+
+      if (candidates.length === 0) {
+        setScreen({ kind: 'error', message: '연결된 학생 정보가 없습니다. 선생님께 문의하세요.' })
+      } else if (candidates.length === 1) {
+        setScreen({ kind: 'confirm', c: candidates[0] })
+      } else {
+        setScreen({ kind: 'select', candidates })
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function confirmCheckin(c: Candidate) {
     setBusy(true)
     try {
       const res = await fetch(
@@ -68,15 +73,15 @@ export default function TagCheckinPage() {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
           },
-          body: JSON.stringify({ student_id: child.id }),
+          body: JSON.stringify({ student_id: c.studentId }),
         }
       )
-      const data = await res.json().catch(() => null)
-      if (!res.ok || !data?.success) {
-        setScreen({ kind: 'error', message: data?.error ?? '등원 처리에 실패했습니다. 선생님께 문의하세요.' })
+      const result = await res.json().catch(() => null)
+      if (!res.ok || !result?.success) {
+        setScreen({ kind: 'error', message: result?.error ?? '등원 처리에 실패했습니다. 선생님께 문의하세요.' })
         return
       }
-      setScreen({ kind: 'success', name: child.name, late: !!data.late, already: !!data.already })
+      setScreen({ kind: 'success', name: c.studentName, late: !!result.late, already: !!result.already })
     } catch {
       setScreen({ kind: 'error', message: '네트워크 오류로 처리하지 못했습니다.' })
     } finally {
@@ -84,39 +89,19 @@ export default function TagCheckinPage() {
     }
   }
 
-  async function handlePhoneSubmit() {
-    if (!phone) return
-    setBusy(true); setPinErr('')
-    try {
-      await parentLookup(phone)
-      setPin('')
-      setScreen({ kind: 'pin', phone })
-    } catch (e: any) {
-      setScreen({ kind: 'error', message: e.message })
-    } finally {
-      setBusy(false)
-    }
+  function pressDigit(d: string) {
+    if (busy || screen.kind !== 'input') return
+    const next = (digits + d).slice(0, 4)
+    setDigits(next)
+    if (next.length === 4) search(next)
   }
-
-  async function handlePinSubmit(phoneVal: string, pinVal: string) {
-    setBusy(true); setPinErr('')
-    try {
-      const result = await parentLoginWithPin(phoneVal, pinVal)
-      const session = { parentId: result.parentId, phone: result.phone, children: result.children }
-      if (autoLogin) localStorage.setItem(AUTO_KEY, JSON.stringify({ session }))
-      sessionStorage.setItem('parent_session', JSON.stringify(session))
-      loginAsParent(session)
-      proceedWithChildren(session.children as Child[])
-    } catch (e: any) {
-      setPinErr(e.message)
-      setPin('')
-      setBusy(false)
-    }
+  function pressBackspace() {
+    if (busy || screen.kind !== 'input') return
+    setDigits(d => d.slice(0, -1))
   }
-
-  function reset() {
-    setPhone(''); setPin(''); setPinErr('')
-    setScreen({ kind: 'phone' })
+  function pressClear() {
+    if (busy || screen.kind !== 'input') return
+    setDigits('')
   }
 
   return (
@@ -125,86 +110,76 @@ export default function TagCheckinPage() {
       justifyContent: 'center', fontFamily: "'Noto Sans KR',sans-serif", padding: 20,
     }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap');`}</style>
+
       <div style={{ width: '100%', maxWidth: 420, textAlign: 'center' }}>
         <p style={{ fontSize: 22, fontWeight: 900, color: '#fff', marginBottom: 6 }}>티처스 수학학원</p>
         <p style={{ fontSize: 14, color: 'rgba(255,255,255,.5)', marginBottom: 36 }}>NFC 태그 등원 체크인</p>
 
-        {(screen.kind === 'loading' || (busy && (screen.kind === 'select'))) && (
-          <p style={{ fontSize: 15, color: 'rgba(255,255,255,.6)' }}>확인 중...</p>
-        )}
-
-        {screen.kind === 'phone' && (
+        {screen.kind === 'input' && (
           <>
-            <p style={{ fontSize: 15, color: 'rgba(255,255,255,.85)', marginBottom: 16 }}>
-              처음 태그하셨네요. 학부모 전화번호를 입력해주세요
+            <p style={{ fontSize: 16, color: 'rgba(255,255,255,.85)', marginBottom: 20 }}>
+              학부모 휴대폰 번호 뒷 4자리를 입력해주세요
             </p>
-            <input
-              type="tel" inputMode="numeric" value={phone}
-              onChange={e => setPhone(e.target.value.replace(/[^0-9]/g, ''))}
-              onKeyDown={e => e.key === 'Enter' && handlePhoneSubmit()}
-              placeholder="01012345678" autoFocus
-              style={{
-                width: '100%', padding: '14px 16px', borderRadius: 10,
-                border: '1.5px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.06)',
-                color: '#fff', fontSize: 18, textAlign: 'center', letterSpacing: 1,
-                outline: 'none', fontFamily: 'inherit', marginBottom: 16, boxSizing: 'border-box',
-              }}
-            />
-            <button onClick={handlePhoneSubmit} disabled={busy || !phone} style={{
-              width: '100%', padding: 16, borderRadius: 12, border: 'none',
-              background: gold, color: navyDk, fontSize: 16, fontWeight: 900,
-              cursor: 'pointer', fontFamily: 'inherit', opacity: busy || !phone ? .6 : 1,
-            }}>
-              {busy ? '확인 중...' : '다음'}
-            </button>
+            <div style={{ display: 'flex', gap: 18, justifyContent: 'center', marginBottom: 32 }}>
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} style={{
+                  width: 46, height: 56, borderRadius: 10,
+                  background: 'rgba(255,255,255,.06)', border: `1.5px solid ${i < digits.length ? gold : 'rgba(255,255,255,.15)'}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 26, fontWeight: 700, color: '#fff',
+                }}>
+                  {digits[i] ?? ''}
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+              {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(n => (
+                <button key={n} onClick={() => pressDigit(n)} disabled={busy} style={keyStyle}>{n}</button>
+              ))}
+              <button onClick={pressClear} disabled={busy} style={{ ...keyStyle, fontSize: 15, color: 'rgba(255,255,255,.5)' }}>지우기</button>
+              <button onClick={() => pressDigit('0')} disabled={busy} style={keyStyle}>0</button>
+              <button onClick={pressBackspace} disabled={busy} style={{ ...keyStyle, fontSize: 20 }}>⌫</button>
+            </div>
+
+            {busy && <p style={{ marginTop: 20, fontSize: 13, color: 'rgba(255,255,255,.5)' }}>확인 중...</p>}
           </>
         )}
 
-        {screen.kind === 'pin' && (
+        {screen.kind === 'select' && (
           <>
-            <p style={{ fontSize: 15, color: 'rgba(255,255,255,.85)', marginBottom: 16 }}>PIN 번호 4자리를 입력해주세요</p>
-            <input
-              type="tel" inputMode="numeric" value={pin}
-              onChange={e => {
-                const v = e.target.value.replace(/\D/g, '').slice(0, 4)
-                setPin(v)
-                if (v.length === 4) handlePinSubmit(screen.phone, v)
-              }}
-              autoFocus
-              style={{
-                width: '100%', padding: '14px 16px', borderRadius: 10,
-                border: '1.5px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.06)',
-                color: '#fff', fontSize: 24, textAlign: 'center', letterSpacing: 12,
-                outline: 'none', fontFamily: 'inherit', marginBottom: 12, boxSizing: 'border-box',
-              }}
-            />
-            {pinErr && <p style={{ fontSize: 13, color: re, marginBottom: 12 }}>{pinErr}</p>}
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', marginBottom: 16, cursor: 'pointer' }}>
-              <input type="checkbox" checked={autoLogin} onChange={e => setAutoLogin(e.target.checked)} style={{ accentColor: gold }} />
-              <span style={{ fontSize: 13, color: 'rgba(255,255,255,.6)' }}>이 폰에서 자동 로그인 유지 (다음부터 태그만 하면 바로 처리)</span>
-            </label>
-            <button onClick={reset} style={{
-              width: '100%', padding: 12, borderRadius: 10, border: 'none', background: 'none',
-              color: 'rgba(255,255,255,.4)', fontSize: 14, cursor: 'pointer', fontFamily: 'inherit',
-            }}>← 전화번호 다시 입력</button>
-          </>
-        )}
-
-        {screen.kind === 'select' && !busy && (
-          <>
-            <p style={{ fontSize: 16, color: 'rgba(255,255,255,.85)', marginBottom: 20 }}>본인을 선택해주세요</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {screen.children.map(c => (
-                <button key={c.id} onClick={() => doCheckin(c)} disabled={busy} style={{
+            <p style={{ fontSize: 16, color: 'rgba(255,255,255,.85)', marginBottom: 20 }}>
+              일치하는 학생이 여러 명입니다. 본인을 선택해주세요
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
+              {screen.candidates.map(c => (
+                <button key={c.studentId} onClick={() => confirmCheckin(c)} disabled={busy} style={{
                   padding: '16px 18px', borderRadius: 10, border: '1.5px solid rgba(255,255,255,.15)',
                   background: 'rgba(255,255,255,.06)', color: '#fff', fontSize: 17, fontWeight: 700,
                   cursor: 'pointer', fontFamily: 'inherit', display: 'flex', justifyContent: 'space-between',
                 }}>
-                  <span>{c.name}</span>
+                  <span>{c.studentName}</span>
                   {c.school && <span style={{ fontSize: 13, color: 'rgba(255,255,255,.45)', fontWeight: 400 }}>{c.school}</span>}
                 </button>
               ))}
             </div>
+            <button onClick={reset} style={backBtnStyle}>← 다시 입력</button>
+          </>
+        )}
+
+        {screen.kind === 'confirm' && (
+          <>
+            <p style={{ fontSize: 20, color: '#fff', marginBottom: 8 }}>
+              <b style={{ color: gold }}>{screen.c.studentName}</b> 학생
+            </p>
+            <p style={{ fontSize: 15, color: 'rgba(255,255,255,.6)', marginBottom: 28 }}>맞으면 등원을 눌러주세요</p>
+            <button onClick={() => confirmCheckin(screen.c)} disabled={busy} style={{
+              width: '100%', padding: 18, borderRadius: 12, border: 'none', background: gold,
+              color: navyDk, fontSize: 18, fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 12,
+            }}>
+              {busy ? '처리 중...' : '등원'}
+            </button>
+            <button onClick={reset} style={backBtnStyle}>← 다시 입력</button>
           </>
         )}
 
@@ -233,4 +208,15 @@ export default function TagCheckinPage() {
       </div>
     </div>
   )
+}
+
+const keyStyle: React.CSSProperties = {
+  padding: '20px 0', borderRadius: 12, border: '1.5px solid rgba(255,255,255,.12)',
+  background: 'rgba(255,255,255,.05)', color: '#fff', fontSize: 24, fontWeight: 700,
+  cursor: 'pointer', fontFamily: 'inherit',
+}
+
+const backBtnStyle: React.CSSProperties = {
+  width: '100%', padding: 12, borderRadius: 10, border: 'none', background: 'none',
+  color: 'rgba(255,255,255,.4)', fontSize: 14, cursor: 'pointer', fontFamily: 'inherit',
 }
