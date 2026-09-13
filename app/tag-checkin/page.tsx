@@ -1,28 +1,57 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
 // 공용 NFC 카드 등원 체크인 — 로그인 없이 접근 가능한 공개 페이지.
 // 학원 입구에 놓인 NFC 카드 1개를 학생이 자기 폰으로 태그하면 이 페이지가 열린다.
 //
-// 처음에는 "자동 로그인(localStorage)" 방식으로 만들었으나, 아이폰에서 NFC 태그를
-// 열 때 뜨는 미리보기 화면은 일반 사파리가 아니라 애플이 의도적으로 매번 새로
-// 시작하는 임시 웹뷰라서, 저장한 로그인 정보가 태그할 때마다 사라져 계속 재로그인이
-// 필요해지는 문제가 있었다. 그래서 태블릿 키오스크(/checkin)와 동일하게 "학부모
-// 휴대폰 번호 뒷 4자리 입력" 방식으로 바꿨다 — 아무것도 저장/복원하지 않으므로
-// 임시 웹뷰에서도 항상 동일하게 동작한다.
+// 하이브리드 방식: 이 폰에 저장된 로그인 정보(localStorage)가 있으면 입력 없이
+// 바로 등원 처리한다(안드로이드는 보통 이 경로로 태그만 하면 끝). 저장된 정보가
+// 없으면(또는 사라졌으면) 태블릿 키오스크(/checkin)와 동일한 "학부모 휴대폰 번호
+// 뒷 4자리 입력" 방식으로 대체하고, 성공하면 다음 태그를 위해 다시 저장을 시도한다.
+// 아이폰에서 NFC 태그를 열 때 뜨는 미리보기 화면은 일반 사파리가 아니라 애플이
+// 매번 새로 시작하는 임시 웹뷰라 저장이 계속 사라질 수 있는데, 그 경우에도 매번
+// 뒷 4자리만 입력하면 되므로(전체 전화번호+PIN보다 훨씬 빠름) 크게 불편하지 않다.
+const AUTO_KEY = 'tag_checkin_auto_login'
 const navyDk = '#071A3E', navy = '#0D2A5E', gold = '#D87E13'
 const re = '#C0392B', gr = '#1A7F4E'
 
-type Candidate = { studentId: number; studentName: string; school: string | null }
+type Child = { id: number; name: string; school: string | null }
+type ParentSession = { parentId: number; phone: string; children: Child[] }
+type Candidate = { studentId: number; studentName: string; school: string | null; parentId: number }
 
-type Screen = { kind: 'input' } | { kind: 'select'; candidates: Candidate[] } | { kind: 'confirm'; c: Candidate }
+type Screen = { kind: 'loading' } | { kind: 'input' } | { kind: 'select'; candidates: Candidate[] } | { kind: 'confirm'; c: Candidate }
   | { kind: 'success'; name: string; late: boolean; already: boolean } | { kind: 'error'; message: string }
 
 export default function TagCheckinPage() {
   const [digits, setDigits] = useState('')
-  const [screen, setScreen] = useState<Screen>({ kind: 'input' })
+  const [screen, setScreen] = useState<Screen>({ kind: 'loading' })
   const [busy, setBusy] = useState(false)
+  // 뒷 4자리 검색 결과로 찾은 후보들을 (다음 태그를 위한) 저장용 부모 세션과 함께 들고 있는다
+  const [parentSessions, setParentSessions] = useState<Record<number, ParentSession>>({})
+
+  // 이 폰에 저장된 로그인이 있으면 입력 없이 바로 등원 처리 시도
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(AUTO_KEY)
+      if (raw) {
+        const session: ParentSession = JSON.parse(raw).session
+        if (session?.children?.length) {
+          proceedWithChildren(session.children.map(c => ({
+            studentId: c.id, studentName: c.name, school: c.school, parentId: session.parentId,
+          })))
+          return
+        }
+      }
+    } catch {}
+    setScreen({ kind: 'input' })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function proceedWithChildren(candidates: Candidate[]) {
+    if (candidates.length === 0) setScreen({ kind: 'error', message: '연결된 학생 정보가 없습니다. 선생님께 문의하세요.' })
+    else if (candidates.length === 1) setScreen({ kind: 'confirm', c: candidates[0] })
+    else setScreen({ kind: 'select', candidates })
+  }
 
   function reset() {
     setDigits('')
@@ -42,13 +71,18 @@ export default function TagCheckinPage() {
         return
       }
 
+      const sessions: Record<number, ParentSession> = {}
       const candidates: Candidate[] = []
       for (const p of data as any[]) {
+        const children: Child[] = []
         for (const ps of (p.parent_students ?? [])) {
           if (!ps.students) continue
-          candidates.push({ studentId: ps.students.id, studentName: ps.students.name, school: ps.students.school ?? null })
+          children.push({ id: ps.students.id, name: ps.students.name, school: ps.students.school ?? null })
+          candidates.push({ studentId: ps.students.id, studentName: ps.students.name, school: ps.students.school ?? null, parentId: p.id })
         }
+        sessions[p.id] = { parentId: p.id, phone: p.phone, children }
       }
+      setParentSessions(sessions)
 
       if (candidates.length === 0) {
         setScreen({ kind: 'error', message: '연결된 학생 정보가 없습니다. 선생님께 문의하세요.' })
@@ -80,6 +114,11 @@ export default function TagCheckinPage() {
       if (!res.ok || !result?.success) {
         setScreen({ kind: 'error', message: result?.error ?? '등원 처리에 실패했습니다. 선생님께 문의하세요.' })
         return
+      }
+      // 다음 태그부터는 입력 없이 되도록 이 폰에 저장 시도 (저장이 유지되는 폰이면 다음엔 바로 처리됨)
+      const session = parentSessions[c.parentId]
+      if (session) {
+        try { localStorage.setItem(AUTO_KEY, JSON.stringify({ session })) } catch {}
       }
       setScreen({ kind: 'success', name: c.studentName, late: !!result.late, already: !!result.already })
     } catch {
@@ -115,6 +154,10 @@ export default function TagCheckinPage() {
         <p style={{ fontSize: 22, fontWeight: 900, color: '#fff', marginBottom: 6 }}>티처스 수학학원</p>
         <p style={{ fontSize: 14, color: 'rgba(255,255,255,.5)', marginBottom: 36 }}>NFC 태그 등원 체크인</p>
 
+        {(screen.kind === 'loading' || (busy && screen.kind === 'select')) && (
+          <p style={{ fontSize: 15, color: 'rgba(255,255,255,.6)' }}>확인 중...</p>
+        )}
+
         {screen.kind === 'input' && (
           <>
             <p style={{ fontSize: 16, color: 'rgba(255,255,255,.85)', marginBottom: 20 }}>
@@ -146,7 +189,7 @@ export default function TagCheckinPage() {
           </>
         )}
 
-        {screen.kind === 'select' && (
+        {screen.kind === 'select' && !busy && (
           <>
             <p style={{ fontSize: 16, color: 'rgba(255,255,255,.85)', marginBottom: 20 }}>
               일치하는 학생이 여러 명입니다. 본인을 선택해주세요
