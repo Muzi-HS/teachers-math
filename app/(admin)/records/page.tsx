@@ -507,7 +507,10 @@ export default function RecordsPage() {
         groups.push({ cls, recs: recsForCls })
       }
     }
-    return groups
+    // 카드와 같은 기준으로 학부모 의견이 있는 반을 먼저 표시하고, 동순위는 기존 순서 유지
+    return groups.sort((a, b) =>
+      Number(b.recs.some(isHighlighted)) - Number(a.recs.some(isHighlighted))
+    )
   })()
 
   const css = `
