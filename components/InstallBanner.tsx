@@ -72,7 +72,7 @@ export default function InstallBanner() {
       boxShadow: '0 -4px 16px rgba(0,0,0,.2)',
       fontFamily: "'Noto Sans KR',sans-serif",
     }}>
-      <Image src="/logo3.png" alt="" width={34} height={34} style={{ objectFit: 'contain', flexShrink: 0, borderRadius: 8, background: '#fff', padding: 2 }} />
+      <Image src="/app-icon-v2-192.png" alt="" width={34} height={34} style={{ flexShrink: 0, borderRadius: 8 }} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <p style={{ margin: 0, fontSize: 13, fontWeight: 700 }}>홈 화면에 추가</p>
         <p style={{ margin: '2px 0 0', fontSize: 11, color: 'rgba(255,255,255,.75)' }}>
