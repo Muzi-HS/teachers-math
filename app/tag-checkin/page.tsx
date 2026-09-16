@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { requestFCMToken } from '@/lib/firebase'
 
 // 공용 NFC 카드 등원 체크인 — 로그인 없이 접근 가능한 공개 페이지.
 // 학원 입구에 놓인 NFC 카드 1개를 학생이 자기 폰으로 태그하면 이 페이지가 열린다.
@@ -12,6 +13,11 @@ import { supabase } from '@/lib/supabase'
 // 아이폰에서 NFC 태그를 열 때 뜨는 미리보기 화면은 일반 사파리가 아니라 애플이
 // 매번 새로 시작하는 임시 웹뷰라 저장이 계속 사라질 수 있는데, 그 경우에도 매번
 // 뒷 4자리만 입력하면 되므로(전체 전화번호+PIN보다 훨씬 빠름) 크게 불편하지 않다.
+//
+// 체크인에 성공하면 그 자리에서 이 폰을 "본인(학생) 명의"로 알림 등록까지 같이 시도한다.
+// 학생/학부모 계정에 로그인(전화번호+PIN)해야만 알림을 받을 수 있었던 것과 달리,
+// 여기서는 등원 체크인 자체와 동일한 신뢰 수준(부모 번호 뒷 4자리 확인)만으로 충분하다고
+// 보고 별도 PIN을 요구하지 않는다 — 학생에게 학부모 PIN을 알려줄 필요가 없어진다.
 const AUTO_KEY = 'tag_checkin_auto_login'
 const navyDk = '#071A3E', navy = '#0D2A5E', gold = '#D87E13'
 const re = '#C0392B', gr = '#1A7F4E'
@@ -46,6 +52,23 @@ export default function TagCheckinPage() {
     } catch {}
     setScreen({ kind: 'input' })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 로그인/PIN 없이, 방금 확인된 학생 본인 명의로 이 폰의 FCM 토큰을 등록한다.
+  // 실패해도(알림 미지원 브라우저, 권한 거부 등) 등원 체크인 자체에는 영향 없다.
+  async function registerThisDeviceForNotifications(studentId: number) {
+    try {
+      const token = await requestFCMToken()
+      if (!token) return
+      await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/register-fcm-token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({ student_id: studentId, token }),
+      })
+    } catch {}
+  }
 
   function proceedWithChildren(candidates: Candidate[]) {
     if (candidates.length === 0) setScreen({ kind: 'error', message: '연결된 학생 정보가 없습니다. 선생님께 문의하세요.' })
@@ -120,6 +143,11 @@ export default function TagCheckinPage() {
       if (session) {
         try { localStorage.setItem(AUTO_KEY, JSON.stringify({ session })) } catch {}
       }
+      // 이 폰(=학생 본인 폰)이 앞으로도 본인 등원 알림을 직접 받을 수 있도록, 별도 로그인/PIN
+      // 없이 방금 뒷 4자리로 확인된 학생 본인 명의로 바로 등록한다. 로그인 계정이 필요한
+      // 알림 등록과 달리, 여기서는 등원 체크인 자체와 동일한 신뢰 수준(뒷 4자리 확인)만 있으면
+      // 충분하다고 보고 PIN을 따로 요구하지 않는다.
+      registerThisDeviceForNotifications(c.studentId)
       setScreen({ kind: 'success', name: c.studentName, late: !!result.late, already: !!result.already })
     } catch {
       setScreen({ kind: 'error', message: '네트워크 오류로 처리하지 못했습니다.' })
