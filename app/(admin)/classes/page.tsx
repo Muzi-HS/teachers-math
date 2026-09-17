@@ -278,6 +278,13 @@ export default function ClassesPage() {
     .bgold:hover{background:${goldL};}
     .bprim{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;background:${navy};color:#fff;font-family:inherit;}
     .bprim:hover{background:#1A4080;}
+    /* 반 상세 헤더 액션 버튼 — 공지하기/수업 준비/학생 추가를 크기·모양 통일된 아웃라인으로,
+       수업기록 작성만 채워진 primary로 둬서 넷이 한 세트처럼 보이면서 주 액션이 도드라지게 한다 */
+    .chdr-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;}
+    .chdr-btn-out{border:1.5px solid ${bd};background:#fff;color:${tx2};}
+    .chdr-btn-out:hover{border-color:${navy};color:${navy};background:${navyM};}
+    .chdr-btn-primary{border:1.5px solid ${navy};background:${navy};color:#fff;}
+    .chdr-btn-primary:hover{background:#1A4080;}
     .bout{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid ${bd};background:transparent;color:${tx2};font-family:inherit;}
     .bout:hover{border-color:${navy};color:${navy};}
     .bdng{display:inline-flex;align-items:center;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;border:none;background:${rbg};color:${re};font-family:inherit;}
@@ -399,24 +406,24 @@ export default function ClassesPage() {
             </div>
             <p style={{ fontSize: 13, color: tx2, marginTop: 4 }}>{detailCls.days} | {detailCls.time}</p>
           </div>
-          {/* v18: bprim 수업기록작성 + bgold 학생추가 (학생추가는 admin만) */}
+          {/* 공지하기 → 수업 준비 → 수업기록 작성(primary) → 학생 추가 순으로 통일된 스타일 */}
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="bout" onClick={() => setPrepModal(true)}>
-              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth={2} d="M9 12h6M9 16h6M9 8h6M5 4h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1z" /></svg>
-              수업 준비
-            </button>
-            <button className="bprim" onClick={() => setBulkModal(true)}>
-              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth={2} d="M11 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-4M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-              수업기록 작성
-            </button>
             {(role === 'admin' || role === 'teacher') && (
-              <button className="bout" onClick={() => setNoticeModal(true)}>
+              <button className="chdr-btn chdr-btn-out" onClick={() => setNoticeModal(true)}>
                 <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
                 공지하기
               </button>
             )}
+            <button className="chdr-btn chdr-btn-out" onClick={() => setPrepModal(true)}>
+              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth={2} d="M9 12h6M9 16h6M9 8h6M5 4h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1z" /></svg>
+              수업 준비
+            </button>
+            <button className="chdr-btn chdr-btn-primary" onClick={() => setBulkModal(true)}>
+              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth={2} d="M11 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-4M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+              수업기록 작성
+            </button>
             {canManageClassInfo && (
-              <button className="bgold" onClick={() => { setStuModal(true); setS2cSrch(''); setSelStus(new Set()); setAgeFilter('') }}>
+              <button className="chdr-btn chdr-btn-out" onClick={() => { setStuModal(true); setS2cSrch(''); setSelStus(new Set()); setAgeFilter('') }}>
                 <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth={2} d="M12 5v14M5 12h14" /></svg>
                 학생 추가
               </button>
