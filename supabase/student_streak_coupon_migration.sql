@@ -4,7 +4,8 @@
 --   시작한다. last_seen_streak/last_prompted_milestone은 그 계산 범위 안에서 이미
 --   물어본(받았거나 넘긴) 가장 높은 마일스톤을 기억해 같은 마일스톤을 반복해서 묻지 않는다.
 -- student_coupons: 학생이 "쿠폰 받기"를 선택했을 때 실제로 발급되는 쿠폰함 항목.
---   used/used_at은 반관리 관리자가 실제 사용 처리를 할 때 기록한다.
+--   code는 학생이 학원에서 보여주면 관리자가 코드로 바로 찾아 사용 처리할 수 있는
+--   짧은 고유 코드다. used/used_at은 그 사용 처리 시점에 기록된다.
 CREATE TABLE IF NOT EXISTS student_streak_state (
   student_id bigint primary key references students(id) on delete cascade,
   last_seen_streak int not null default 0,
@@ -18,6 +19,7 @@ CREATE TABLE IF NOT EXISTS student_coupons (
   student_id bigint not null references students(id) on delete cascade,
   milestone int not null,
   streak_value int not null,
+  code text not null unique,
   claimed_at timestamptz not null default now(),
   used boolean not null default false,
   used_at timestamptz

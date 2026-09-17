@@ -7,10 +7,11 @@ const navy = '#0D2A5E', navyDk = '#071A3E', gold = '#D87E13'
 const bg = '#F5F7FA', bd = '#DDE3EE'
 const tx = '#0D1B36', tx2 = '#4B5C7E', tx3 = '#96A4BF', gr = '#1A7F4E', gbg = '#E0F5EB'
 
-type Coupon = { id: number; milestone: number; streak_value: number; claimed_at: string; used: boolean }
+type Coupon = { id: number; milestone: number; streak_value: number; claimed_at: string; used: boolean; code: string }
 
 // 학생 계정 "쿠폰함" — 숙제 이행률 연속 100% 달성 마일스톤에서 받은 쿠폰 목록.
-// 실제 사용 처리(used)는 관리자가 반관리 > 학생 상세에서 확인해준다.
+// 학생이 이 코드를 학원에서 보여주면, 관리자가 반관리 > 학생관리에서 코드로 검색해
+// 바로 사용 처리한다.
 export default function StudentCoupons() {
   const { student } = useAuth()
   const [coupons, setCoupons] = useState<Coupon[]>([])
@@ -24,7 +25,7 @@ export default function StudentCoupons() {
   async function load(studentId: number) {
     setLoading(true)
     const { data } = await supabase
-      .from('student_coupons').select('id,milestone,streak_value,claimed_at,used')
+      .from('student_coupons').select('id,milestone,streak_value,claimed_at,used,code')
       .eq('student_id', studentId).order('claimed_at', { ascending: false })
     setCoupons(data ?? [])
     setLoading(false)
@@ -71,32 +72,39 @@ export default function StudentCoupons() {
 function CouponCard({ c }: { c: Coupon }) {
   return (
     <div style={{
-      position: 'relative', display: 'flex', alignItems: 'center', gap: 14,
       background: c.used ? bg : `linear-gradient(135deg,${navy} 0%,${navyDk} 100%)`,
       borderRadius: 14, padding: '16px 18px', marginBottom: 10,
       opacity: c.used ? 0.6 : 1, overflow: 'hidden',
     }}>
-      <div style={{
-        width: 52, height: 52, borderRadius: '50%', flexShrink: 0,
-        background: c.used ? '#fff' : 'rgba(255,255,255,.15)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24,
-      }}>
-        🎟️
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: c.used ? 0 : 14 }}>
+        <div style={{
+          width: 52, height: 52, borderRadius: '50%', flexShrink: 0,
+          background: c.used ? '#fff' : 'rgba(255,255,255,.15)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24,
+        }}>
+          🎟️
+        </div>
+        <div style={{ flex: 1 }}>
+          <p style={{ fontSize: 15, fontWeight: 800, color: c.used ? tx : '#fff', margin: 0 }}>
+            {c.milestone}일 연속 달성 쿠폰
+          </p>
+          <p style={{ fontSize: 11.5, color: c.used ? tx3 : 'rgba(255,255,255,.6)', margin: '3px 0 0' }}>
+            {c.claimed_at.slice(0, 10)} 획득 · {c.streak_value}일 연속 기록
+          </p>
+        </div>
+        <span style={{
+          flexShrink: 0, fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 20,
+          background: c.used ? '#fff' : gbg, color: c.used ? tx3 : gr, border: c.used ? `1px solid ${bd}` : 'none',
+        }}>
+          {c.used ? '사용완료' : '사용가능'}
+        </span>
       </div>
-      <div style={{ flex: 1 }}>
-        <p style={{ fontSize: 15, fontWeight: 800, color: c.used ? tx : '#fff', margin: 0 }}>
-          {c.milestone}일 연속 달성 쿠폰
-        </p>
-        <p style={{ fontSize: 11.5, color: c.used ? tx3 : 'rgba(255,255,255,.6)', margin: '3px 0 0' }}>
-          {c.claimed_at.slice(0, 10)} 획득 · {c.streak_value}일 연속 기록
-        </p>
-      </div>
-      <span style={{
-        flexShrink: 0, fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 20,
-        background: c.used ? '#fff' : gbg, color: c.used ? tx3 : gr, border: c.used ? `1px solid ${bd}` : 'none',
-      }}>
-        {c.used ? '사용완료' : '사용가능'}
-      </span>
+      {!c.used && (
+        <div style={{ background: 'rgba(255,255,255,.1)', border: '1.5px dashed rgba(255,255,255,.4)', borderRadius: 10, padding: '10px 8px', textAlign: 'center' }}>
+          <p style={{ fontSize: 10, color: 'rgba(255,255,255,.6)', margin: '0 0 4px' }}>학원에서 이 코드를 보여주세요</p>
+          <p style={{ fontSize: 22, fontWeight: 900, color: '#fff', letterSpacing: 3, margin: 0, fontFamily: 'monospace' }}>{c.code}</p>
+        </div>
+      )}
     </div>
   )
 }
