@@ -2,11 +2,12 @@
 import { useEffect, useState } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { supabase } from '@/lib/supabase'
-import { computeStreak } from '@/lib/streak'
+import { computeStreak, COUPON_MILESTONES } from '@/lib/streak'
 
 const navy='#0D2A5E', gold='#D87E13', tx='#0D1B36', tx2='#4B5C7E', tx3='#96A4BF', bd='#DDE3EE'
 
-const STREAK_TIERS = [3, 5, 10, 20, 30]
+// 쿠폰 마일스톤(5일부터 5일 단위로 30일까지)과 동일한 기준으로 뱃지를 보여준다
+const STREAK_TIERS = COUPON_MILESTONES
 
 type StatRec = { date: string; hw_rate: number; hw_cor: number }
 
