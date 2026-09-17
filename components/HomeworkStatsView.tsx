@@ -1,5 +1,7 @@
 'use client'
+import { useEffect, useState } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { supabase } from '@/lib/supabase'
 import { computeStreak } from '@/lib/streak'
 
 const navy='#0D2A5E', gold='#D87E13', tx='#0D1B36', tx2='#4B5C7E', tx3='#96A4BF', bd='#DDE3EE'
@@ -13,7 +15,18 @@ function rateColor(v: number) { return v >= 80 ? '#1A7F4E' : v >= 60 ? '#C05621'
 // 학부모/학생 화면이 공유하는 수업기록 통계 뷰 — 숙제 이행률/정답률 추이 그래프와
 // 연속 100% 이행률 스트릭·뱃지를 보여준다. 이미 화면에서 불러온 records 배열을
 // 그대로 재사용하므로 별도 쿼리를 하지 않는다.
-export default function HomeworkStatsView({ recs }: { recs: StatRec[] }) {
+// studentId를 주면 "현재 스트릭"은 쿠폰 시스템과 동일하게 마지막 쿠폰 수령일 이후
+// 기록만으로 계산한다(쿠폰을 받으면 그 순간부터 다시 센다) — "최고 기록"은 쿠폰 여부와
+// 무관하게 전체 기록 기준 역대 최장 기록을 그대로 보여준다.
+export default function HomeworkStatsView({ recs, studentId }: { recs: StatRec[]; studentId?: number }) {
+  const [lastClaimedDate, setLastClaimedDate] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!studentId) return
+    supabase.from('student_streak_state').select('last_claimed_date').eq('student_id', studentId).maybeSingle()
+      .then(({ data }) => setLastClaimedDate(data?.last_claimed_date ?? null))
+  }, [studentId])
+
   // recs는 최신순(date desc)으로 넘어온다 — 그래프/스트릭은 시간순으로 계산해야 하므로 뒤집는다
   const chrono = [...recs].reverse()
   const chartData = chrono.map(r => ({
@@ -27,7 +40,9 @@ export default function HomeworkStatsView({ recs }: { recs: StatRec[] }) {
   const corRecs = recs.filter(r => r.hw_cor >= 0)
   const avgHwCor = corRecs.length ? Math.round(corRecs.reduce((a, b) => a + b.hw_cor, 0) / corRecs.length) : null
 
-  const { current, best } = computeStreak(chrono)
+  const { best } = computeStreak(chrono)
+  const scopedChrono = lastClaimedDate ? chrono.filter(r => r.date > lastClaimedDate) : chrono
+  const { current } = computeStreak(scopedChrono)
 
   return (
     <div>

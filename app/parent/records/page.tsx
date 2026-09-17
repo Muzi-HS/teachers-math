@@ -169,7 +169,7 @@ export default function ParentRecords() {
           </div>
 
           {showStats ? (
-            <HomeworkStatsView recs={recs} />
+            <HomeworkStatsView recs={recs} studentId={selChild ?? undefined} />
           ) : loading ? (
             <p style={{ textAlign: 'center', color: tx3, padding: '40px 0' }}>불러오는 중...</p>
           ) : recs.length === 0 ? (

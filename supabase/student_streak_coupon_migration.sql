@@ -1,12 +1,15 @@
 -- 학생 계정의 "숙제 이행률 연속 달성" 쿠폰 시스템.
--- student_streak_state: 학생별로 마지막까지 확인한 스트릭 길이와, 이미 쿠폰 선택지를
---   보여준(받았거나 넘긴) 가장 높은 마일스톤을 기억해서 같은 마일스톤을 반복해서 묻지 않는다.
+-- student_streak_state: 학생별로 마지막으로 쿠폰을 받은 날짜(last_claimed_date) 이후의
+--   스트릭만 계산 대상으로 삼는다 — 쿠폰을 받으면 그 시점부터 처음부터 다시 세기
+--   시작한다. last_seen_streak/last_prompted_milestone은 그 계산 범위 안에서 이미
+--   물어본(받았거나 넘긴) 가장 높은 마일스톤을 기억해 같은 마일스톤을 반복해서 묻지 않는다.
 -- student_coupons: 학생이 "쿠폰 받기"를 선택했을 때 실제로 발급되는 쿠폰함 항목.
 --   used/used_at은 반관리 관리자가 실제 사용 처리를 할 때 기록한다.
 CREATE TABLE IF NOT EXISTS student_streak_state (
   student_id bigint primary key references students(id) on delete cascade,
   last_seen_streak int not null default 0,
   last_prompted_milestone int not null default 0,
+  last_claimed_date date,
   updated_at timestamptz not null default now()
 );
 

@@ -7,7 +7,6 @@ import TestResultCard from '@/components/TestResultCard'
 import HomeworkStatsView from '@/components/HomeworkStatsView'
 import TodayClassBanner from '@/components/TodayClassBanner'
 import StreakCouponPrompt from '@/components/StreakCouponPrompt'
-import { computeStreak } from '@/lib/streak'
 
 const navy='#0D2A5E', gold='#D87E13', tx='#0D1B36', tx2='#4B5C7E', tx3='#96A4BF'
 const bd='#DDE3EE', bg='#F5F7FA', re='#C0392B', rbg='#FDECEA', gr='#1A7F4E', gbg='#E0F5EB'
@@ -94,11 +93,11 @@ export default function StudentRecords() {
     latestByClass.push({ classId: r.class_id, rec: r })
   }
 
-  const { current: currentStreak } = computeStreak([...recs].reverse())
+  const chronoRecs = [...recs].reverse()
 
   return (
     <div>
-      {student?.studentId && <StreakCouponPrompt studentId={student.studentId} currentStreak={currentStreak} />}
+      {student?.studentId && <StreakCouponPrompt studentId={student.studentId} chronoRecs={chronoRecs} />}
       <TodayClassBanner studentId={student?.studentId ?? null} />
 
       {/* 학생 헤더 */}
@@ -120,7 +119,7 @@ export default function StudentRecords() {
       </div>
 
       {showStats ? (
-        <HomeworkStatsView recs={recs} />
+        <HomeworkStatsView recs={recs} studentId={student?.studentId} />
       ) : loading ? (
         <p style={{ textAlign: 'center', color: tx3, padding: '40px 0' }}>불러오는 중...</p>
       ) : recs.length === 0 ? (
