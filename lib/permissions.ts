@@ -63,4 +63,6 @@ export const menuAccess: Record<string, (role: Role) => boolean> = {
   parent:     (r) => r === 'parent',
   // 학생 전용
   student:    (r) => r === 'student',
+  // 쿠폰 사용 처리 — admin만
+  coupons:    (r) => r === 'admin',
 }

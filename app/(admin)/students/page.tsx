@@ -80,10 +80,6 @@ export default function StudentsPage() {
   const [noSchoolMap, setNoSchoolMap] = useState<Record<SchoolKey, boolean>>({ '초등': false, '중등': false, '고등': false })
   const [parentPinMap, setParentPinMap] = useState<Record<string, string>>({})
   const [detailCoupons, setDetailCoupons] = useState<{ id: number; milestone: number; claimed_at: string; used: boolean; code: string }[]>([])
-  const [couponCodeInput, setCouponCodeInput] = useState('')
-  const [couponSearchBusy, setCouponSearchBusy] = useState(false)
-  const [couponSearchErr, setCouponSearchErr] = useState('')
-  const [couponResult, setCouponResult] = useState<{ id: number; code: string; milestone: number; claimed_at: string; used: boolean; studentName: string } | null>(null)
 
   useEffect(() => { fetchAll() }, [])
   useEffect(() => { if (role === 'admin') fetchParentPins() }, [role])
@@ -99,35 +95,6 @@ export default function StudentsPage() {
       .update({ used, used_at: used ? new Date().toISOString() : null }).eq('id', couponId)
     if (error) return toast('쿠폰 처리 실패: ' + error.message, false)
     setDetailCoupons(cs => cs.map(c => c.id === couponId ? { ...c, used } : c))
-  }
-
-  // 쿠폰 코드로 찾기 — 학생을 일일이 찾지 않고 학생이 보여준 코드로 바로 검색해서 사용 처리
-  function normalizeCouponCode(raw: string): string | null {
-    const clean = raw.replace(/[^A-Za-z0-9]/g, '').toUpperCase()
-    if (clean.length !== 6) return null
-    return `${clean.slice(0, 3)}-${clean.slice(3)}`
-  }
-
-  async function searchCouponByCode() {
-    const code = normalizeCouponCode(couponCodeInput)
-    if (!code) { setCouponSearchErr('코드 6자리를 정확히 입력하세요.'); setCouponResult(null); return }
-    setCouponSearchBusy(true); setCouponSearchErr(''); setCouponResult(null)
-    const { data: coupon } = await supabase
-      .from('student_coupons').select('id,code,milestone,claimed_at,used,student_id').eq('code', code).maybeSingle()
-    if (!coupon) { setCouponSearchErr('일치하는 쿠폰이 없습니다.'); setCouponSearchBusy(false); return }
-    const { data: stu } = await supabase.from('students').select('name').eq('id', coupon.student_id).maybeSingle()
-    setCouponResult({ id: coupon.id, code: coupon.code, milestone: coupon.milestone, claimed_at: coupon.claimed_at, used: coupon.used, studentName: stu?.name ?? '알 수 없음' })
-    setCouponSearchBusy(false)
-  }
-
-  async function toggleFoundCouponUsed() {
-    if (!couponResult) return
-    const used = !couponResult.used
-    const { error } = await supabase.from('student_coupons')
-      .update({ used, used_at: used ? new Date().toISOString() : null }).eq('id', couponResult.id)
-    if (error) return toast('쿠폰 처리 실패: ' + error.message, false)
-    setCouponResult({ ...couponResult, used })
-    toast(used ? '쿠폰을 사용 처리했습니다' : '쿠폰 사용을 취소했습니다')
   }
 
   async function fetchParentPins() {
@@ -387,37 +354,6 @@ export default function StudentsPage() {
           </button>
         )}
       </div>
-
-      {/* 쿠폰 코드로 사용 처리 (admin만) — 학생을 찾지 않고 코드만으로 바로 검색 */}
-      {isAdmin && (
-        <div style={{ background:'#fff',borderRadius:12,border:`1px solid ${bd}`,padding:mobileMode?14:18,marginBottom:16,boxShadow:'0 1px 4px rgba(0,0,0,.06)' }}>
-          <p style={{ fontSize:13,fontWeight:600,color:tx,margin:'0 0 10px' }}>🎟️ 쿠폰 코드로 사용 처리</p>
-          <div style={{ display:'flex',gap:8,flexWrap:'wrap' }}>
-            <input
-              value={couponCodeInput}
-              onChange={e => setCouponCodeInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && searchCouponByCode()}
-              placeholder="예) K3X-9QF"
-              style={{ flex:1,minWidth:160,padding:'9px 12px',border:`1.5px solid ${bd}`,borderRadius:8,fontSize:14,fontFamily:'monospace',letterSpacing:1,outline:'none',color:tx }}
-            />
-            <button className="bgold" onClick={searchCouponByCode} disabled={couponSearchBusy || !couponCodeInput.trim()}>
-              {couponSearchBusy ? '검색 중...' : '검색'}
-            </button>
-          </div>
-          {couponSearchErr && <p style={{ fontSize:12,color:re,margin:'8px 0 0' }}>{couponSearchErr}</p>}
-          {couponResult && (
-            <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginTop:12,padding:'10px 14px',background:bg,borderRadius:10,flexWrap:'wrap' }}>
-              <div>
-                <p style={{ fontSize:14,fontWeight:700,color:tx,margin:0 }}>{couponResult.studentName} · {couponResult.milestone}일 연속 달성 쿠폰</p>
-                <p style={{ fontSize:11,color:tx3,margin:'2px 0 0' }}>{couponResult.claimed_at.slice(0,10)} 획득 · 코드 {couponResult.code}</p>
-              </div>
-              <button className={couponResult.used ? 'bout' : 'bgold'} onClick={toggleFoundCouponUsed}>
-                {couponResult.used ? '사용 취소' : '사용 처리'}
-              </button>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* 카드 */}
       <div style={{ background:'#fff',borderRadius:12,border:`1px solid ${bd}`,padding:mobileMode?14:22,boxShadow:'0 1px 4px rgba(0,0,0,.06)' }}>
