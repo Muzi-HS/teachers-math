@@ -49,6 +49,26 @@ export default function ClassNoticeModal({
     if (error) { setErr('전송 실패: ' + error.message); return }
     setNotices(ns => [...ns, data as Notice])
     setDraft('')
+    notifyStudents(content)
+  }
+
+  // 반 소속 학생 각자의 계정에 등록된 기기로 새 공지 푸시를 보낸다 (실패해도 공지 자체는 이미 등록됨)
+  async function notifyStudents(content: string) {
+    const { data: csRows } = await supabase.from('class_students').select('student_id').eq('class_id', classId)
+    const studentIds = [...new Set((csRows ?? []).map(r => r.student_id))]
+    const body = content.length > 60 ? content.slice(0, 60) + '…' : content
+    await Promise.allSettled(studentIds.map(studentId =>
+      fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({
+          student_id: studentId,
+          title: `${className} 공지`,
+          body,
+          link: '/student/notices',
+        }),
+      }).catch(() => {})
+    ))
   }
 
   async function remove(id: number) {
