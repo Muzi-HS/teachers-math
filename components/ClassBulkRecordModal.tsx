@@ -52,6 +52,7 @@ export default function ClassBulkRecordModal({
   const [bulkChks, setBulkChks] = useState<Record<number, boolean>>({})
   const [bulkForms, setBulkForms] = useState<Record<number, RecForm>>({})
   const [bulkRecIds, setBulkRecIds] = useState<Record<number, number>>({})
+  const [bulkReleased, setBulkReleased] = useState<Record<number, boolean>>({})
   const [bulkShowTest, setBulkShowTest] = useState<Record<number, boolean>>({})
   const [bulkContentText, setBulkContentText] = useState('')
   const [bulkHomeworkText, setBulkHomeworkText] = useState('')
@@ -71,6 +72,7 @@ export default function ClassBulkRecordModal({
     const forms: Record<number, RecForm> = {}
     const showT: Record<number, boolean> = {}
     const recIds: Record<number, number> = {}
+    const released: Record<number, boolean> = {}
     students.forEach(s => { chks[s.id] = true; forms[s.id] = BLANK_REC(s.id); showT[s.id] = false })
 
     // 태블릿 키오스크(/checkin) 등원 체크인 기록으로 지각/정시를 자동 반영 — 아직 저장된
@@ -103,6 +105,7 @@ export default function ClassBulkRecordModal({
       for (const r of recs) {
         if (!(r.student_id in chks)) continue // 반 소속 학생 목록에 없는 경우(제외됨 등) 무시
         recIds[r.student_id] = r.id
+        released[r.student_id] = !!r.released_to_parent
         forms[r.student_id] = {
           student_id: r.student_id, content: r.content ?? '', homework: r.homework ?? '',
           hw_rate: r.hw_rate < 0 ? 0 : r.hw_rate, hw_cor: r.hw_cor < 0 ? 0 : r.hw_cor,
@@ -113,7 +116,7 @@ export default function ClassBulkRecordModal({
         showT[r.student_id] = r.has_test
       }
     }
-    setBulkChks(chks); setBulkForms(forms); setBulkShowTest(showT); setBulkRecIds(recIds)
+    setBulkChks(chks); setBulkForms(forms); setBulkShowTest(showT); setBulkRecIds(recIds); setBulkReleased(released)
     setHasDraft(!!sessionStorage.getItem(draftKey))
     setLoading(false)
   }
@@ -201,7 +204,10 @@ export default function ClassBulkRecordModal({
 
       let recId: number
       if (existingId) {
-        const { error } = await supabase.from('records').update(row).eq('id', existingId)
+        // 이미 발송(released_to_parent)된 기록을 수정하는 경우에만 "수정됨" 표시를 남긴다.
+        // 최초 저장이나 아직 발송 전 수정은 학부모가 볼 일이 없으므로 표시할 필요가 없다.
+        const updateRow = bulkReleased[sid] ? { ...row, edited_at: new Date().toISOString() } : row
+        const { error } = await supabase.from('records').update(updateRow).eq('id', existingId)
         if (error) { toast('저장 실패: ' + error.message, false); errCnt++; continue }
         recId = existingId
         await supabase.from('record_test_items').delete().eq('record_id', recId)

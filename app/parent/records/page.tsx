@@ -15,7 +15,7 @@ type Rec = {
   id: number; date: string; content: string; homework: string
   hw_rate: number; hw_cor: number; attitude: number
   late: boolean; has_test: boolean; feedback: string
-  viewed_at: string | null; class_id: number | null
+  viewed_at: string | null; class_id: number | null; edited_at: string | null
   record_test_items?: { test_id: number; t_total: number; t_cor: number; t_score: number; tests: { name: string } | null }[]
 }
 
@@ -33,6 +33,7 @@ export default function ParentRecords() {
   const [commentErr, setCommentErr] = useState<Record<number, string>>({})
   const [showStats, setShowStats] = useState(false)
   const [classNames, setClassNames] = useState<Record<number, string>>({})
+  const [editedNotice, setEditedNotice] = useState<{ id: number; date: string }[]>([])
 
   useEffect(() => {
     if (!selChild) return
@@ -86,6 +87,7 @@ export default function ParentRecords() {
     const merged = recsData.map(r => ({ ...r, record_test_items: itemsByRecord[r.id] ?? [] })) as Rec[]
     setRecs(merged)
     setComments((commentsData ?? []) as RecordComment[])
+    setEditedNotice(merged.filter(r => r.edited_at).map(r => ({ id: r.id, date: r.date })))
     setLoading(false)
 
     // 아직 안 읽은(viewed_at이 없는) 기록을 지금 열람한 것으로 기록 — 관리자 쪽 읽음 확인용
@@ -99,6 +101,13 @@ export default function ParentRecords() {
         setRecs(rs => rs.map(r => unviewedIds.includes(r.id) ? { ...r, viewed_at: nowIso } : r))
       })
     }
+  }
+
+  async function dismissEditedNotice() {
+    const ids = editedNotice.map(n => n.id)
+    setEditedNotice([])
+    if (ids.length === 0) return
+    await supabase.from('records').update({ edited_at: null }).in('id', ids)
   }
 
   async function sendComment(recId: number) {
@@ -148,6 +157,20 @@ export default function ParentRecords() {
         </div>
       ) : (
         <>
+          {editedNotice.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#FEF3E2', border: `1px solid ${gold}55`, borderRadius: 12, padding: '12px 14px', marginBottom: 16 }}>
+              <span style={{ fontSize: 18, flexShrink: 0 }}>✏️</span>
+              <p style={{ flex: 1, fontSize: 13, fontWeight: 600, color: '#7A4A0A', margin: 0, lineHeight: 1.5 }}>
+                {editedNotice.length === 1
+                  ? `${editedNotice[0].date} 수업기록이 수정되었습니다`
+                  : `${editedNotice.length}개의 수업기록이 수정되었습니다 (${editedNotice.map(n => n.date.slice(5)).join(', ')})`}
+              </p>
+              <button onClick={dismissEditedNotice} style={{ flexShrink: 0, border: 'none', background: 'none', color: '#7A4A0A', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: '4px 8px' }}>
+                확인
+              </button>
+            </div>
+          )}
+
           <TodayClassBanner studentId={selChild} />
 
           {/* 학생 헤더 */}
