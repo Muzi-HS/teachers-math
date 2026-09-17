@@ -7,6 +7,7 @@ import { useSearchParams } from 'next/navigation'
 import { kstDateStr } from '@/lib/kst'
 import ClassBulkRecordModal from '@/components/ClassBulkRecordModal'
 import ClassPrepModal from '@/components/ClassPrepModal'
+import ClassNoticeModal from '@/components/ClassNoticeModal'
 import { IconClock } from '@/components/icons'
 import { useMobileMode } from '@/context/MobileModeContext'
 
@@ -67,6 +68,7 @@ export default function ClassesPage() {
   // mBulkRec (반 수업기록 일괄) — 실제 폼/저장 로직은 ClassBulkRecordModal 컴포넌트가 담당
   const [bulkModal, setBulkModal] = useState(false)
   const [prepModal, setPrepModal] = useState(false)
+  const [noticeModal, setNoticeModal] = useState(false)
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
   const [notif, setNotif] = useState<{ msg: string; ok: boolean } | null>(null)
@@ -407,6 +409,12 @@ export default function ClassesPage() {
               <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth={2} d="M11 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-4M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
               수업기록 작성
             </button>
+            {(role === 'admin' || role === 'teacher') && (
+              <button className="bout" onClick={() => setNoticeModal(true)}>
+                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                공지하기
+              </button>
+            )}
             {canManageClassInfo && (
               <button className="bgold" onClick={() => { setStuModal(true); setS2cSrch(''); setSelStus(new Set()); setAgeFilter('') }}>
                 <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth={2} d="M12 5v14M5 12h14" /></svg>
@@ -637,6 +645,15 @@ export default function ClassesPage() {
           className={detailCls.name}
           students={detailStus}
           onClose={() => setPrepModal(false)}
+        />
+      )}
+
+      {/* ════ 반 공지하기 (학생 계정 "반 공지사항"에 표시) ════ */}
+      {noticeModal && detailCls && (
+        <ClassNoticeModal
+          classId={detailCls.id}
+          className={detailCls.name}
+          onClose={() => setNoticeModal(false)}
         />
       )}
 

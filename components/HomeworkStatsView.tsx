@@ -1,5 +1,6 @@
 'use client'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { computeStreak } from '@/lib/streak'
 
 const navy='#0D2A5E', gold='#D87E13', tx='#0D1B36', tx2='#4B5C7E', tx3='#96A4BF', bd='#DDE3EE'
 
@@ -26,16 +27,7 @@ export default function HomeworkStatsView({ recs }: { recs: StatRec[] }) {
   const corRecs = recs.filter(r => r.hw_cor >= 0)
   const avgHwCor = corRecs.length ? Math.round(corRecs.reduce((a, b) => a + b.hw_cor, 0) / corRecs.length) : null
 
-  // 스트릭 계산 — 숙제 이행률 100%가 이어지는 구간의 길이. 숙제가 없는 날(-1)은 흐름을
-  // 끊지 않고 건너뛰고, 100% 미만이거나 미제출(-2)이면 스트릭이 끊긴다.
-  let best = 0
-  let running = 0
-  for (const r of chrono) {
-    if (r.hw_rate === -1) continue
-    if (r.hw_rate === 100) { running++; best = Math.max(best, running) }
-    else running = 0
-  }
-  const current = running
+  const { current, best } = computeStreak(chrono)
 
   return (
     <div>

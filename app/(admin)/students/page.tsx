@@ -79,9 +79,23 @@ export default function StudentsPage() {
   const [schoolHigh,       setSchoolHigh]       = useState('')
   const [noSchoolMap, setNoSchoolMap] = useState<Record<SchoolKey, boolean>>({ '초등': false, '중등': false, '고등': false })
   const [parentPinMap, setParentPinMap] = useState<Record<string, string>>({})
+  const [detailCoupons, setDetailCoupons] = useState<{ id: number; milestone: number; claimed_at: string; used: boolean }[]>([])
 
   useEffect(() => { fetchAll() }, [])
   useEffect(() => { if (role === 'admin') fetchParentPins() }, [role])
+  useEffect(() => {
+    if (!detailStu) { setDetailCoupons([]); return }
+    supabase.from('student_coupons').select('id,milestone,claimed_at,used')
+      .eq('student_id', detailStu.id).order('claimed_at', { ascending: false })
+      .then(({ data }) => setDetailCoupons(data ?? []))
+  }, [detailStu?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function toggleCouponUsed(couponId: number, used: boolean) {
+    const { error } = await supabase.from('student_coupons')
+      .update({ used, used_at: used ? new Date().toISOString() : null }).eq('id', couponId)
+    if (error) return toast('쿠폰 처리 실패: ' + error.message, false)
+    setDetailCoupons(cs => cs.map(c => c.id === couponId ? { ...c, used } : c))
+  }
 
   async function fetchParentPins() {
     const { data: pp, error } = await supabase.from('parents').select('phone, pin')
@@ -775,6 +789,24 @@ export default function StudentsPage() {
                       </button>
                     )}
                   </div>
+                </div>
+              )}
+
+              {/* 쿠폰함 (admin만) — 학생이 숙제 이행률 연속 달성으로 받은 쿠폰의 실사용 처리 */}
+              {isAdmin && detailCoupons.length > 0 && (
+                <div style={{ background:bg,borderRadius:10,padding:'14px 16px',marginTop:14 }}>
+                  <p style={{ fontSize:11,fontWeight:700,color:tx3,letterSpacing:1,margin:'0 0 10px' }}>쿠폰함</p>
+                  {detailCoupons.map(c => (
+                    <div key={c.id} style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:'6px 0' }}>
+                      <div>
+                        <p style={{ fontSize:13,fontWeight:600,color:tx,margin:0 }}>🎟️ {c.milestone}일 연속 달성 쿠폰</p>
+                        <p style={{ fontSize:11,color:tx3,margin:'2px 0 0' }}>{c.claimed_at.slice(0,10)} 획득</p>
+                      </div>
+                      <button className="bdng" onClick={() => toggleCouponUsed(c.id, !c.used)}>
+                        {c.used ? '사용취소' : '사용 처리'}
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
 
