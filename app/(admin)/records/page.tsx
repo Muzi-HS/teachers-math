@@ -174,6 +174,8 @@ export default function RecordsPage() {
   const [unreadCommentDates, setUnreadCommentDates] = useState<Set<string>>(new Set())
   const [justReadIds, setJustReadIds] = useState<Set<number>>(new Set())
   const [dayRecs,  setDayRecs]  = useState<Rec[]>([])
+  const [unsentOnly, setUnsentOnly] = useState(false)
+  const [bulkSendState, setBulkSendState] = useState<{ date: string; clicked: Set<number>; error: boolean } | null>(null)
   const [comments, setComments] = useState<RecordComment[]>([])
   const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({})
   const [sendingCommentId, setSendingCommentId] = useState<number | null>(null)
@@ -195,6 +197,13 @@ export default function RecordsPage() {
   useEffect(() => { fetchBase() }, [])
   useEffect(() => { fetchMonthDates() }, [llYear, llMonth])
   useEffect(() => { fetchDayRecs() }, [selDate])
+  useEffect(() => {
+    let cancelled = false
+    supabase.from('class_bulk_sends').select('class_key').eq('date', selDate).then(({ data, error }) => {
+      if (!cancelled) setBulkSendState({ date: selDate, clicked: new Set((data ?? []).map(row => row.class_key)), error: !!error })
+    })
+    return () => { cancelled = true }
+  }, [selDate])
 
   // 대시보드 등에서 ?date=YYYY-MM-DD 로 들어온 경우 해당 날짜로 바로 이동
   useEffect(() => {
@@ -203,13 +212,14 @@ export default function RecordsPage() {
     if (!dt) return
     dateParamHandled.current = true
     selectDate(dt)
+    setUnsentOnly(searchParams.get('unsent') === '1')
   }, [searchParams])
 
   async function fetchBase() {
     const [{ data: s }, { data: c }, { data: cs }, { data: t }] = await Promise.all([
       supabase.from('students').select('id,name,parent_phone').order('name'),
       supabase.from('classes').select('id,name').order('name'),
-      supabase.from('class_students').select('student_id,class_id'),
+      supabase.from('class_students').select('student_id,class_id').order('class_id'),
       supabase.from('tests').select('id,name,date,total').order('date', { ascending: false }),
     ])
     setStudents(s ?? [])
@@ -413,6 +423,17 @@ export default function RecordsPage() {
   async function sendPushByClass(clsId: number | null) {
     if (pushing) return
     setPushing(true)
+    // 버튼 실행 자체를 먼저 저장합니다. 개별 푸시 실패/알림 미등록은 이 상태에 영향을 주지 않습니다.
+    const { error } = await supabase.from('class_bulk_sends').upsert(
+      { date: selDate, class_id: clsId },
+      { onConflict: 'date,class_key', ignoreDuplicates: true },
+    )
+    if (error) {
+      setPushing(false)
+      toast('일괄 발송 상태를 저장하지 못했습니다. 다시 시도해주세요.', false)
+      return
+    }
+    setBulkSendState(previous => ({ date: selDate, clicked: new Set([...(previous?.date === selDate ? previous.clicked : []), clsId ?? 0]), error: false }))
     const targets = dayRecs.filter(r => {
       const rClsId = r.class_id ?? (csMap[r.student_id] ?? null)
       return clsId === null ? rClsId === null : rClsId === clsId
@@ -512,6 +533,10 @@ export default function RecordsPage() {
       Number(b.recs.some(isHighlighted)) - Number(a.recs.some(isHighlighted))
     )
   })()
+
+  const bulkStatusReady = bulkSendState?.date === selDate && !bulkSendState.error
+  const unsentGroups = bulkStatusReady ? clsGroups.filter(group => !bulkSendState.clicked.has(recClsId(group.recs[0]) ?? 0)) : []
+  const visibleGroups = unsentOnly ? unsentGroups : clsGroups
 
   const css = `
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
@@ -646,6 +671,16 @@ export default function RecordsPage() {
             <span className="badge" style={{ background: navyM, color: navy }}>{dayRecs.length}건</span>
           </div>
 
+          {!loading && dayRecs.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: navy, cursor: 'pointer' }}>
+                <input type="checkbox" checked={unsentOnly} disabled={!bulkStatusReady} onChange={e => setUnsentOnly(e.target.checked)} />
+                미발송 반만 보기 {bulkStatusReady && `(${unsentGroups.length}개)`}
+              </label>
+              <p style={{ fontSize: 11, color: tx3, margin: '6px 0 0' }}>선택한 날짜에 ‘일괄 발송’ 버튼을 누르지 않은 반만 표시합니다. 일부 학생의 미발송 여부는 무시합니다.</p>
+              {!bulkStatusReady && <p role="status" style={{ fontSize: 12, color: tx3 }}>{bulkSendState?.date === selDate && bulkSendState.error ? '일괄 발송 상태를 불러오지 못했습니다. 새로고침해주세요.' : '일괄 발송 상태 확인 중...'}</p>}
+            </div>
+          )}
           {loading ? (
             <p style={{ color: tx3, fontSize: 13 }}>불러오는 중...</p>
           ) : dayRecs.length === 0 ? (
@@ -655,29 +690,30 @@ export default function RecordsPage() {
             </div>
           ) : (
             <div>
-            {clsGroups.map(({ cls: clsG, recs: clsRecs }) => (
+            {unsentOnly && bulkStatusReady && visibleGroups.length === 0 && <p style={{ textAlign: 'center', padding: '24px 0', color: tx3, fontSize: 13 }}>선택한 날짜의 모든 반에서 일괄 발송을 실행했습니다.</p>}
+            {visibleGroups.map(({ cls: clsG, recs: clsRecs }) => (
               <div key={clsG?.id ?? 'none'} style={{ marginBottom: 20 }}>
                 {/* 반별 헤더 + 일괄 푸시 버튼 */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: mobileMode ? 'wrap' : 'nowrap', gap: mobileMode ? 8 : 0, marginBottom: 12, padding: '8px 14px', background: bg, borderRadius: 8, border: `1px solid ${bd}` }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 13, fontWeight: 700, color: navy }}>{clsG?.name ?? '반 미지정'}</span>
                     <span className="badge" style={{ background: navyM, color: navy }}>{clsRecs.length}명</span>
-                    {clsRecs.some(r => !(r.push_sent ?? false)) && (
+                    {bulkStatusReady && !bulkSendState.clicked.has(recClsId(clsRecs[0]) ?? 0) && (
                       <span className="badge" style={{ background: '#FEF3E2', color: gold }}>
-                        미발송 {clsRecs.filter(r => !(r.push_sent ?? false)).length}건
+                        일괄 발송 전
                       </span>
                     )}
-                    {clsRecs.length > 0 && clsRecs.every(r => r.push_sent ?? false) && (
-                      <span className="badge" style={{ background: gbg, color: gr }}>전체 발송됨</span>
+                    {bulkStatusReady && bulkSendState.clicked.has(recClsId(clsRecs[0]) ?? 0) && (
+                      <span className="badge" style={{ background: gbg, color: gr }}>일괄 발송 실행됨</span>
                     )}
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {clsG && <button className="bout" onClick={() => setBulkModalClsId(clsG.id)}>일괄 수정</button>}
                     <button className="bgrn"
-                      onClick={() => sendPushByClass(clsG?.id ?? null)}
-                      disabled={pushing || !clsRecs.some(r => !(r.push_sent ?? false) && !!students.find(s => s.id === r.student_id)?.parent_phone)}
-                      style={{ opacity: clsRecs.some(r => !(r.push_sent ?? false) && !!students.find(s => s.id === r.student_id)?.parent_phone) ? 1 : 0.5 }}>
-                      {pushing ? '발송 중...' : '일괄 푸시 발송'}
+                      onClick={() => sendPushByClass(recClsId(clsRecs[0]))}
+                      disabled={pushing || !bulkStatusReady}
+                      style={{ opacity: pushing || !bulkStatusReady ? 0.5 : 1 }}>
+                      {pushing ? '발송 중...' : '일괄 발송'}
                     </button>
                   </div>
                 </div>

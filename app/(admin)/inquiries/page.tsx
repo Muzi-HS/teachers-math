@@ -186,7 +186,7 @@ export default function AdminInquiriesPage() {
   const showThread = !mobileMode || !!selParentId
 
   return (
-    <div style={{ padding: mobileMode ? '16px 14px 88px' : '28px 32px', fontFamily: "'Noto Sans KR',sans-serif", height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ padding: mobileMode ? '16px 14px 88px' : '28px 32px', fontFamily: "'Noto Sans KR',sans-serif", height: 'calc(100dvh - 52px)', minHeight: 0, overflow: 'hidden', boxSizing: 'border-box', display: 'flex', flexDirection: 'column' }}>
       <style>{css}</style>
 
       {notif && (
@@ -209,7 +209,7 @@ export default function AdminInquiriesPage() {
         {/* 좌측: 대화 목록 */}
         {showList && (
         <div style={{ width: mobileMode ? '100%' : 300, flexShrink: 0, borderRight: mobileMode ? 'none' : `1px solid ${bd}`, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: 12, borderBottom: `1px solid ${bd}`, display: 'flex', gap: 8 }}>
+          <div style={{ padding: 12, borderBottom: `1px solid ${bd}`, display: 'flex', gap: 8, flexShrink: 0 }}>
             <div className="iq-sbox" style={{ flex: 1 }}>
               <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke={tx3}><circle cx="11" cy="11" r="8" strokeWidth={2} /><path strokeWidth={2} d="M21 21l-4.35-4.35" /></svg>
               <input placeholder="학생 이름 또는 전화번호 검색" value={search} onChange={e => setSearch(e.target.value)} />
@@ -221,7 +221,7 @@ export default function AdminInquiriesPage() {
               <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.4}><path d="M12 5v14M5 12h14" /></svg>
             </button>
           </div>
-          <div style={{ flex: 1, overflowY: 'auto' }}>
+          <div role="region" aria-label="대화 목록" tabIndex={0} style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain' }}>
             {loading ? (
               <p style={{ color: tx3, fontSize: 13, textAlign: 'center', padding: 20 }}>불러오는 중...</p>
             ) : conversations.length === 0 ? (
@@ -278,7 +278,7 @@ export default function AdminInquiriesPage() {
                 </div>
               </div>
 
-              <div style={{ flex: 1, overflowY: 'auto', padding: '18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: '18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {threadMsgs.length === 0 && (
                   <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', color: tx3 }}>
                     <p style={{ marginBottom: 8, display: 'flex', justifyContent: 'center' }}><IconChat size={28} /></p>

@@ -7,6 +7,7 @@ import { IconBook, IconPencil } from '@/components/icons'
 import { useMobileMode } from '@/context/MobileModeContext'
 
 type Student = { id: number; name: string; school?: string }
+type PreviousProgress = { date: string; content: string | null }
 
 const navy = '#0D2A5E'
 const gold = '#D87E13'
@@ -39,6 +40,8 @@ export default function ClassPrepModal({
   const { mobileMode } = useMobileMode()
   const [chks, setChks] = useState<Record<number, boolean>>({})
   const [prevHomework, setPrevHomework] = useState<Record<number, string>>({})
+  const [previousProgress, setPreviousProgress] = useState<Record<number, PreviousProgress[]>>({})
+  const [historyError, setHistoryError] = useState(false)
   const [progress, setProgress] = useState<Record<number, string>>({})
   const [bulkProgress, setBulkProgress] = useState('')
   const [loading, setLoading] = useState(true)
@@ -60,15 +63,20 @@ export default function ClassPrepModal({
     // class_id로 걸러야 한다 — 학생이 A반, B반을 연달아 들을 때 반 구분 없이 가장 최근
     // 기록을 가져오면 B반 수업 준비에 A반 숙제가 잘못 표시되는 문제가 있었다.
     let recsQuery = supabase
-      .from('records').select('student_id, date, homework')
+      .from('records').select('student_id, date, homework, content')
       .in('student_id', ids).eq('is_draft', false).lt('date', today)
       .order('date', { ascending: false })
     if (classId != null) recsQuery = recsQuery.eq('class_id', classId)
-    const { data: recs } = await recsQuery
+    const { data: recs, error: recsError } = await recsQuery
+    setHistoryError(!!recsError)
     const prevHw: Record<number, string> = {}
+    const history: Record<number, PreviousProgress[]> = {}
     for (const r of (recs ?? [])) {
       if (!(r.student_id in prevHw)) prevHw[r.student_id] = withLeadingSpaces(r.homework ?? '')
+      if (!history[r.student_id]) history[r.student_id] = []
+      history[r.student_id].push({ date: r.date, content: r.content })
     }
+    setPreviousProgress(history)
 
     // 이미 오늘자로 준비해둔 진도가 있으면 이어서 편집 가능하도록 불러오기
     const { data: preps } = await supabase
@@ -210,6 +218,19 @@ export default function ClassPrepModal({
                 <span style={{ fontSize: 14, fontWeight: 700, color: tx }}>{s.name}</span>
                 {s.school && <span style={{ fontSize: 12, color: tx3 }}>{s.school}</span>}
               </label>
+              <details style={{ marginBottom: 12, padding: '10px 12px', background: bg, borderRadius: 8 }}>
+                <summary style={{ cursor: 'pointer', fontSize: 12, fontWeight: 600, color: navy }}>이전 진도 보기 (열람 전용)</summary>
+                <div style={{ maxHeight: 240, overflowY: 'auto', marginTop: 8 }}>
+                  {historyError ? <p style={{ fontSize: 12, color: re }}>이전 진도를 불러오지 못했습니다. 창을 다시 열어주세요.</p>
+                    : !(previousProgress[s.id]?.length) ? <p style={{ fontSize: 12, color: tx3 }}>이 반에서 작성된 이전 수업기록이 없습니다.</p>
+                    : previousProgress[s.id].map((record, index) => (
+                      <div key={`${record.date}-${index}`} style={{ padding: '8px 0', borderBottom: `1px solid ${bd}` }}>
+                        <p style={{ fontSize: 12, fontWeight: 600, color: tx2, margin: '0 0 4px' }}>{record.date}</p>
+                        <p style={{ fontSize: 13, color: tx, margin: 0, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{record.content?.trim() || '입력된 진도가 없습니다.'}</p>
+                      </div>
+                    ))}
+                </div>
+              </details>
               <div style={{ marginBottom: 8 }}>
                 <label className="cp-lb" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><IconPencil size={12} /> 지난 숙제 (자동 입력됨 — 수정 가능)</label>
                 <AutoGrowTextarea className="cp-fi" rows={2} value={prevHomework[s.id] ?? '  '} onChange={e => setPrevHomework(p => ({ ...p, [s.id]: withLeadingSpaces(e.target.value) }))} placeholder="이전 숙제 내용" />
