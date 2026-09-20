@@ -43,13 +43,11 @@ function rateBg(v: number) { return v >= 80 ? '#E0F5EB' : v >= 60 ? '#FEF3E2' : 
 function attColor(v: number) { return v >= 8 ? '#1A7F4E' : v >= 5 ? '#C05621' : '#C0392B' }
 function attBg(v: number) { return v >= 8 ? '#E0F5EB' : v >= 5 ? '#FEF3E2' : '#FDECEA' }
 function attLabel(v: number) { return v >= 8 ? '우수' : v >= 5 ? '보통' : '노력필요' }
-// 발송/읽음 상태를 배지 하나로 통합 (미발송 / 발송됨·안읽음 / 읽음·시각)
-function pushStatus(r: { push_sent?: boolean; viewed_at: string | null }) {
-  // 읽음 여부는 push_sent와 무관하게 독립적으로 확인한다 — released_to_parent 도입 이후
-  // 푸시가 미발송이어도 학부모가 직접 열람할 수 있으므로, 미발송이라고 항상 안읽음으로
-  // 단정하면 안 된다 (읽었으면 읽음이 우선 표시되어야 함)
+// 개별 기록의 공개/읽음 상태. 반별 미발송 여부는 일괄 발송 이력으로 판단한다.
+function recordStatus(r: { released_to_parent: boolean; viewed_at: string | null }) {
+  // 발송은 학부모 공개 여부로 판단하며, 푸시 수신 여부와는 무관하다.
   if (r.viewed_at) return { label: `읽음 · ${kstTimeOf(r.viewed_at)}`, bg: gbg, color: gr }
-  if (!(r.push_sent ?? false)) return { label: '미발송 · 안읽음', bg, color: tx3, border: bd }
+  if (!r.released_to_parent) return { label: '미공개 · 안읽음', bg, color: tx3, border: bd }
   return { label: '발송됨 · 안읽음', bg: navyM, color: navy }
 }
 function todayStr() { return kstDateStr() }
@@ -385,12 +383,6 @@ export default function RecordsPage() {
 
   // 기록 1건에 대해 실제로 푸시를 보내고 push_sent를 true로 남긴다 (개별/일괄 발송 공용)
   async function sendPushForRecord(r: Rec): Promise<boolean> {
-    // 발송을 시도한 시점에 학부모 공개 처리 — 실제 푸시 성공 여부(push_sent)와는 분리해서
-    // 관리한다. 학부모가 알림을 허용하지 않았거나 발송이 실패해도 수업기록 자체는
-    // "발송"을 누른 이상 볼 수 있어야 하고, 미발송/개별발송 표시만 별도로 남는다.
-    if (!r.released_to_parent) {
-      await supabase.from('records').update({ released_to_parent: true }).eq('id', r.id)
-    }
     const stu = students.find(s => s.id === r.student_id)
     if (!stu?.parent_phone) return false
     const [, mm, dd] = r.date.split('-')
@@ -411,55 +403,58 @@ export default function RecordsPage() {
         }),
       })
       const result = await res.json().catch(() => null)
-      // 학부모 미존재/FCM 토큰 미등록 시에도 200이 오므로 실제 발송 건수(sent)까지 확인해야
-      // "미발송"이 잘못 "발송됨"으로 집계되는 것을 막을 수 있다
+      // push_sent는 푸시 전달 이력에만 사용하며 수업기록 발송 상태와는 무관하다.
       if (!res.ok || !result || (result.sent ?? 0) <= 0) return false
       await supabase.from('records').update({ push_sent: true, push_sent_at: new Date().toISOString() }).eq('id', r.id)
       return true
     } catch { return false }
   }
 
-  // 반별 일괄 발송 — 이미 개별 발송된(push_sent=true) 학생은 자동으로 건너뜀
+  // 반별 기록 공개와 일괄 발송 이력은 하나의 트랜잭션으로 저장한다.
   async function sendPushByClass(clsId: number | null) {
-    if (pushing) return
+    if (pushing || pushingOneId !== null) return
     setPushing(true)
-    // 버튼 실행 자체를 먼저 저장합니다. 개별 푸시 실패/알림 미등록은 이 상태에 영향을 주지 않습니다.
-    const { error } = await supabase.from('class_bulk_sends').upsert(
-      { date: selDate, class_id: clsId },
-      { onConflict: 'date,class_key', ignoreDuplicates: true },
-    )
-    if (error) {
+    const sendDate = selDate
+    try {
+      const { data, error } = await supabase.rpc('release_class_records', {
+        p_date: sendDate, p_class_id: clsId,
+      })
+      if (error) throw error
+      const releasedIds = new Set<number>(data ?? [])
+      setDayRecs(rs => rs.map(r => releasedIds.has(r.id) ? { ...r, released_to_parent: true } : r))
+      setBulkSendState(previous => previous?.date === sendDate
+        ? { ...previous, clicked: new Set([...previous.clicked, clsId ?? 0]) }
+        : previous)
+      toast(`일괄 발송 완료 · ${releasedIds.size}명의 수업기록을 학부모가 볼 수 있습니다.`)
+      // 공개 후 알림을 시도한다. 알림 미등록/차단/실패는 발송 완료에 영향을 주지 않는다.
+      for (const r of dayRecs) {
+        if (releasedIds.has(r.id) && !r.released_to_parent) await sendPushForRecord(r)
+      }
+    } catch {
+      toast('수업기록을 공개하지 못했습니다. 다시 시도해주세요.', false)
+    } finally {
       setPushing(false)
-      toast('일괄 발송 상태를 저장하지 못했습니다. 다시 시도해주세요.', false)
-      return
     }
-    setBulkSendState(previous => ({ date: selDate, clicked: new Set([...(previous?.date === selDate ? previous.clicked : []), clsId ?? 0]), error: false }))
-    const targets = dayRecs.filter(r => {
-      const rClsId = r.class_id ?? (csMap[r.student_id] ?? null)
-      return clsId === null ? rClsId === null : rClsId === clsId
-    })
-    let sent = 0
-    for (const r of targets) {
-      if (r.push_sent ?? false) continue
-      if (await sendPushForRecord(r)) sent++
-    }
-    setPushing(false)
-    toast(sent > 0 ? `${sent}명 푸시 발송 완료` : '발송 가능한 대상이 없습니다. (연락처 또는 알림 미등록)', sent > 0)
-    if (sent > 0) await fetchDayRecs()
   }
 
-  // 학생 1명 개별 발송
+  // 개별 발송도 공개 여부를 기준으로 처리하며 반별 일괄 발송 이력은 만들지 않는다.
   async function sendPushOne(recId: number) {
-    if (pushingOneId) return
+    if (pushingOneId !== null || pushing) return
     const r = dayRecs.find(x => x.id === recId)
     if (!r) return
-    const stu = students.find(s => s.id === r.student_id)
-    if (!stu?.parent_phone) return toast('학부모 연락처가 없습니다.', false)
     setPushingOneId(recId)
-    const ok = await sendPushForRecord(r)
-    setPushingOneId(null)
-    toast(ok ? `${stu.name} 학부모에게 푸시 발송 완료` : '발송 실패', ok)
-    if (ok) await fetchDayRecs()
+    try {
+      const { data, error } = await supabase.from('records')
+        .update({ released_to_parent: true }).eq('id', r.id).eq('is_draft', false).select('id').single()
+      if (error || !data) throw error ?? new Error('Record not updated')
+      setDayRecs(rs => rs.map(rec => rec.id === r.id ? { ...rec, released_to_parent: true } : rec))
+      toast('발송 완료 · 학부모가 수업기록을 볼 수 있습니다.')
+      await sendPushForRecord(r)
+    } catch {
+      toast('수업기록을 공개하지 못했습니다. 다시 시도해주세요.', false)
+    } finally {
+      setPushingOneId(null)
+    }
   }
 
   // ── 문자 발송 (주석처리 — 푸시 알림으로 대체됨) ──
@@ -677,7 +672,7 @@ export default function RecordsPage() {
                 <input type="checkbox" checked={unsentOnly} disabled={!bulkStatusReady} onChange={e => setUnsentOnly(e.target.checked)} />
                 미발송 반만 보기 {bulkStatusReady && `(${unsentGroups.length}개)`}
               </label>
-              <p style={{ fontSize: 11, color: tx3, margin: '6px 0 0' }}>선택한 날짜에 ‘일괄 발송’ 버튼을 누르지 않은 반만 표시합니다. 일부 학생의 미발송 여부는 무시합니다.</p>
+              <p style={{ fontSize: 11, color: tx3, margin: '6px 0 0' }}>선택한 날짜에 ‘일괄 발송’ 버튼을 누르지 않은 반만 표시합니다. 발송 완료는 학부모에게 기록을 공개한 상태이며, 푸시 알림 수신 여부는 무관합니다.</p>
               {!bulkStatusReady && <p role="status" style={{ fontSize: 12, color: tx3 }}>{bulkSendState?.date === selDate && bulkSendState.error ? '일괄 발송 상태를 불러오지 못했습니다. 새로고침해주세요.' : '일괄 발송 상태 확인 중...'}</p>}
             </div>
           )}
@@ -704,15 +699,15 @@ export default function RecordsPage() {
                       </span>
                     )}
                     {bulkStatusReady && bulkSendState.clicked.has(recClsId(clsRecs[0]) ?? 0) && (
-                      <span className="badge" style={{ background: gbg, color: gr }}>일괄 발송 실행됨</span>
+                      <span className="badge" style={{ background: gbg, color: gr }}>일괄 발송 완료</span>
                     )}
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {clsG && <button className="bout" onClick={() => setBulkModalClsId(clsG.id)}>일괄 수정</button>}
                     <button className="bgrn"
                       onClick={() => sendPushByClass(recClsId(clsRecs[0]))}
-                      disabled={pushing || !bulkStatusReady}
-                      style={{ opacity: pushing || !bulkStatusReady ? 0.5 : 1 }}>
+                      disabled={pushing || pushingOneId !== null || !bulkStatusReady}
+                      style={{ opacity: pushing || pushingOneId !== null || !bulkStatusReady ? 0.5 : 1 }}>
                       {pushing ? '발송 중...' : '일괄 발송'}
                     </button>
                   </div>
@@ -740,16 +735,16 @@ export default function RecordsPage() {
                             }
                             {r.has_test && <span className="badge" style={{ background: navyM, color: navy }}>시험</span>}
                             {(() => {
-                              const ps = pushStatus(r)
+                              const ps = recordStatus(r)
                               return <span className="badge" style={{ background: ps.bg, color: ps.color, border: ps.border ? `1px solid ${ps.border}` : undefined }}>{ps.label}</span>
                             })()}
                           </div>
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                        {!(r.push_sent ?? false) && (
+                        {!r.released_to_parent && (
                           <button className="bout" style={{ color: gr, borderColor: gr + '66', whiteSpace: 'nowrap' }}
-                            disabled={pushingOneId === r.id || !students.find(s => s.id === r.student_id)?.parent_phone}
+                            disabled={pushing || pushingOneId !== null}
                             onClick={() => sendPushOne(r.id)}>
                             {pushingOneId === r.id ? '발송 중...' : '개별 발송'}
                           </button>

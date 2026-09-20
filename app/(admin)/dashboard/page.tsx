@@ -210,7 +210,7 @@ export default function DashboardPage(){
 
       <div className="mc" style={{ marginTop: 16 }}>
         <p style={{ fontSize: 13, fontWeight: 700, color: navy, margin: '0 0 6px' }}>미발송 반 목록 {!pendingLoading && !pendingError && `(${pendingClasses.length}건)`}</p>
-        <p style={{ fontSize: 11, color: tx3, margin: '0 0 10px' }}>수업기록이 있고 ‘일괄 발송’ 버튼을 누르지 않은 반입니다. 날짜별로 표시하며 일부 학생의 미발송은 제외합니다.</p>
+        <p style={{ fontSize: 11, color: tx3, margin: '0 0 10px' }}>수업기록이 있고 ‘일괄 발송’ 버튼을 누르지 않은 반입니다. 날짜별로 표시하며, 학부모의 푸시 알림 수신 여부는 무관합니다.</p>
         {pendingLoading ? <p style={{ fontSize: 13, color: tx3 }}>불러오는 중...</p>
           : pendingError ? <p role="alert" style={{ fontSize: 13, color: re }}>미발송 반 목록을 불러오지 못했습니다. 새로고침해주세요.</p>
           : pendingClasses.length === 0 ? <p style={{ fontSize: 13, color: tx3 }}>일괄 발송하지 않은 반이 없습니다.</p>
