@@ -78,6 +78,15 @@ test('PostgreSQL migration and exam lifecycle', async t => {
     await assert.rejects(create(true,[{ points: 10, choices: [], text: ' ' }]))
     assert.equal((await db.query('select count(*)::int as n from tests')).rows[0].n, before)
   })
+  await t.test('decimal points (up to 2 places) are graded precisely; over-precise values are rejected', async () => {
+    await assert.rejects(create(true,[{ points: 1.005, choices: [1], text: '' }]))
+    const id = await create(true,[{ points: 2.5, choices: [2], text: '' }, { points: 7.5, choices: [], text: 'x = 2' }])
+    await act(id,'start')
+    const result = await act(id,'submit',{1:[2],2:'wrong'},1)
+    assert.equal(result.attempt.earned_points, 2.5)
+    assert.equal(result.attempt.total_points, 10)
+    assert.equal(result.attempt.score, 25)
+  })
   await t.test('only assigned published tests can start and list does not expose answer keys', async () => {
     const id = await create(false)
     await assert.rejects(act(id,'start'))

@@ -7,11 +7,13 @@ alter table public.tests add column if not exists is_published boolean not null 
 create table if not exists public.test_questions (
   test_id bigint not null references public.tests(id) on delete cascade,
   number integer not null check (number between 1 and 200),
-  points integer not null check (points between 1 and 1000),
+  points numeric(6,2) not null check (points between 1 and 1000),
   kind text not null check (kind in ('choice', 'text')),
   correct_answer jsonb not null,
   primary key (test_id, number)
 );
+-- 기존 설치(배점이 integer)에도 소수점 배점을 허용한다. 새 설치에서는 위에서 이미 numeric으로 생성된다.
+alter table public.test_questions alter column points type numeric(6,2) using points::numeric(6,2);
 create table if not exists public.test_assignees (
   test_id bigint not null references public.tests(id) on delete cascade,
   student_id bigint not null references public.students(id) on delete cascade,
@@ -28,10 +30,12 @@ create table if not exists public.test_attempts (
   revision integer not null default 0,
   cor integer,
   score integer,
-  earned_points integer,
-  total_points integer,
+  earned_points numeric(8,2),
+  total_points numeric(8,2),
   unique (test_id, student_id)
 );
+alter table public.test_attempts alter column earned_points type numeric(8,2) using earned_points::numeric(8,2);
+alter table public.test_attempts alter column total_points type numeric(8,2) using total_points::numeric(8,2);
 create index if not exists test_attempts_pending on public.test_attempts(deadline_at) where submitted_at is null;
 
 create or replace function public.is_exam_staff() returns boolean
@@ -88,7 +92,7 @@ begin
   end if;
   for q in select value from jsonb_array_elements(p_questions) loop
     n := n + 1;
-    if (q->>'points') is null or (q->>'points') !~ '^[0-9]+$' or (q->>'points')::integer not between 1 and 1000 then
+    if (q->>'points') is null or (q->>'points') !~ '^[0-9]+(\.[0-9]{1,2})?$' or (q->>'points')::numeric not between 1 and 1000 then
       raise exception '%번 문항의 배점을 확인하세요.', n;
     end if;
     if jsonb_typeof(q->'choices') is distinct from 'array' then raise exception '객관식 선택지를 확인하세요.'; end if;
@@ -97,11 +101,11 @@ begin
         raise exception '객관식 정답은 1~5 중에서 선택하세요.';
       end if;
       select jsonb_agg(value order by value) into choices from (select distinct value from jsonb_array_elements(q->'choices')) s;
-      insert into public.test_questions values(v_id,n,(q->>'points')::integer,'choice',choices);
+      insert into public.test_questions values(v_id,n,(q->>'points')::numeric,'choice',choices);
     else
       answer := btrim(q->>'text');
       if answer is null or length(answer) = 0 or length(answer) > 500 then raise exception '%번 주관식 정답을 입력하세요 (최대 500자).', n; end if;
-      insert into public.test_questions values(v_id,n,(q->>'points')::integer,'text',to_jsonb(answer));
+      insert into public.test_questions values(v_id,n,(q->>'points')::numeric,'text',to_jsonb(answer));
     end if;
   end loop;
   insert into public.test_assignees(test_id,student_id) select v_id, unnest(p_students) on conflict do nothing;
@@ -132,7 +136,7 @@ grant execute on function public.publish_auto_test(bigint,boolean) to authentica
 create or replace function public.finalize_test_attempt(p_id bigint)
 returns void language plpgsql security definer set search_path = public as $$
 declare a public.test_attempts; q public.test_questions; answer jsonb; correct boolean;
-  v_cor integer := 0; earned integer := 0; total_pts integer := 0; v_score integer;
+  v_cor integer := 0; earned numeric(8,2) := 0; total_pts numeric(8,2) := 0; v_score integer;
 begin
   select * into a from public.test_attempts where id=p_id for update;
   if not found or a.submitted_at is not null then return; end if;

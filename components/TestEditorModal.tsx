@@ -70,7 +70,12 @@ export default function TestEditorModal({ test, students, onClose, onSaved }: {
     if (saving || loading || locked || loadError) return
     setError('')
     if (!name.trim() || !date || !Number.isInteger(total) || total < 1) return setError('시험명, 날짜, 문항 수를 입력하세요.')
-    if (auto && questions.some(q => q.points === null || !Number.isInteger(q.points) || q.points < 1 || q.points > 1000 || (!q.choices.length && !q.text.trim()))) return setError('모든 문항에 배점(1~1000)과 정답을 입력하세요.')
+    if (auto) {
+      const badPoints = questions.findIndex(q => q.points === null || !Number.isFinite(q.points) || q.points < 1 || q.points > 1000)
+      if (badPoints !== -1) return setError(`${badPoints + 1}번 문항의 배점을 확인하세요. 1~1000 사이 값을 입력할 수 있습니다(소수점 둘째 자리까지).`)
+      const badAnswer = questions.findIndex(q => !q.choices.length && !q.text.trim())
+      if (badAnswer !== -1) return setError(`${badAnswer + 1}번 문항의 정답을 입력하세요.`)
+    }
     const keepPublished = test?.is_published ?? false
     if (auto && keepPublished && !selected.length) return setError('공개된 시험은 응시 학생이 1명 이상 있어야 합니다.')
     setSaving(true)
@@ -91,7 +96,7 @@ export default function TestEditorModal({ test, students, onClose, onSaved }: {
     finally { setSaving(false) }
   }
 
-  const totalPoints = questions.reduce((sum, q) => sum + (q.points ?? 0), 0)
+  const totalPoints = Math.round(questions.reduce((sum, q) => sum + (q.points ?? 0), 0) * 100) / 100
 
   return <div className="exam-editor-overlay">
     <style>{`
@@ -205,7 +210,13 @@ export default function TestEditorModal({ test, students, onClose, onSaved }: {
                     <div>
                       <span className="exam-qpts-label">배점</span>
                       <div className="exam-qpts-row">
-                        <input aria-label={`${i + 1}번 배점`} type="number" min={1} max={1000} disabled={locked} value={q.points ?? ''} onChange={e => updateQuestion(i, { points: e.target.value === '' ? null : Number(e.target.value) })} />
+                        <input aria-label={`${i + 1}번 배점`} type="number" inputMode="decimal" min={1} max={1000} step={0.01} disabled={locked} value={q.points ?? ''} onChange={e => {
+                          const raw = e.target.value
+                          if (raw === '') return updateQuestion(i, { points: null })
+                          const num = Number(raw)
+                          if (Number.isNaN(num)) return
+                          updateQuestion(i, { points: Math.round(num * 100) / 100 })
+                        }} />
                         <span>점</span>
                       </div>
                     </div>
