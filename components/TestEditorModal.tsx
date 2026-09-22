@@ -193,7 +193,7 @@ export default function TestEditorModal({ test, students, onClose, onSaved }: {
           <label className="exam-field">시험명<input value={name} onChange={e => setName(e.target.value)} placeholder="예) 2학년 1학기 중간 단원평가" /></label>
           <div className="exam-grid" style={{ marginTop: 14 }}>
             <label className="exam-field">날짜<input type="date" value={date} onChange={e => setDate(e.target.value)} /></label>
-            <label className="exam-field">총 문항 수<input type="number" min={1} max={200} value={total} onChange={e => changeTotal(Number(e.target.value))} /></label>
+            <label className="exam-field">총 문항 수<input type="text" inputMode="numeric" value={total} onChange={e => changeTotal(Number(e.target.value.replace(/[^0-9]/g, '') || 0))} /></label>
           </div>
 
           <div className="exam-section">
