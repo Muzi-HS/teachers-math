@@ -7,7 +7,9 @@ import { ExamQuestionDraft, toggleChoice } from '@/lib/auto-grading'
 export type EditableTest = { id: number; name: string; date: string; total: number; auto_grading?: boolean; is_published?: boolean }
 type Student = { id: number; name: string; school: string }
 type ClassRow = { id: number; name: string }
-const blank = (): ExamQuestionDraft => ({ points: 5, choices: [], text: '' })
+const blank = (): ExamQuestionDraft => ({ points: null, choices: [], text: '' })
+const navy = '#0D2A5E', gold = '#D87E13', bd = '#DDE3EE', bg = '#F5F7FA'
+const tx = '#0D1B36', tx2 = '#4B5C7E', tx3 = '#96A4BF', gr = '#1A7F4E', re = '#C0392B'
 
 export default function TestEditorModal({ test, students, onClose, onSaved }: {
   test: EditableTest | null; students: Student[]; onClose: () => void; onSaved: () => void
@@ -16,7 +18,6 @@ export default function TestEditorModal({ test, students, onClose, onSaved }: {
   const [date, setDate] = useState(test?.date ?? kstDateStr())
   const [total, setTotal] = useState(test?.total ?? 20)
   const [auto, setAuto] = useState(test?.auto_grading ?? false)
-  const [published, setPublished] = useState(test?.is_published ?? false)
   const [questions, setQuestions] = useState<ExamQuestionDraft[]>(Array.from({ length: test?.total ?? 20 }, blank))
   const [selected, setSelected] = useState<number[]>([])
   const [classes, setClasses] = useState<ClassRow[]>([])
@@ -69,14 +70,15 @@ export default function TestEditorModal({ test, students, onClose, onSaved }: {
     if (saving || loading || locked || loadError) return
     setError('')
     if (!name.trim() || !date || !Number.isInteger(total) || total < 1) return setError('시험명, 날짜, 문항 수를 입력하세요.')
-    if (auto && questions.some(q => !Number.isInteger(q.points) || q.points < 1 || q.points > 1000 || (!q.choices.length && !q.text.trim()))) return setError('모든 문항에 배점(1~1000)과 정답을 입력하세요.')
-    if (auto && published && !selected.length) return setError('시험을 공개하려면 응시 학생을 추가하세요.')
+    if (auto && questions.some(q => q.points === null || !Number.isInteger(q.points) || q.points < 1 || q.points > 1000 || (!q.choices.length && !q.text.trim()))) return setError('모든 문항에 배점(1~1000)과 정답을 입력하세요.')
+    const keepPublished = test?.is_published ?? false
+    if (auto && keepPublished && !selected.length) return setError('공개된 시험은 응시 학생이 1명 이상 있어야 합니다.')
     setSaving(true)
     try {
       if (auto || test?.auto_grading) {
         const { error } = await supabase.rpc('save_auto_test', {
           p_id: test?.id ?? null, p_name: name.trim(), p_date: date, p_total: total, p_auto: auto,
-          p_published: published, p_questions: questions, p_students: selected,
+          p_published: keepPublished, p_questions: questions, p_students: selected,
         })
         if (error) throw new Error(error.code === 'PGRST202' ? '자동채점 DB 설정이 필요합니다. 마이그레이션을 적용해 주세요.' : error.message)
       } else {
@@ -89,62 +91,142 @@ export default function TestEditorModal({ test, students, onClose, onSaved }: {
     finally { setSaving(false) }
   }
 
+  const totalPoints = questions.reduce((sum, q) => sum + (q.points ?? 0), 0)
+
   return <div className="exam-editor-overlay">
     <style>{`
-      .exam-editor-overlay{position:fixed;inset:0;background:#0006;z-index:1100;display:flex;align-items:center;justify-content:center;padding:16px}
-      .exam-editor{width:760px;max-width:100%;max-height:92dvh;overflow:auto;background:#fff;border-radius:12px;color:#0D1B36;font-family:inherit}
-      .exam-editor header,.exam-editor footer{padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:10px;background:#fff;position:sticky;z-index:1}
-      .exam-editor header{top:0;border-bottom:1px solid #DDE3EE}.exam-editor footer{bottom:0;border-top:1px solid #DDE3EE}
-      .exam-editor fieldset{margin:0;border:0;padding:20px;min-width:0}.exam-editor input:not([type=checkbox]){width:100%;padding:9px;border:1px solid #DDE3EE;border-radius:7px;font:inherit;font-size:14px;box-sizing:border-box}
-      .exam-editor button{padding:8px 12px;border:1px solid #DDE3EE;border-radius:7px;background:#fff;font:inherit;font-size:13px;cursor:pointer}.exam-editor button:disabled{opacity:.5;cursor:default}
-      .exam-editor button[aria-pressed=true],.exam-editor .exam-save{background:#0D2A5E;color:#fff;border-color:#0D2A5E}
-      .exam-editor .exam-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.exam-editor label{font-size:13px}.exam-editor .exam-section{margin-top:22px}.exam-editor h3{font-size:15px;margin:0 0 10px}
-      .exam-editor .exam-help{font-size:12px;color:#4B5C7E;line-height:1.7;margin:8px 0}.exam-editor .exam-question{padding:12px 0;border-top:1px solid #DDE3EE;display:grid;grid-template-columns:95px 1fr;gap:12px}
-      .exam-editor .exam-choices{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:7px}.exam-editor .exam-choices button{min-width:38px;font-size:17px}
-      .exam-editor .exam-roster{max-height:190px;overflow:auto;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px 0}.exam-editor .exam-check{display:flex;gap:7px;align-items:center}
-      @media(max-width:500px){.exam-editor-overlay{padding:8px}.exam-editor fieldset{padding:14px}.exam-editor .exam-question{grid-template-columns:65px 1fr}.exam-editor .exam-roster{grid-template-columns:1fr}}
+      .exam-editor-overlay{position:fixed;inset:0;background:rgba(13,27,54,.5);z-index:1100;display:flex;align-items:center;justify-content:center;padding:16px}
+      .exam-editor{width:800px;max-width:100%;max-height:92dvh;overflow:auto;background:#fff;border-radius:16px;color:${tx};font-family:inherit;box-shadow:0 24px 60px rgba(13,27,54,.25)}
+      .exam-editor header,.exam-editor footer{padding:18px 24px;display:flex;align-items:center;justify-content:space-between;gap:10px;background:#fff;position:sticky;z-index:1}
+      .exam-editor header{top:0;border-bottom:1px solid ${bd}}.exam-editor footer{bottom:0;border-top:1px solid ${bd};border-radius:0 0 16px 16px}
+      .exam-editor header strong{font-size:16px}
+      .exam-editor .exam-close{width:30px;height:30px;border-radius:50%;border:none;background:${bg};color:${tx2};font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+      .exam-editor fieldset{margin:0;border:0;padding:22px 24px;min-width:0}
+      .exam-editor input:not([type=checkbox]){width:100%;padding:10px 12px;border:1.5px solid ${bd};border-radius:9px;font:inherit;font-size:14px;box-sizing:border-box;color:${tx};transition:border-color .15s}
+      .exam-editor input:not([type=checkbox]):focus{outline:none;border-color:${navy}}
+      .exam-editor .exam-btn{padding:9px 14px;border:1.5px solid ${bd};border-radius:8px;background:#fff;font:inherit;font-size:13px;font-weight:600;color:${tx2};cursor:pointer;transition:all .15s}
+      .exam-editor .exam-btn:disabled{opacity:.5;cursor:default}
+      .exam-editor .exam-btn:hover:not(:disabled){border-color:${navy};color:${navy}}
+      .exam-editor .exam-btn[aria-pressed=true]{background:${navy};color:#fff;border-color:${navy}}
+      .exam-editor .exam-save{padding:10px 22px;border:none;border-radius:9px;background:${gold};color:#3A2205;font-weight:700;font-size:14px;cursor:pointer}
+      .exam-editor .exam-save:disabled{opacity:.55;cursor:default}
+      .exam-editor .exam-cancel{padding:10px 16px;border:1.5px solid ${bd};border-radius:9px;background:#fff;color:${tx2};font-weight:600;font-size:14px;cursor:pointer}
+      .exam-editor .exam-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+      .exam-editor label.exam-field{font-size:12px;font-weight:600;color:${tx2};display:block}
+      .exam-editor label.exam-field input{margin-top:6px}
+      .exam-editor .exam-section{margin-top:26px;padding-top:22px;border-top:1px solid ${bd}}
+      .exam-editor .exam-section-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+      .exam-editor h3{font-size:14px;font-weight:700;margin:0;color:${tx}}
+      .exam-editor .exam-help{font-size:12px;color:${tx3};line-height:1.7;margin:0 0 14px}
+      .exam-editor .exam-auto-toggle{display:flex;align-items:center;gap:10px;padding:14px 16px;border:1.5px solid ${bd};border-radius:10px;cursor:pointer;background:${bg}}
+      .exam-editor .exam-auto-toggle[data-on=true]{border-color:${navy};background:#EAF0FB}
+      .exam-editor .exam-switch{width:38px;height:22px;border-radius:99px;background:${bd};position:relative;flex-shrink:0;transition:background .15s}
+      .exam-editor .exam-switch[data-on=true]{background:${navy}}
+      .exam-editor .exam-switch::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .15s;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+      .exam-editor .exam-switch[data-on=true]::after{transform:translateX(16px)}
+      .exam-editor .exam-question{display:grid;grid-template-columns:56px 1fr;gap:14px;padding:14px 16px;border:1.5px solid ${bd};border-radius:12px;margin-bottom:10px;align-items:start}
+      .exam-editor .exam-qnum{width:30px;height:30px;border-radius:50%;background:${navy};color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+      .exam-editor .exam-qpoints{display:flex;align-items:center;gap:5px;margin-top:8px}
+      .exam-editor .exam-qpoints input{width:56px;padding:6px 4px;text-align:center;font-weight:700}
+      .exam-editor .exam-qpoints span{font-size:12px;color:${tx3};white-space:nowrap}
+      .exam-editor .exam-choices{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px}
+      .exam-editor .exam-choices button{width:40px;height:40px;border-radius:10px;font-size:16px;padding:0}
+      .exam-editor .exam-qstatus{font-size:11.5px;font-weight:600;margin-top:7px;display:inline-flex;align-items:center;gap:4px}
+      .exam-editor .exam-qstatus[data-ok=true]{color:${gr}}.exam-editor .exam-qstatus[data-ok=false]{color:${tx3}}
+      .exam-editor .exam-roster{max-height:200px;overflow:auto;display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:10px;border:1px solid ${bd};border-radius:10px;margin-top:10px;background:${bg}}
+      .exam-editor .exam-check{display:flex;gap:7px;align-items:center;font-size:13px;padding:4px 6px;border-radius:6px}
+      .exam-editor .exam-search{margin-top:10px}
+      .exam-editor .exam-publish-note{display:flex;gap:10px;align-items:flex-start;padding:14px 16px;border-radius:10px;background:#FFF7EA;border:1px solid #F3DDB0;color:#6B4A0E;font-size:12.5px;line-height:1.7;margin-top:20px}
+      .exam-editor .exam-locked{display:flex;gap:10px;align-items:flex-start;padding:14px 16px;border-radius:10px;background:#FDF3ED;border:1px solid #F5CBA7;color:#8A4B14;font-size:12.5px;line-height:1.7;margin:16px 24px 0}
+      .exam-editor .exam-error{color:${re};background:#FDECEA;border-radius:8px;padding:10px 14px;margin:16px 24px 0;font-size:13px}
+      @media(max-width:560px){.exam-editor-overlay{padding:0}.exam-editor{border-radius:0;max-height:100dvh}.exam-editor fieldset{padding:16px}.exam-editor .exam-grid{grid-template-columns:1fr}.exam-editor .exam-question{grid-template-columns:1fr}.exam-editor .exam-qnum{width:26px;height:26px}.exam-editor .exam-roster{grid-template-columns:1fr}}
     `}</style>
     <section className="exam-editor" role="dialog" aria-modal="true" aria-label={test ? '테스트 편집' : '테스트 추가'}>
-      <header><strong>{test ? '테스트 편집' : '테스트 추가'}</strong><button onClick={onClose} disabled={saving} aria-label="닫기">×</button></header>
-      {error && <p role="alert" style={{ color: '#C0392B', padding: '0 20px' }}>{error}</p>}
-      {loading && <p style={{ padding: 20 }}>시험 설정을 불러오는 중...</p>}
-      {locked && <p className="exam-help" style={{ padding: '0 20px' }}>응시가 시작되어 문항·배점·대상은 변경할 수 없습니다. 공개 여부는 시험 상세에서 변경할 수 있습니다.</p>}
+      <header>
+        <strong>{test ? '테스트 편집' : '테스트 추가'}</strong>
+        <button className="exam-close" onClick={onClose} disabled={saving} aria-label="닫기">×</button>
+      </header>
+      {error && <p role="alert" className="exam-error">{error}</p>}
+      {locked && <p className="exam-locked">응시가 시작된 시험은 내용을 변경할 수 없습니다. 재시험이나 문항 변경이 필요하면 새 시험을 만들어 주세요. 공개 여부는 시험 상세 화면에서 바꿀 수 있습니다.</p>}
       <fieldset disabled={loading || saving || locked || loadError}>
-        <label>시험명<input value={name} onChange={e => setName(e.target.value)} placeholder="시험명" /></label>
-        <div className="exam-grid" style={{ marginTop: 12 }}>
-          <label>날짜<input type="date" value={date} onChange={e => setDate(e.target.value)} /></label>
-          <label>총 문항 수<input type="number" min={1} max={200} value={total} onChange={e => changeTotal(Number(e.target.value))} /></label>
-        </div>
-        <label className="exam-check exam-section"><input type="checkbox" checked={auto} onChange={e => setAuto(e.target.checked)} />자동채점 사용 (선택)</label>
-        {!auto && <p className="exam-help">기존처럼 수업기록에서 정답 수와 점수를 직접 입력합니다.</p>}
-        {auto && <>
-          <section className="exam-section">
-            <h3>문항별 배점과 정답 · 배점 합계 {questions.reduce((sum, q) => sum + q.points, 0)}점</h3>
-            <p className="exam-help">①~⑤를 선택하면 객관식, 아래 빈칸에 입력하면 주관식입니다. 복수 선택은 모두 일치해야 정답이며 부분 점수는 없습니다. 주관식은 앞뒤 공백을 제외하고 일치해야 합니다. 성적은 배점 합계를 기준으로 100점 만점 환산합니다.</p>
-            {questions.map((q, i) => <div className="exam-question" key={i}>
-              <label><strong>{i + 1}번</strong><input aria-label={`${i + 1}번 배점`} type="number" min={1} max={1000} value={q.points || ''} onChange={e => updateQuestion(i, { points: Number(e.target.value) })} />점</label>
-              <div>
-                <div className="exam-choices">{['①','②','③','④','⑤'].map((label, index) => <button type="button" key={label} aria-label={`${i + 1}번 정답 ${label}`} aria-pressed={q.choices.includes(index + 1)} onClick={() => updateQuestion(i, { choices: toggleChoice(q.choices, index + 1), text: '' })}>{label}</button>)}</div>
-                <input aria-label={`${i + 1}번 주관식 정답`} maxLength={500} value={q.text} onChange={e => updateQuestion(i, { text: e.target.value, choices: [] })} placeholder="주관식 정답 입력" />
-                <span className="exam-help">{q.choices.length ? `객관식${q.choices.length > 1 ? ' · 복수 정답' : ''}` : q.text.trim() ? '주관식' : '정답 미입력'}</span>
+        {loading ? <p style={{ color: tx3, fontSize: 13 }}>시험 설정을 불러오는 중...</p> : <>
+          <label className="exam-field">시험명<input value={name} onChange={e => setName(e.target.value)} placeholder="예) 2학년 1학기 중간 단원평가" /></label>
+          <div className="exam-grid" style={{ marginTop: 14 }}>
+            <label className="exam-field">날짜<input type="date" value={date} onChange={e => setDate(e.target.value)} /></label>
+            <label className="exam-field">총 문항 수<input type="number" min={1} max={200} value={total} onChange={e => changeTotal(Number(e.target.value))} /></label>
+          </div>
+
+          <div className="exam-section">
+            <button type="button" className="exam-auto-toggle" data-on={auto} disabled={locked} onClick={() => setAuto(v => !v)} style={{ width: '100%', font: 'inherit', textAlign: 'left' }}>
+              <span className="exam-switch" data-on={auto} />
+              <span>
+                <strong style={{ display: 'block', fontSize: 13.5, color: tx }}>자동채점 사용</strong>
+                <span style={{ display: 'block', fontSize: 12, color: tx3, marginTop: 2 }}>{auto ? '학생이 직접 답안을 입력하면 서버가 즉시 채점합니다.' : '기존처럼 수업기록에서 정답 수와 점수를 직접 입력합니다.'}</span>
+              </span>
+            </button>
+          </div>
+
+          {auto && <>
+            <section className="exam-section">
+              <div className="exam-section-head">
+                <h3>문항별 배점 · 정답</h3>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: navy, background: '#EAF0FB', padding: '3px 10px', borderRadius: 20 }}>배점 합계 {totalPoints}점</span>
               </div>
-            </div>)}
-          </section>
-          <section className="exam-section">
-            <h3>응시 대상 · {selected.length}명</h3>
-            <div className="exam-choices">{classes.map(c => {
-              const ids = members.filter(m => m.class_id === c.id).map(m => m.student_id)
-              const all = ids.length > 0 && ids.every(id => selected.includes(id))
-              return <button key={c.id} type="button" aria-pressed={all} disabled={!ids.length} onClick={() => setSelected(s => all ? s.filter(id => !ids.includes(id)) : [...new Set([...s, ...ids])])}>{c.name} ({ids.filter(id => selected.includes(id)).length}/{ids.length})</button>
-            })}</div>
-            <input aria-label="학생 검색" placeholder="학생 이름 검색" value={search} onChange={e => setSearch(e.target.value)} />
-            <div className="exam-roster">{students.filter(s => s.name.includes(search)).map(s => <label className="exam-check" key={s.id}><input type="checkbox" checked={selected.includes(s.id)} onChange={e => setSelected(ids => e.target.checked ? [...ids, s.id] : ids.filter(id => id !== s.id))} />{s.name} <span style={{ color: '#96A4BF' }}>{s.school}</span></label>)}</div>
-            <p className="exam-help">반을 선택하면 현재 소속 학생이 추가됩니다. 학생은 ‘답안 입력’을 누른 시점부터 2분 동안 한 번 응시할 수 있습니다.</p>
-          </section>
-          <label className="exam-check exam-section"><input type="checkbox" checked={published} onChange={e => setPublished(e.target.checked)} />학생에게 시험 공개</label>
+              <p className="exam-help">①~⑤를 누르면 객관식(복수 선택 가능), 빈칸에 입력하면 주관식입니다. 객관식은 정답 조합이 정확히 일치해야 하고 부분 점수는 없습니다. 주관식은 앞뒤 공백을 제외하고 완전히 일치해야 합니다. 성적은 배점 합계를 기준으로 100점 만점으로 환산됩니다.</p>
+              {questions.map((q, i) => {
+                const filled = q.choices.length > 0 || q.text.trim().length > 0
+                return <div className="exam-question" key={i}>
+                  <div>
+                    <span className="exam-qnum">{i + 1}</span>
+                    <div className="exam-qpoints">
+                      <input aria-label={`${i + 1}번 배점`} type="number" min={1} max={1000} disabled={locked} value={q.points ?? ''} onChange={e => updateQuestion(i, { points: e.target.value === '' ? null : Number(e.target.value) })} />
+                      <span>점</span>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="exam-choices">{['①', '②', '③', '④', '⑤'].map((label, index) => (
+                      <button type="button" key={label} disabled={locked} aria-label={`${i + 1}번 정답 ${label}`} aria-pressed={q.choices.includes(index + 1)} onClick={() => updateQuestion(i, { choices: toggleChoice(q.choices, index + 1), text: '' })}>{label}</button>
+                    ))}</div>
+                    <input aria-label={`${i + 1}번 주관식 정답`} maxLength={500} disabled={locked} value={q.text} onChange={e => updateQuestion(i, { text: e.target.value, choices: [] })} placeholder="주관식 정답 입력" />
+                    <span className="exam-qstatus" data-ok={filled}>
+                      {q.choices.length ? `● 객관식${q.choices.length > 1 ? ' · 복수 정답' : ''}` : q.text.trim() ? '● 주관식' : '○ 정답 미입력'}
+                    </span>
+                  </div>
+                </div>
+              })}
+            </section>
+
+            <section className="exam-section">
+              <div className="exam-section-head">
+                <h3>응시 대상</h3>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: navy, background: '#EAF0FB', padding: '3px 10px', borderRadius: 20 }}>{selected.length}명 선택</span>
+              </div>
+              <p className="exam-help">반을 누르면 현재 소속 학생이 한 번에 추가됩니다. 개별 학생은 아래 목록에서 추가·제외할 수 있습니다.</p>
+              <div className="exam-choices">{classes.map(c => {
+                const ids = members.filter(m => m.class_id === c.id).map(m => m.student_id)
+                const all = ids.length > 0 && ids.every(id => selected.includes(id))
+                return <button key={c.id} type="button" className="exam-btn" aria-pressed={all} disabled={!ids.length || locked} onClick={() => setSelected(s => all ? s.filter(id => !ids.includes(id)) : [...new Set([...s, ...ids])])} style={{ width: 'auto', height: 'auto', borderRadius: 8 }}>{c.name} ({ids.filter(id => selected.includes(id)).length}/{ids.length})</button>
+              })}</div>
+              <input className="exam-search" aria-label="학생 검색" placeholder="학생 이름 검색" disabled={locked} value={search} onChange={e => setSearch(e.target.value)} />
+              <div className="exam-roster">{students.filter(s => s.name.includes(search)).map(s => (
+                <label className="exam-check" key={s.id}>
+                  <input type="checkbox" disabled={locked} checked={selected.includes(s.id)} onChange={e => setSelected(ids => e.target.checked ? [...ids, s.id] : ids.filter(id => id !== s.id))} />
+                  {s.name} <span style={{ color: tx3 }}>{s.school}</span>
+                </label>
+              ))}</div>
+            </section>
+
+            <div className="exam-publish-note">
+              <span>🔒</span>
+              <span>학생 공개는 여기서 하지 않습니다. 저장 후 <strong>테스트 상세 화면의 &lsquo;학생에게 공개&rsquo; 버튼</strong>을 눌러야 대상 학생이 답안을 입력할 수 있습니다.</span>
+            </div>
+          </>}
         </>}
       </fieldset>
-      <footer><button onClick={onClose} disabled={saving}>닫기</button><button className="exam-save" onClick={save} disabled={saving || loading || locked || loadError}>{saving ? '저장 중...' : '저장'}</button></footer>
+      <footer>
+        <button className="exam-cancel" onClick={onClose} disabled={saving}>취소</button>
+        <button className="exam-save" onClick={save} disabled={saving || loading || locked || loadError}>{saving ? '저장 중...' : '저장'}</button>
+      </footer>
     </section>
   </div>
 }

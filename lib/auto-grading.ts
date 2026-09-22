@@ -1,4 +1,4 @@
-export type ExamQuestionDraft = { points: number; choices: number[]; text: string }
+export type ExamQuestionDraft = { points: number | null; choices: number[]; text: string }
 export type ExamQuestion = { number: number; points: number; kind: 'choice' | 'text'; multiple: boolean }
 export type ExamAnswers = Record<string, string | number[]>
 export type ExamAttempt = {

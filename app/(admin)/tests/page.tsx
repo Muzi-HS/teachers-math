@@ -350,13 +350,14 @@ export default function TestsPage() {
             {loading?(
               <p style={{color:tx3,fontSize:13}}>불러오는 중...</p>
             ):(
-              <div style={{background:'#fff',borderRadius:12,border:`1px solid ${bd}`,overflow:'hidden',boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
+              <div style={{background:'#fff',borderRadius:12,border:`1px solid ${bd}`,overflow:'hidden',boxShadow:'0 1px 4px rgba(0,0,0,.06)',display:'flex',flexDirection:'column',maxHeight:mobileMode?'calc(100dvh - 300px)':'calc(100dvh - 220px)'}}>
                 {selDate&&(
-                  <div style={{padding:'10px 16px',borderBottom:`1px solid ${bd}`,fontSize:13,fontWeight:700,color:tx,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                  <div style={{padding:'10px 16px',borderBottom:`1px solid ${bd}`,fontSize:13,fontWeight:700,color:tx,display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
                     <span style={{display:'flex',alignItems:'center',gap:5}}><IconClipboard size={13} /> {selDate} 테스트</span>
                     <span style={{fontSize:12,color:tx3,fontWeight:400}}>{filtered.length}건</span>
                   </div>
                 )}
+                <div style={{overflowY:'auto',minHeight:0,flex:1}}>
                 {filtered.length===0?(
                   <div style={{padding:'50px 0',textAlign:'center',color:tx3}}>
                     <p style={{marginBottom:8,display:'flex',justifyContent:'center'}}><IconClipboard size={28} /></p>
@@ -397,10 +398,11 @@ export default function TestsPage() {
                     </div>
                   )
                 })}
+                </div>
                 {/* 테스트 추가 행 */}
                 {canManageTests&&(
                   <div onClick={openAdd}
-                    style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8,padding:14,color:tx3,cursor:'pointer',borderTop:`1px dashed ${bd}`,fontSize:13,transition:'all .15s'}}
+                    style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8,padding:14,color:tx3,cursor:'pointer',borderTop:`1px dashed ${bd}`,fontSize:13,transition:'all .15s',flexShrink:0}}
                     onMouseEnter={e=>{(e.currentTarget as HTMLDivElement).style.color=navy;(e.currentTarget as HTMLDivElement).style.background=navyM}}
                     onMouseLeave={e=>{(e.currentTarget as HTMLDivElement).style.color=tx3;(e.currentTarget as HTMLDivElement).style.background='transparent'}}
                   >
