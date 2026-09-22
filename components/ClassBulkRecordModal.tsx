@@ -1,5 +1,5 @@
 'use client'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { kstDateStr } from '@/lib/kst'
 import { IconChat, IconBook, IconPencil, IconSave, IconX } from '@/components/icons'
@@ -8,7 +8,7 @@ import { useMobileMode } from '@/context/MobileModeContext'
 
 type Student = { id: number; name: string; school?: string }
 type Test = { id: number; name: string; date: string; total: number }
-type TestItem = { testId: number | null; tTotal: number; tCor: number; tScore: number }
+type TestItem = { testId: number | null; tTotal: number; tCor: number; tScore: number | null; autoGraded?: boolean; scoreLoading?: boolean; lookupToken?: number; hasSavedScore?: boolean }
 type RecForm = {
   student_id: number; content: string; homework: string
   hw_rate: number | ''; hw_cor: number | ''; attitude: number
@@ -61,6 +61,7 @@ export default function ClassBulkRecordModal({
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(false)
   const [notif, setNotif] = useState<{ msg: string; ok: boolean } | null>(null)
+  const scoreLookup = useRef(0)
 
   function toast(msg: string, ok = true) { setNotif({ msg, ok }); setTimeout(() => setNotif(null), 3000) }
 
@@ -97,10 +98,16 @@ export default function ClassBulkRecordModal({
     if (recs && recs.length > 0) {
       const recIdList = recs.map(r => r.id)
       const { data: items } = await supabase.from('record_test_items').select('record_id, test_id, t_total, t_cor, t_score').in('record_id', recIdList)
+      const itemTestIds = [...new Set((items ?? []).map(it => it.test_id))]
+      const autoIds = new Set<number>()
+      if (itemTestIds.length) {
+        const { data: meta } = await supabase.from('tests').select('*').in('id', itemTestIds)
+        for (const t of meta ?? []) if (t.auto_grading) autoIds.add(t.id)
+      }
       const itemsByRec: Record<number, TestItem[]> = {}
       for (const it of (items ?? [])) {
         if (!itemsByRec[it.record_id]) itemsByRec[it.record_id] = []
-        itemsByRec[it.record_id].push({ testId: it.test_id, tTotal: it.t_total, tCor: it.t_cor, tScore: it.t_score })
+        itemsByRec[it.record_id].push({ testId: it.test_id, tTotal: it.t_total, tCor: it.t_cor, tScore: it.t_score, autoGraded: autoIds.has(it.test_id), hasSavedScore: true })
       }
       for (const r of recs) {
         if (!(r.student_id in chks)) continue // 반 소속 학생 목록에 없는 경우(제외됨 등) 무시
@@ -148,18 +155,38 @@ export default function ClassBulkRecordModal({
     setBulkForms(p => ({ ...p, [sid]: { ...p[sid], [key]: val } }))
   }
   function setBulkTestItem(sid: number, idx: number, key: keyof TestItem, val: any) {
+    const token = ++scoreLookup.current
     setBulkForms(p => {
       const items = [...(p[sid]?.testItems || [])]
       items[idx] = { ...items[idx], [key]: val }
       if (key === 'testId') {
         const t = tests.find(x => x.id === Number(val))
         items[idx].tTotal = t ? t.total : 0
+        items[idx] = { ...items[idx], tCor: 0, tScore: null, autoGraded: false, hasSavedScore: false, scoreLoading: !!val, lookupToken: token }
       }
       return { ...p, [sid]: { ...p[sid], testItems: items } }
     })
+    if (key === 'testId' && val) {
+      Promise.all([
+        supabase.from('tests').select('*').eq('id', Number(val)).single(),
+        supabase.from('test_scores').select('cor,score').eq('test_id', Number(val)).eq('student_id', sid).maybeSingle(),
+      ]).then(([test, score]) => {
+        if (test.error || score.error) toast('저장된 시험 점수를 불러오지 못했습니다. 시험을 다시 선택해 주세요.', false)
+        setBulkForms(p => {
+          const index = p[sid]?.testItems.findIndex(item => item.lookupToken === token) ?? -1
+          const current = p[sid]?.testItems[index]
+          if (!current || current.lookupToken !== token || current.testId !== Number(val)) return p
+          const items = [...p[sid].testItems]
+          items[index] = { ...current, scoreLoading: false, autoGraded: !!test.data?.auto_grading,
+            hasSavedScore: !!score.data, tTotal: test.data?.total ?? current.tTotal,
+            tCor: score.data?.cor ?? 0, tScore: score.data?.score ?? null }
+          return { ...p, [sid]: { ...p[sid], testItems: items } }
+        })
+      })
+    }
   }
   function addBulkTestItem(sid: number) {
-    setBulkForms(p => ({ ...p, [sid]: { ...p[sid], testItems: [...(p[sid]?.testItems || []), { testId: null, tTotal: 0, tCor: 0, tScore: 0 }] } }))
+    setBulkForms(p => ({ ...p, [sid]: { ...p[sid], testItems: [...(p[sid]?.testItems || []), { testId: null, tTotal: 0, tCor: 0, tScore: null }] } }))
   }
   function removeBulkTestItem(sid: number, idx: number) {
     setBulkForms(p => { const items = [...(p[sid]?.testItems || [])]; items.splice(idx, 1); return { ...p, [sid]: { ...p[sid], testItems: items } } })
@@ -182,6 +209,22 @@ export default function ClassBulkRecordModal({
     setSaving(true)
     let cnt = 0, errCnt = 0
     const checkedSids = Object.entries(bulkChks).filter(([, v]) => v).map(([k]) => Number(k))
+    const selectedTestIds = [...new Set(checkedSids.flatMap(sid => bulkForms[sid]?.has_test ? bulkForms[sid].testItems.map(t => t.testId).filter((id): id is number => id !== null) : []))]
+    const autoTestIds = new Set<number>()
+    const savedScores = new Map<string, { cor: number; score: number }>()
+    if (selectedTestIds.length) {
+      if (checkedSids.some(sid => bulkForms[sid]?.testItems.some(t => t.scoreLoading))) { setSaving(false); return toast('시험 점수를 불러오는 중입니다.', false) }
+      const [meta, sc] = await Promise.all([
+        supabase.from('tests').select('*').in('id', selectedTestIds),
+        supabase.from('test_scores').select('test_id,student_id,cor,score').in('test_id', selectedTestIds).in('student_id', checkedSids),
+      ])
+      if (meta.error || sc.error) { setSaving(false); return toast('시험 성적 확인에 실패했습니다. 다시 시도해 주세요.', false) }
+      for (const t of meta.data ?? []) if (t.auto_grading) autoTestIds.add(t.id)
+      for (const s of sc.data ?? []) savedScores.set(`${s.test_id}:${s.student_id}`, s)
+      if (checkedSids.some(sid => bulkForms[sid]?.has_test && bulkForms[sid].testItems.some(t => t.testId && autoTestIds.has(t.testId) && !savedScores.has(`${t.testId}:${sid}`)))) {
+        setSaving(false); return toast('아직 채점되지 않은 자동채점 시험이 있습니다. 학생 제출 후 저장해 주세요.', false)
+      }
+    }
     for (const sid of checkedSids) {
       const f = bulkForms[sid]
       const existingId = bulkRecIds[sid] ?? null
@@ -215,6 +258,7 @@ export default function ClassBulkRecordModal({
         const { data: rec, error: recErr } = await supabase.from('records').insert(row).select('id').single()
         if (recErr || !rec) { toast('저장 실패: ' + (recErr?.message || '알 수 없는 오류'), false); errCnt++; continue }
         recId = rec.id
+        setBulkRecIds(ids => ({ ...ids, [sid]: recId }))
       }
 
       if (f.has_test && f.testItems && f.testItems.length > 0) {
@@ -226,16 +270,27 @@ export default function ClassBulkRecordModal({
             const { data: td } = await supabase.from('tests').select('total').eq('id', ti.testId).single()
             if (td?.total) total = td.total
           }
-          const tCorVal = ti.tCor ?? 0
-          const autoScore = ti.tScore ? ti.tScore : (total > 0 ? Math.round(tCorVal / total * 100) : 0)
-          await supabase.from('record_test_items').insert({ record_id: recId, test_id: ti.testId, t_total: total, t_cor: tCorVal, t_score: autoScore })
-          await supabase.from('test_scores').upsert({ test_id: ti.testId, student_id: sid, cor: tCorVal, score: autoScore }, { onConflict: 'test_id,student_id' })
+          const graded = autoTestIds.has(ti.testId) ? savedScores.get(`${ti.testId}:${sid}`) : null
+          const tCorVal = graded?.cor ?? ti.tCor ?? 0
+          const autoScore = graded?.score ?? ti.tScore ?? (total > 0 ? Math.round(tCorVal / total * 100) : 0)
+          const { error: itemError } = await supabase.from('record_test_items').insert({ record_id: recId, test_id: ti.testId, t_total: total, t_cor: tCorVal, t_score: autoScore })
+          if (itemError) { toast('시험 성적 저장 실패: ' + itemError.message, false); errCnt++; continue }
+          if (!graded) {
+            const { error: scoreError } = await supabase.from('test_scores').upsert({ test_id: ti.testId, student_id: sid, cor: tCorVal, score: autoScore }, { onConflict: 'test_id,student_id' })
+            if (scoreError) { toast('성적 집계 저장 실패: ' + scoreError.message, false); errCnt++ }
+          }
         }
       }
       cnt++
     }
-    sessionStorage.removeItem(draftKey)
     setSaving(false)
+    if (errCnt > 0) {
+      sessionStorage.setItem(draftKey, JSON.stringify({ date: bulkDate, chks: bulkChks, forms: bulkForms, showTest: bulkShowTest }))
+      setHasDraft(true)
+      toast('일부 항목을 저장하지 못했습니다. 작성 내용은 유지됩니다. 확인 후 다시 저장해 주세요.', false)
+      return
+    }
+    sessionStorage.removeItem(draftKey)
     setHasDraft(false)
     if (cnt === 0 && errCnt === 0) {
       toast('저장할 내용이 없습니다. 수업 내용·숙제·피드백이나 수치 항목을 수정 후 저장하세요.', false)
@@ -485,9 +540,10 @@ export default function ClassBulkRecordModal({
                           </div>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
                             <div className="bcr-fg"><label className="bcr-lb" style={{ fontSize: 10 }}>총 문제 수</label><input type="number" className="bcr-fi bcr-fi-sm" value={item.tTotal || ''} readOnly placeholder="자동입력" /></div>
-                            <div className="bcr-fg"><label className="bcr-lb" style={{ fontSize: 10 }}>정답 수</label><input type="number" className="bcr-fi bcr-fi-sm" min={0} value={item.tCor || ''} onChange={e => setBulkTestItem(sid, idx, 'tCor', parseInt(e.target.value) || 0)} /></div>
-                            <div className="bcr-fg"><label className="bcr-lb" style={{ fontSize: 10 }}>점수 (선택)</label><input type="number" className="bcr-fi bcr-fi-sm" min={0} max={100} value={item.tScore || ''} onChange={e => setBulkTestItem(sid, idx, 'tScore', parseInt(e.target.value) || 0)} /></div>
+                            <div className="bcr-fg"><label className="bcr-lb" style={{ fontSize: 10 }}>정답 수</label><input type="number" className="bcr-fi bcr-fi-sm" min={0} disabled={item.autoGraded || item.scoreLoading} value={item.tCor} onChange={e => setBulkTestItem(sid, idx, 'tCor', parseInt(e.target.value) || 0)} /></div>
+                            <div className="bcr-fg"><label className="bcr-lb" style={{ fontSize: 10 }}>점수 (선택)</label><input type="number" className="bcr-fi bcr-fi-sm" min={0} max={100} disabled={item.autoGraded || item.scoreLoading} value={item.tScore ?? ''} onChange={e => setBulkTestItem(sid, idx, 'tScore', e.target.value === '' ? null : Number(e.target.value))} /></div>
                           </div>
+                          {item.scoreLoading ? <p style={{fontSize:11,color:tx3}}>저장된 점수 불러오는 중...</p> : item.autoGraded ? <p style={{fontSize:11,color:gr}}>{item.hasSavedScore ? '자동채점 성적이 입력되었습니다.' : '학생 제출 후 채점된 점수가 입력됩니다. 시험을 다시 선택해 확인하세요.'}</p> : item.hasSavedScore ? <p style={{fontSize:11,color:tx3}}>저장된 성적을 불러왔습니다.</p> : null}
                         </div>
                       ))}
                       <button className="bcr-bout" style={{ marginTop: 4, fontSize: 12 }} onClick={() => addBulkTestItem(sid)}>

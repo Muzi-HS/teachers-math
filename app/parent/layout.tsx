@@ -4,7 +4,8 @@ import { useRouter, usePathname } from 'next/navigation'
 import Image from 'next/image'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
-import { requestFCMToken, onForegroundMessage, isFCMSupported } from '@/lib/firebase'
+import { requestFCMToken, isFCMSupported } from '@/lib/firebase'
+import ForegroundNotification from '@/components/ForegroundNotification'
 
 const navy='#0D2A5E', navyDk='#071A3E', bd='#DDE3EE', bg='#F5F7FA', tx2='#4B5C7E', tx3='#96A4BF'
 
@@ -156,9 +157,8 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
     }
   }, [parent?.parentId])
 
-  // 알림 클릭(백그라운드) 또는 앱이 열려있는 중에 푸시 수신(포그라운드) 시
-  // 해당 메뉴로 바로 이동 — 이미 그 페이지에 머물러 있으면 router.push는 아무 효과가
-  // 없으므로(리마운트 안 됨) 새로고침으로 강제 리마운트시켜 읽음 처리가 정상 실행되게 한다
+  // 사용자가 백그라운드 알림을 직접 클릭한 경우에만 해당 메뉴로 이동한다.
+  // 앱 사용 중 수신한 알림은 ForegroundNotification에서 입력 내용을 유지하며 표시한다.
   function navigateToLink(link: string) {
     if (link === window.location.pathname) window.location.reload()
     else router.push(link)
@@ -173,17 +173,6 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
     }
     navigator.serviceWorker.addEventListener('message', onMessage)
     return () => navigator.serviceWorker.removeEventListener('message', onMessage)
-  }, [router])
-
-  // 포그라운드(앱을 이미 보고 있는 중)에 알림이 도착했을 때 — 배경 알림과 동일하게 바로 이동
-  // (포그라운드 메시지는 OS 알림 배너 없이 SDK로만 전달되므로 별도 처리 필요)
-  useEffect(() => {
-    let unsub: (() => void) | undefined
-    onForegroundMessage(payload => {
-      const link: string | undefined = payload?.data?.link
-      if (link) navigateToLink(link)
-    }).then(fn => { unsub = fn })
-    return () => { if (typeof unsub === 'function') unsub() }
   }, [router])
 
   // /parent 루트 접근 시 수업기록으로 리다이렉트 (별도 effect, pathname만 의존)
@@ -330,6 +319,7 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
           )
         })}
       </nav>
+      <ForegroundNotification />
     </div>
   )
 }

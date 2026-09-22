@@ -6,8 +6,10 @@ import { can } from '@/lib/permissions'
 import { kstDateStr, kstNow } from '@/lib/kst'
 import { IconClipboard, IconBarChart, IconTrophy, IconArrowLeft } from '@/components/icons'
 import { useMobileMode } from '@/context/MobileModeContext'
+import TestEditorModal from '@/components/TestEditorModal'
+import AutoTestStatus from '@/components/AutoTestStatus'
 
-type Test = { id:number; name:string; date:string; total:number }
+type Test = { id:number; name:string; date:string; total:number; auto_grading?:boolean; is_published?:boolean }
 type ScoreRow = {
   id:number; test_id:number; student_id:number; cor:number; score:number
   students?:{ name:string; school:string }|null
@@ -31,7 +33,6 @@ export default function TestsPage() {
   const [loading,   setLoading]   = useState(true)
   const [search,    setSearch]    = useState('')
   const [addModal,  setAddModal]  = useState(false)
-  const [form,      setForm]      = useState({ name:'', date:kstDateStr(), total:'' })
   const [editId,    setEditId]    = useState<number|null>(null)
   const [editSc,    setEditSc]    = useState<{row:ScoreRow;cor:string;score:string}|null>(null)
   const [saving,    setSaving]    = useState(false)
@@ -137,30 +138,21 @@ export default function TestsPage() {
 
   function openAdd() {
     setEditId(null)
-    setForm({ name:'', date:kstDateStr(), total:'' })
     setAddModal(true)
   }
   function openEdit(t:Test, e:React.MouseEvent) {
     e.stopPropagation()
     setEditId(t.id)
-    setForm({ name:t.name, date:t.date, total:String(t.total) })
     setAddModal(true)
   }
-  async function saveTest() {
-    if (!form.name.trim()) return toast('테스트명을 입력하세요.',false)
-    if (!form.total || parseInt(form.total)<1) return toast('총 문항 수를 입력하세요.',false)
-    setSaving(true)
-    const row = { name:form.name.trim(), date:form.date, total:parseInt(form.total) }
-    if (editId) {
-      await supabase.from('tests').update(row).eq('id',editId)
-      if (curTest?.id===editId) setCurTest(p=>p?{...p,...row}:null)
-      toast(form.name+' 수정됨')
-    } else {
-      await supabase.from('tests').insert(row)
-      toast(form.name+' 생성됨')
-    }
-    setSaving(false); setAddModal(false)
+  async function onTestSaved() {
+    setAddModal(false)
+    toast('시험이 저장되었습니다.')
     await fetchAll()
+    if (curTest) {
+      const { data } = await supabase.from('tests').select('*').eq('id', curTest.id).single()
+      if (data) setCurTest(data)
+    }
   }
   async function delTest(t:Test, e:React.MouseEvent) {
     e.stopPropagation()
@@ -172,10 +164,11 @@ export default function TestsPage() {
   }
 
   function openEditSc(sc: ScoreRow) {
+    if (curTest?.auto_grading) return
     setEditSc({ row: sc, cor: String(sc.cor), score: '' })
   }
   async function saveEditedSc() {
-    if (!editSc || !curTest) return
+    if (!editSc || !curTest || curTest.auto_grading) return
     setSaving(true)
     const cor        = parseInt(editSc.cor)   || 0
     const scoreInput = parseInt(editSc.score) || 0
@@ -196,7 +189,7 @@ export default function TestsPage() {
     await fetchScores(curTest.id)
   }
   async function deleteSc(sc: ScoreRow) {
-    if (!curTest || !confirm(`${sc.students?.name ?? '이 학생'}의 성적을 삭제하시겠습니까?`)) return
+    if (!curTest || curTest.auto_grading || !confirm(`${sc.students?.name ?? '이 학생'}의 성적을 삭제하시겠습니까?`)) return
     await supabase.from('test_scores').delete().eq('test_id', curTest.id).eq('student_id', sc.student_id)
     const { data: stuRecs } = await supabase.from('records').select('id').eq('student_id', sc.student_id)
     if (stuRecs && stuRecs.length > 0) {
@@ -383,7 +376,7 @@ export default function TestsPage() {
                         <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke={navy} strokeWidth={2}><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2"/></svg>
                       </div>
                       <div style={{flex:1}}>
-                        <p style={{fontSize:13,fontWeight:600,color:tx,margin:0}}>{t.name}</p>
+                        <p style={{fontSize:13,fontWeight:600,color:tx,margin:0}}>{t.name} {t.auto_grading && <span style={{fontSize:11,color:gr}}>자동채점 · {t.is_published?'공개':'비공개'}</span>}</p>
                         <p style={{fontSize:11,color:tx3,margin:0}}>{t.date} · {t.total}문항 · 응시 {stat?.cnt??0}명</p>
                       </div>
                       {hasData?(
@@ -437,10 +430,15 @@ export default function TestsPage() {
           <div/>
         </div>
 
+        {curTest.auto_grading && <AutoTestStatus test={curTest} students={students} onPublished={value => {
+          setCurTest(t => t ? {...t,is_published:value} : t)
+          setTests(ts => ts.map(t => t.id===curTest.id ? {...t,is_published:value} : t))
+        }} onResults={() => { void fetchScores(curTest.id); void fetchAllStats() }} />}
+
         {scores.length===0?(
           <div style={{background:'#fff',borderRadius:12,border:`1px solid ${bd}`,padding:'60px 0',textAlign:'center',color:tx3}}>
             <p style={{fontSize:15,fontWeight:600,color:tx,marginBottom:8}}>아직 입력된 성적이 없어요</p>
-            <p style={{fontSize:13,color:tx3}}>테스트 결과 입력을 위해서 수업기록에서 작성을 해주세요</p>
+            <p style={{fontSize:13,color:tx3}}>{curTest.auto_grading?'학생이 답안을 제출하면 채점 결과가 자동 집계됩니다.':'테스트 결과 입력을 위해서 수업기록에서 작성을 해주세요'}</p>
           </div>
         ):null}
 
@@ -511,7 +509,7 @@ export default function TestsPage() {
                   <div style={{width:64,textAlign:'center'}}>맞은 개수</div>
                   <div style={{width:50,textAlign:'center'}}>정답률</div>
                   <div style={{width:50,textAlign:'right'}}>점수</div>
-                  {canManageTests&&<div style={{width:80,textAlign:'right'}}>관리</div>}
+                  {canManageTests&&!curTest.auto_grading&&<div style={{width:80,textAlign:'right'}}>관리</div>}
                 </div>
                 <div style={{overflowY:'auto',maxHeight:380}}>
                 {scores.map((sc,i)=>{
@@ -535,7 +533,7 @@ export default function TestsPage() {
                         <span style={{fontSize:11,fontWeight:600,color:pct>=80?gr:pct>=60?'#C05621':re}}>{pct}%</span>
                       </div>
                       <div style={{width:50,textAlign:'right',fontSize:14,fontWeight:700,color:scoreColor(sc.score)}}>{sc.score}점</div>
-                      {canManageTests&&(
+                      {canManageTests&&!curTest.auto_grading&&(
                         <div style={{width:80,display:'flex',gap:4,justifyContent:'flex-end'}}>
                           <button className="bout" style={{padding:'3px 8px',fontSize:11}} onClick={()=>openEditSc(sc)}>수정</button>
                           <button className="bdng" style={{padding:'3px 8px',fontSize:11}} onClick={()=>deleteSc(sc)}>삭제</button>
@@ -552,38 +550,11 @@ export default function TestsPage() {
       </>}
 
       {/* ════ 테스트 추가/수정 모달 ════ */}
-      {addModal&&(
-        <div onClick={()=>setAddModal(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.42)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
-          <div onClick={e=>e.stopPropagation()} style={{background:'#fff',borderRadius:12,width:460,maxWidth:'100%',boxShadow:'0 20px 60px rgba(0,0,0,.15)'}}>
-            <div style={{padding:'18px 22px 0',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-              <span style={{fontSize:15,fontWeight:600,color:tx}}>{editId?'테스트 편집':'테스트 추가'}</span>
-              <button onClick={()=>setAddModal(false)} style={{width:28,height:28,borderRadius:'50%',border:'none',background:bg,cursor:'pointer',fontSize:17,color:tx2}}>×</button>
-            </div>
-            <div style={{padding:'18px 22px'}}>
-              <div style={{marginBottom:14}}>
-                <label className="lb">테스트명</label>
-                <input className="fi" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="예) 2학년 1학기 중간 단원평가"/>
-              </div>
-              <div style={{display:'grid',gridTemplateColumns:mobileMode?'1fr':'1fr 1fr',gap:12}}>
-                <div>
-                  <label className="lb">날짜</label>
-                  <input type="date" className="fi" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))}/>
-                </div>
-                <div>
-                  <label className="lb">총 문항 수</label>
-                  <input type="number" className="fi" min={1} value={form.total} onChange={e=>setForm(f=>({...f,total:e.target.value}))} placeholder="예) 20" style={{textAlign:'center'}}/>
-                </div>
-              </div>
-            </div>
-            <div style={{padding:'0 22px 18px',display:'flex',gap:8,justifyContent:'flex-end'}}>
-              <button onClick={()=>setAddModal(false)} style={{padding:'8px 16px',borderRadius:8,fontSize:13,border:`1px solid ${bd}`,background:'#fff',cursor:'pointer',color:tx2,fontFamily:'inherit'}}>취소</button>
-              <button className="bgold" onClick={saveTest} disabled={saving} style={{opacity:saving?0.7:1}}>{saving?'저장 중...':'저장'}</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {addModal && <TestEditorModal
+        test={editId ? tests.find(t => t.id === editId) ?? null : null}
+        students={students} onClose={() => setAddModal(false)} onSaved={onTestSaved}
+      />}
 
-      {/* ════ 개별 성적 수정 모달 ════ */}
       {editSc&&curTest&&(
         <div onClick={()=>setEditSc(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.42)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
           <div onClick={e=>e.stopPropagation()} style={{background:'#fff',borderRadius:12,width:440,maxWidth:'100%',boxShadow:'0 20px 60px rgba(0,0,0,.15)'}}>

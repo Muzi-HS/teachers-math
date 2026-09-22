@@ -105,6 +105,11 @@ export async function studentLookup(phone: string) {
 export async function studentLoginWithPin(phone: string, pin: string) {
   const data = await studentLookup(phone)
   if (data.pin !== pin) throw new Error('PIN이 올바르지 않습니다.')
+  // 기존 학생 로그인은 유지하고, 시험 제출용 서버 검증 세션도 발급한다.
+  if (data.pin !== '0000') await fetch('/api/student-tests', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'verify', studentId: data.studentId, pin }),
+  }).catch(() => {})
   return {
     studentId: data.studentId,
     name: data.name,

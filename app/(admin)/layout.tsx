@@ -4,7 +4,8 @@ import { usePathname, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
-import { requestFCMToken, onForegroundMessage } from '@/lib/firebase'
+import { requestFCMToken } from '@/lib/firebase'
+import ForegroundNotification from '@/components/ForegroundNotification'
 import Sidebar from '@/components/Sidebar'
 import { menuAccess, Role } from '@/lib/permissions'
 import { MobileModeProvider, useMobileMode } from '@/context/MobileModeContext'
@@ -124,10 +125,8 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     }
   }, [pathname])
 
-  // 알림 클릭(백그라운드) 또는 앱을 보고 있는 중 푸시 수신(포그라운드) 시 해당 메뉴로 이동
-  // 학부모 화면(app/parent/layout.tsx)에는 이미 있었는데 관리자 화면에는 빠져있어서,
-  // 서비스워커가 postMessage로 보내는 이동 요청을 받을 곳이 없어 그냥 포커스만 되고
-  // 원래 열려있던 페이지(예: 수업기록)에 머물러 있던 것처럼 보였다.
+  // 사용자가 백그라운드 알림을 직접 클릭한 경우에만 해당 메뉴로 이동한다.
+  // 앱 사용 중 수신한 알림은 ForegroundNotification에서 입력 내용을 유지하며 표시한다.
   function navigateToLink(link: string) {
     if (link === window.location.pathname) window.location.reload()
     else router.push(link)
@@ -140,14 +139,6 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     }
     navigator.serviceWorker.addEventListener('message', onMessage)
     return () => navigator.serviceWorker.removeEventListener('message', onMessage)
-  }, [router])
-  useEffect(() => {
-    let unsub: (() => void) | undefined
-    onForegroundMessage(payload => {
-      const link: string | undefined = payload?.data?.link
-      if (link) navigateToLink(link)
-    }).then(fn => { unsub = fn })
-    return () => { if (typeof unsub === 'function') unsub() }
   }, [router])
 
   if (loading) return (
@@ -205,6 +196,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
         </main>
       </div>
       {mobileMode && <Sidebar />}
+      <ForegroundNotification />
     </div>
   )
 }

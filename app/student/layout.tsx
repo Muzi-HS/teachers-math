@@ -3,11 +3,14 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Image from 'next/image'
 import { useAuth } from '@/context/AuthContext'
-import { requestFCMToken, onForegroundMessage, isFCMSupported } from '@/lib/firebase'
+import { requestFCMToken, isFCMSupported } from '@/lib/firebase'
+import ForegroundNotification from '@/components/ForegroundNotification'
 
 const navy='#0D2A5E', navyDk='#071A3E', bd='#DDE3EE', bg='#F5F7FA', tx2='#4B5C7E', tx3='#96A4BF'
 
 const NAV = [
+  { href: '/student/tests', label: '시험',
+    icon: <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><rect x="5" y="4" width="14" height="17" rx="2" strokeWidth={2}/><path d="M9 9h6M9 13h6M9 17h3" strokeWidth={2}/></svg> },
   { href: '/student/records', label: '수업기록',
     icon: <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg> },
   { href: '/student/notices', label: '반 공지',
@@ -119,15 +122,6 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
     }
     navigator.serviceWorker.addEventListener('message', onMessage)
     return () => navigator.serviceWorker.removeEventListener('message', onMessage)
-  }, [router]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    let unsub: (() => void) | undefined
-    onForegroundMessage(payload => {
-      const link: string | undefined = payload?.data?.link
-      if (link) navigateToLink(link)
-    }).then(fn => { unsub = fn })
-    return () => { if (typeof unsub === 'function') unsub() }
   }, [router]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -247,6 +241,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
           )
         })}
       </nav>
+      <ForegroundNotification />
     </div>
   )
 }

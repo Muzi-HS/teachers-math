@@ -144,6 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function logout() {
+    await fetch('/api/student-tests', { method: 'DELETE' }).catch(() => {})
     setLoading(true)
     setTeacher(null)
     setParent(null)
