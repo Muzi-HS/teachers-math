@@ -99,47 +99,71 @@ export default function TestEditorModal({ test, students, onClose, onSaved }: {
       .exam-editor{width:800px;max-width:100%;max-height:92dvh;overflow:auto;background:#fff;border-radius:16px;color:${tx};font-family:inherit;box-shadow:0 24px 60px rgba(13,27,54,.25)}
       .exam-editor header,.exam-editor footer{padding:18px 24px;display:flex;align-items:center;justify-content:space-between;gap:10px;background:#fff;position:sticky;z-index:1}
       .exam-editor header{top:0;border-bottom:1px solid ${bd}}.exam-editor footer{bottom:0;border-top:1px solid ${bd};border-radius:0 0 16px 16px}
-      .exam-editor header strong{font-size:16px}
+      .exam-editor header strong{font-size:17px}
       .exam-editor .exam-close{width:30px;height:30px;border-radius:50%;border:none;background:${bg};color:${tx2};font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
       .exam-editor fieldset{margin:0;border:0;padding:22px 24px;min-width:0}
-      .exam-editor input:not([type=checkbox]){width:100%;padding:10px 12px;border:1.5px solid ${bd};border-radius:9px;font:inherit;font-size:14px;box-sizing:border-box;color:${tx};transition:border-color .15s}
+      .exam-editor input:not([type=checkbox]){width:100%;padding:10px 12px;border:1.5px solid ${bd};border-radius:9px;font:inherit;font-size:15px;box-sizing:border-box;color:${tx};transition:border-color .15s}
       .exam-editor input:not([type=checkbox]):focus{outline:none;border-color:${navy}}
-      .exam-editor .exam-btn{padding:9px 14px;border:1.5px solid ${bd};border-radius:8px;background:#fff;font:inherit;font-size:13px;font-weight:600;color:${tx2};cursor:pointer;transition:all .15s}
-      .exam-editor .exam-btn:disabled{opacity:.5;cursor:default}
-      .exam-editor .exam-btn:hover:not(:disabled){border-color:${navy};color:${navy}}
-      .exam-editor .exam-btn[aria-pressed=true]{background:${navy};color:#fff;border-color:${navy}}
-      .exam-editor .exam-save{padding:10px 22px;border:none;border-radius:9px;background:${gold};color:#3A2205;font-weight:700;font-size:14px;cursor:pointer}
+      .exam-editor .exam-save{padding:10px 22px;border:none;border-radius:9px;background:${gold};color:#3A2205;font-weight:700;font-size:14.5px;cursor:pointer}
       .exam-editor .exam-save:disabled{opacity:.55;cursor:default}
-      .exam-editor .exam-cancel{padding:10px 16px;border:1.5px solid ${bd};border-radius:9px;background:#fff;color:${tx2};font-weight:600;font-size:14px;cursor:pointer}
+      .exam-editor .exam-cancel{padding:10px 16px;border:1.5px solid ${bd};border-radius:9px;background:#fff;color:${tx2};font-weight:600;font-size:14.5px;cursor:pointer}
       .exam-editor .exam-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-      .exam-editor label.exam-field{font-size:12px;font-weight:600;color:${tx2};display:block}
+      .exam-editor label.exam-field{font-size:12.5px;font-weight:600;color:${tx2};display:block}
       .exam-editor label.exam-field input{margin-top:6px}
       .exam-editor .exam-section{margin-top:26px;padding-top:22px;border-top:1px solid ${bd}}
       .exam-editor .exam-section-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap}
-      .exam-editor h3{font-size:14px;font-weight:700;margin:0;color:${tx}}
-      .exam-editor .exam-help{font-size:12px;color:${tx3};line-height:1.7;margin:0 0 14px}
+      .exam-editor h3{font-size:15px;font-weight:700;margin:0;color:${tx}}
+      .exam-editor .exam-help{font-size:12.5px;color:${tx3};line-height:1.75;margin:0 0 14px}
       .exam-editor .exam-auto-toggle{display:flex;align-items:center;gap:10px;padding:14px 16px;border:1.5px solid ${bd};border-radius:10px;cursor:pointer;background:${bg}}
       .exam-editor .exam-auto-toggle[data-on=true]{border-color:${navy};background:#EAF0FB}
       .exam-editor .exam-switch{width:38px;height:22px;border-radius:99px;background:${bd};position:relative;flex-shrink:0;transition:background .15s}
       .exam-editor .exam-switch[data-on=true]{background:${navy}}
       .exam-editor .exam-switch::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .15s;box-shadow:0 1px 3px rgba(0,0,0,.25)}
       .exam-editor .exam-switch[data-on=true]::after{transform:translateX(16px)}
-      .exam-editor .exam-question{display:grid;grid-template-columns:56px 1fr;gap:14px;padding:14px 16px;border:1.5px solid ${bd};border-radius:12px;margin-bottom:10px;align-items:start}
-      .exam-editor .exam-qnum{width:30px;height:30px;border-radius:50%;background:${navy};color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-      .exam-editor .exam-qpoints{display:flex;align-items:center;gap:5px;margin-top:8px}
-      .exam-editor .exam-qpoints input{width:56px;padding:6px 4px;text-align:center;font-weight:700}
-      .exam-editor .exam-qpoints span{font-size:12px;color:${tx3};white-space:nowrap}
-      .exam-editor .exam-choices{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px}
-      .exam-editor .exam-choices button{width:40px;height:40px;border-radius:10px;font-size:16px;padding:0}
+      .exam-editor .exam-question{display:grid;grid-template-columns:108px 1fr;gap:16px;padding:14px 16px;border:1.5px solid ${bd};border-radius:12px;margin-bottom:10px;align-items:start}
+      .exam-editor .exam-qmeta{display:flex;flex-direction:column;gap:10px;min-width:0}
+      .exam-editor .exam-qlabel{font-size:15px;font-weight:700;color:${tx}}
+      .exam-editor .exam-qpts-label{font-size:11px;font-weight:700;color:${tx3};letter-spacing:.3px;display:block;margin-bottom:4px}
+      .exam-editor .exam-qpts-row{display:flex;align-items:center;gap:5px}
+      .exam-editor .exam-qpts-row input{width:62px;padding:6px 4px;text-align:center;font-weight:700;font-size:15px}
+      .exam-editor .exam-qpts-row span{font-size:12.5px;color:${tx3};white-space:nowrap;flex-shrink:0}
+      .exam-editor .exam-choices{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+      .exam-editor .exam-choice{width:44px;height:44px;border-radius:50%;border:1.5px solid ${bd};background:#fff;color:${tx};font-size:17px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;transition:all .15s;flex-shrink:0}
+      .exam-editor .exam-choice:hover:not(:disabled){border-color:${navy};color:${navy}}
+      .exam-editor .exam-choice:disabled{opacity:.5;cursor:default}
+      .exam-editor .exam-choice[aria-pressed=true]{background:${navy};border-color:${navy};color:#fff;box-shadow:0 0 0 3px rgba(13,42,94,.18)}
       .exam-editor .exam-qstatus{font-size:11.5px;font-weight:600;margin-top:7px;display:inline-flex;align-items:center;gap:4px}
       .exam-editor .exam-qstatus[data-ok=true]{color:${gr}}.exam-editor .exam-qstatus[data-ok=false]{color:${tx3}}
-      .exam-editor .exam-roster{max-height:200px;overflow:auto;display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:10px;border:1px solid ${bd};border-radius:10px;margin-top:10px;background:${bg}}
-      .exam-editor .exam-check{display:flex;gap:7px;align-items:center;font-size:13px;padding:4px 6px;border-radius:6px}
-      .exam-editor .exam-search{margin-top:10px}
+      .exam-editor .exam-count-badge{font-size:12.5px;font-weight:700;color:${navy};background:#EAF0FB;padding:3px 10px;border-radius:20px;flex-shrink:0}
+      .exam-editor .exam-class-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(126px,1fr));gap:8px;margin-bottom:16px}
+      .exam-editor .exam-class-chip{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:10px 12px;border-radius:10px;border:1.5px solid ${bd};background:#fff;cursor:pointer;text-align:left;transition:all .15s;font-family:inherit}
+      .exam-editor .exam-class-chip:disabled{opacity:.4;cursor:default}
+      .exam-editor .exam-class-chip:hover:not(:disabled){border-color:${navy}}
+      .exam-editor .exam-class-name{font-size:12.5px;font-weight:700;color:${tx};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+      .exam-editor .exam-class-count{font-size:11px;font-weight:600;color:${tx3}}
+      .exam-editor .exam-class-chip[data-state=partial]{border-color:${gold};background:#FFF7EA}
+      .exam-editor .exam-class-chip[data-state=partial] .exam-class-count{color:#B36A00}
+      .exam-editor .exam-class-chip[data-state=all]{border-color:${navy};background:${navy}}
+      .exam-editor .exam-class-chip[data-state=all] .exam-class-name,.exam-editor .exam-class-chip[data-state=all] .exam-class-count{color:#fff}
+      .exam-editor .exam-roster-head{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+      .exam-editor .exam-search-box{flex:1;display:flex;align-items:center;gap:7px;padding:9px 12px;border:1.5px solid ${bd};border-radius:9px;background:#fff}
+      .exam-editor .exam-search-box input{border:none;padding:0;font-size:14px}
+      .exam-editor .exam-search-box input:focus{outline:none;border:none}
+      .exam-editor .exam-clear-link{border:none;background:none;color:${tx3};font-size:12.5px;font-weight:700;cursor:pointer;padding:4px 2px;white-space:nowrap;font-family:inherit}
+      .exam-editor .exam-clear-link:hover{color:${re}}
+      .exam-editor .exam-roster{max-height:230px;overflow:auto;border:1px solid ${bd};border-radius:10px;background:#fff}
+      .exam-editor .exam-roster-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid ${bg};cursor:pointer;font-size:13.5px}
+      .exam-editor .exam-roster-row:last-child{border-bottom:none}
+      .exam-editor .exam-roster-row:hover{background:${bg}}
+      .exam-editor .exam-roster-row[data-checked=true]{background:#EAF0FB}
+      .exam-editor .exam-roster-row input[type=checkbox]{width:17px;height:17px;accent-color:${navy};flex-shrink:0;cursor:pointer}
+      .exam-editor .exam-roster-name{font-weight:600;color:${tx}}
+      .exam-editor .exam-roster-school{font-size:11.5px;color:${tx3};margin-left:auto}
+      .exam-editor .exam-roster-empty{padding:20px;text-align:center;color:${tx3};font-size:13px;margin:0}
       .exam-editor .exam-publish-note{display:flex;gap:10px;align-items:flex-start;padding:14px 16px;border-radius:10px;background:#FFF7EA;border:1px solid #F3DDB0;color:#6B4A0E;font-size:12.5px;line-height:1.7;margin-top:20px}
       .exam-editor .exam-locked{display:flex;gap:10px;align-items:flex-start;padding:14px 16px;border-radius:10px;background:#FDF3ED;border:1px solid #F5CBA7;color:#8A4B14;font-size:12.5px;line-height:1.7;margin:16px 24px 0}
       .exam-editor .exam-error{color:${re};background:#FDECEA;border-radius:8px;padding:10px 14px;margin:16px 24px 0;font-size:13px}
-      @media(max-width:560px){.exam-editor-overlay{padding:0}.exam-editor{border-radius:0;max-height:100dvh}.exam-editor fieldset{padding:16px}.exam-editor .exam-grid{grid-template-columns:1fr}.exam-editor .exam-question{grid-template-columns:1fr}.exam-editor .exam-qnum{width:26px;height:26px}.exam-editor .exam-roster{grid-template-columns:1fr}}
+      @media(max-width:560px){.exam-editor-overlay{padding:0}.exam-editor{border-radius:0;max-height:100dvh}.exam-editor fieldset{padding:16px}.exam-editor .exam-grid{grid-template-columns:1fr}.exam-editor .exam-question{grid-template-columns:1fr}.exam-editor .exam-qmeta{flex-direction:row;align-items:center;justify-content:space-between}.exam-editor .exam-class-grid{grid-template-columns:repeat(auto-fill,minmax(108px,1fr))}}
     `}</style>
     <section className="exam-editor" role="dialog" aria-modal="true" aria-label={test ? '테스트 편집' : '테스트 추가'}>
       <header>
@@ -172,24 +196,27 @@ export default function TestEditorModal({ test, students, onClose, onSaved }: {
                 <h3>문항별 배점 · 정답</h3>
                 <span style={{ fontSize: 12.5, fontWeight: 700, color: navy, background: '#EAF0FB', padding: '3px 10px', borderRadius: 20 }}>배점 합계 {totalPoints}점</span>
               </div>
-              <p className="exam-help">①~⑤를 누르면 객관식(복수 선택 가능), 빈칸에 입력하면 주관식입니다. 객관식은 정답 조합이 정확히 일치해야 하고 부분 점수는 없습니다. 주관식은 앞뒤 공백을 제외하고 완전히 일치해야 합니다. 성적은 배점 합계를 기준으로 100점 만점으로 환산됩니다.</p>
+              <p className="exam-help">1~5 중에서 누르면 객관식(복수 선택 가능), 빈칸에 입력하면 주관식입니다. 객관식은 정답 조합이 정확히 일치해야 하고 부분 점수는 없습니다. 주관식은 앞뒤 공백을 제외하고 완전히 일치해야 합니다. 성적은 배점 합계를 기준으로 100점 만점으로 환산됩니다.</p>
               {questions.map((q, i) => {
                 const filled = q.choices.length > 0 || q.text.trim().length > 0
                 return <div className="exam-question" key={i}>
-                  <div>
-                    <span className="exam-qnum">{i + 1}</span>
-                    <div className="exam-qpoints">
-                      <input aria-label={`${i + 1}번 배점`} type="number" min={1} max={1000} disabled={locked} value={q.points ?? ''} onChange={e => updateQuestion(i, { points: e.target.value === '' ? null : Number(e.target.value) })} />
-                      <span>점</span>
+                  <div className="exam-qmeta">
+                    <span className="exam-qlabel">{i + 1}번</span>
+                    <div>
+                      <span className="exam-qpts-label">배점</span>
+                      <div className="exam-qpts-row">
+                        <input aria-label={`${i + 1}번 배점`} type="number" min={1} max={1000} disabled={locked} value={q.points ?? ''} onChange={e => updateQuestion(i, { points: e.target.value === '' ? null : Number(e.target.value) })} />
+                        <span>점</span>
+                      </div>
                     </div>
                   </div>
                   <div>
-                    <div className="exam-choices">{['①', '②', '③', '④', '⑤'].map((label, index) => (
-                      <button type="button" key={label} disabled={locked} aria-label={`${i + 1}번 정답 ${label}`} aria-pressed={q.choices.includes(index + 1)} onClick={() => updateQuestion(i, { choices: toggleChoice(q.choices, index + 1), text: '' })}>{label}</button>
+                    <div className="exam-choices">{[1, 2, 3, 4, 5].map(choice => (
+                      <button type="button" className="exam-choice" key={choice} disabled={locked} aria-label={`${i + 1}번 정답 ${choice}`} aria-pressed={q.choices.includes(choice)} onClick={() => updateQuestion(i, { choices: toggleChoice(q.choices, choice), text: '' })}>{choice}</button>
                     ))}</div>
                     <input aria-label={`${i + 1}번 주관식 정답`} maxLength={500} disabled={locked} value={q.text} onChange={e => updateQuestion(i, { text: e.target.value, choices: [] })} placeholder="주관식 정답 입력" />
                     <span className="exam-qstatus" data-ok={filled}>
-                      {q.choices.length ? `● 객관식${q.choices.length > 1 ? ' · 복수 정답' : ''}` : q.text.trim() ? '● 주관식' : '○ 정답 미입력'}
+                      {q.choices.length ? `● 객관식${q.choices.length > 1 ? ' · 복수 정답' : ''} 선택됨` : q.text.trim() ? '● 주관식 입력됨' : '○ 정답 미입력'}
                     </span>
                   </div>
                 </div>
@@ -199,21 +226,39 @@ export default function TestEditorModal({ test, students, onClose, onSaved }: {
             <section className="exam-section">
               <div className="exam-section-head">
                 <h3>응시 대상</h3>
-                <span style={{ fontSize: 12.5, fontWeight: 700, color: navy, background: '#EAF0FB', padding: '3px 10px', borderRadius: 20 }}>{selected.length}명 선택</span>
+                <span className="exam-count-badge">{selected.length}명 선택</span>
               </div>
-              <p className="exam-help">반을 누르면 현재 소속 학생이 한 번에 추가됩니다. 개별 학생은 아래 목록에서 추가·제외할 수 있습니다.</p>
-              <div className="exam-choices">{classes.map(c => {
+              <p className="exam-help">반을 누르면 소속 학생이 한 번에 추가·제외됩니다. 개별 학생은 아래 목록에서 추가·제외할 수 있습니다.</p>
+
+              <div className="exam-class-grid">{classes.map(c => {
                 const ids = members.filter(m => m.class_id === c.id).map(m => m.student_id)
-                const all = ids.length > 0 && ids.every(id => selected.includes(id))
-                return <button key={c.id} type="button" className="exam-btn" aria-pressed={all} disabled={!ids.length || locked} onClick={() => setSelected(s => all ? s.filter(id => !ids.includes(id)) : [...new Set([...s, ...ids])])} style={{ width: 'auto', height: 'auto', borderRadius: 8 }}>{c.name} ({ids.filter(id => selected.includes(id)).length}/{ids.length})</button>
+                const count = ids.filter(id => selected.includes(id)).length
+                const state = ids.length === 0 ? 'empty' : count === 0 ? 'none' : count === ids.length ? 'all' : 'partial'
+                return <button key={c.id} type="button" className="exam-class-chip" data-state={state} disabled={!ids.length || locked}
+                  onClick={() => setSelected(s => state === 'all' ? s.filter(id => !ids.includes(id)) : [...new Set([...s, ...ids])])}>
+                  <span className="exam-class-name">{c.name}</span>
+                  <span className="exam-class-count">{count}/{ids.length}명</span>
+                </button>
               })}</div>
-              <input className="exam-search" aria-label="학생 검색" placeholder="학생 이름 검색" disabled={locked} value={search} onChange={e => setSearch(e.target.value)} />
-              <div className="exam-roster">{students.filter(s => s.name.includes(search)).map(s => (
-                <label className="exam-check" key={s.id}>
-                  <input type="checkbox" disabled={locked} checked={selected.includes(s.id)} onChange={e => setSelected(ids => e.target.checked ? [...ids, s.id] : ids.filter(id => id !== s.id))} />
-                  {s.name} <span style={{ color: tx3 }}>{s.school}</span>
-                </label>
-              ))}</div>
+
+              <div className="exam-roster-head">
+                <div className="exam-search-box">
+                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke={tx3}><circle cx="11" cy="11" r="8" strokeWidth={2} /><path strokeWidth={2} d="M21 21l-4.35-4.35" /></svg>
+                  <input aria-label="학생 검색" placeholder="학생 이름 검색" disabled={locked} value={search} onChange={e => setSearch(e.target.value)} />
+                </div>
+                {selected.length > 0 && <button type="button" className="exam-clear-link" disabled={locked} onClick={() => setSelected([])}>전체 해제</button>}
+              </div>
+              <div className="exam-roster">
+                {students.filter(s => s.name.includes(search)).length === 0 && <p className="exam-roster-empty">검색 결과가 없습니다.</p>}
+                {students.filter(s => s.name.includes(search)).map(s => {
+                  const checked = selected.includes(s.id)
+                  return <label className="exam-roster-row" data-checked={checked} key={s.id}>
+                    <input type="checkbox" disabled={locked} checked={checked} onChange={e => setSelected(ids => e.target.checked ? [...ids, s.id] : ids.filter(id => id !== s.id))} />
+                    <span className="exam-roster-name">{s.name}</span>
+                    <span className="exam-roster-school">{s.school}</span>
+                  </label>
+                })}
+              </div>
             </section>
 
             <div className="exam-publish-note">

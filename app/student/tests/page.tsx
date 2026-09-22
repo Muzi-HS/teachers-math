@@ -202,9 +202,9 @@ export default function StudentTestsPage() {
       .student-exams .exam-progress{height:6px;background:#DDE3EE;border-radius:99px;overflow:hidden;margin:12px 0 4px}
       .student-exams .exam-progress-fill{height:100%;background:#D87E13;border-radius:99px;transition:width .2s}
       .student-exams .exam-status-line{font-size:12.5px;color:#4B5C7E;display:flex;align-items:center;gap:6px;margin:6px 0 14px}
-      .student-exams .exam-answers{display:flex;gap:8px;margin-top:12px}
-      .student-exams .exam-answers button{flex:1;min-height:48px;font-size:18px;font-weight:700;padding:6px;border-radius:12px}
-      .student-exams .exam-qnum{width:26px;height:26px;border-radius:50%;background:#E8EEF8;color:#0D2A5E;font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;margin-right:8px}
+      .student-exams .exam-answers{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+      .student-exams .exam-choice{width:50px;height:50px;border-radius:50%;font-size:19px;font-weight:700;padding:0;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+      .student-exams .exam-choice[aria-pressed=true]{box-shadow:0 0 0 3px rgba(13,42,94,.18)}
       .student-exams .exam-error{background:#FDECEA;color:#C0392B;padding:12px 14px;border-radius:10px;font-size:13px}
       .student-exams .exam-result{text-align:center;padding:30px 20px}
       .student-exams .exam-result-score{font-size:52px;font-weight:800;color:#0D2A5E;margin:4px 0}
@@ -255,12 +255,12 @@ export default function StudentTestsPage() {
       </p>
       {active.questions.map(q => <section className="exam-card" key={q.number}>
         <div className="exam-row">
-          <span><span className="exam-qnum">{q.number}</span><strong style={{ fontSize: 13.5 }}>{q.number}번</strong></span>
+          <strong style={{ fontSize: 14.5 }}>{q.number}번</strong>
           <span style={{ fontSize: 11.5, color: '#4B5C7E', fontWeight: 600 }}>{q.points}점 · {q.kind === 'text' ? '주관식' : q.multiple ? '객관식 · 복수 선택' : '객관식'}</span>
         </div>
         {q.kind === 'choice' ? <div className="exam-answers">{[1, 2, 3, 4, 5].map(choice => {
           const value = Array.isArray(answers[q.number]) ? answers[q.number] as number[] : []
-          return <button key={choice} disabled={seconds === 0 || submitting} aria-label={`${q.number}번 답안 ${choice}`} aria-pressed={value.includes(choice)} onClick={() => changeAnswer(q.number, toggleChoice(value, choice, q.multiple))}>{choice}</button>
+          return <button className="exam-choice" key={choice} disabled={seconds === 0 || submitting} aria-label={`${q.number}번 답안 ${choice}`} aria-pressed={value.includes(choice)} onClick={() => changeAnswer(q.number, toggleChoice(value, choice, q.multiple))}>{choice}</button>
         })}</div> : <input style={{ marginTop: 12 }} aria-label={`${q.number}번 주관식 답안`} maxLength={500} autoComplete="off" disabled={seconds === 0 || submitting} value={typeof answers[q.number] === 'string' ? answers[q.number] as string : ''} onChange={e => changeAnswer(q.number, e.target.value)} placeholder="답안을 입력하세요" />}
       </section>)}
       <button disabled={submitting || seconds === 0} className="exam-primary" style={{ width: '100%', padding: 14, fontSize: 14.5 }} onClick={() => submit(false)}>답안 제출</button>

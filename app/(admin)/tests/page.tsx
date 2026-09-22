@@ -350,7 +350,7 @@ export default function TestsPage() {
             {loading?(
               <p style={{color:tx3,fontSize:13}}>불러오는 중...</p>
             ):(
-              <div style={{background:'#fff',borderRadius:12,border:`1px solid ${bd}`,overflow:'hidden',boxShadow:'0 1px 4px rgba(0,0,0,.06)',display:'flex',flexDirection:'column',maxHeight:mobileMode?'calc(100dvh - 300px)':'calc(100dvh - 220px)'}}>
+              <div style={{background:'#fff',borderRadius:12,border:`1px solid ${bd}`,overflow:'hidden',boxShadow:'0 1px 4px rgba(0,0,0,.06)',display:'flex',flexDirection:'column',maxHeight:mobileMode?'calc(100dvh - 340px)':'calc(100dvh - 280px)'}}>
                 {selDate&&(
                   <div style={{padding:'10px 16px',borderBottom:`1px solid ${bd}`,fontSize:13,fontWeight:700,color:tx,display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
                     <span style={{display:'flex',alignItems:'center',gap:5}}><IconClipboard size={13} /> {selDate} 테스트</span>
