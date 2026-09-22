@@ -11,6 +11,16 @@ const blank = (): ExamQuestionDraft => ({ points: null, choices: [], text: '' })
 const navy = '#0D2A5E', gold = '#D87E13', bd = '#DDE3EE', bg = '#F5F7FA'
 const tx = '#0D1B36', tx2 = '#4B5C7E', tx3 = '#96A4BF', gr = '#1A7F4E', re = '#C0392B'
 
+// 숫자와 소수점(둘째 자리까지)만 남기고, 키보드로 직접 타이핑할 때 "12." 같은 중간 상태도 허용한다.
+function filterPointsInput(raw: string) {
+  let cleaned = raw.replace(/[^0-9.]/g, '')
+  const firstDot = cleaned.indexOf('.')
+  if (firstDot !== -1) {
+    cleaned = cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, '').slice(0, 2)
+  }
+  return cleaned
+}
+
 export default function TestEditorModal({ test, students, onClose, onSaved }: {
   test: EditableTest | null; students: Student[]; onClose: () => void; onSaved: () => void
 }) {
@@ -19,6 +29,7 @@ export default function TestEditorModal({ test, students, onClose, onSaved }: {
   const [total, setTotal] = useState(test?.total ?? 20)
   const [auto, setAuto] = useState(test?.auto_grading ?? false)
   const [questions, setQuestions] = useState<ExamQuestionDraft[]>(Array.from({ length: test?.total ?? 20 }, blank))
+  const [pointsDraft, setPointsDraft] = useState<Record<number, string>>({})
   const [selected, setSelected] = useState<number[]>([])
   const [classes, setClasses] = useState<ClassRow[]>([])
   const [members, setMembers] = useState<{ class_id: number; student_id: number }[]>([])
@@ -210,13 +221,17 @@ export default function TestEditorModal({ test, students, onClose, onSaved }: {
                     <div>
                       <span className="exam-qpts-label">배점</span>
                       <div className="exam-qpts-row">
-                        <input aria-label={`${i + 1}번 배점`} type="number" inputMode="decimal" min={1} max={1000} step={0.01} disabled={locked} value={q.points ?? ''} onChange={e => {
-                          const raw = e.target.value
-                          if (raw === '') return updateQuestion(i, { points: null })
-                          const num = Number(raw)
-                          if (Number.isNaN(num)) return
-                          updateQuestion(i, { points: Math.round(num * 100) / 100 })
-                        }} />
+                        <input aria-label={`${i + 1}번 배점`} type="text" inputMode="decimal" disabled={locked}
+                          value={pointsDraft[i] ?? (q.points ?? '')}
+                          onChange={e => {
+                            const filtered = filterPointsInput(e.target.value)
+                            setPointsDraft(d => ({ ...d, [i]: filtered }))
+                            if (filtered === '' || filtered === '.') return updateQuestion(i, { points: null })
+                            const num = Number(filtered)
+                            if (!Number.isNaN(num)) updateQuestion(i, { points: num })
+                          }}
+                          onBlur={() => setPointsDraft(d => { if (!(i in d)) return d; const next = { ...d }; delete next[i]; return next })}
+                        />
                         <span>점</span>
                       </div>
                     </div>
