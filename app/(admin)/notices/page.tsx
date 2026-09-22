@@ -7,6 +7,7 @@ import { kstDateOf, kstDateStr, kstTimeOf } from '@/lib/kst'
 import { IconBell, IconPin } from '@/components/icons'
 import { useMobileMode } from '@/context/MobileModeContext'
 import RichTextEditor from '@/components/RichTextEditor'
+import { resolveNoticeTargetIds, studentIdsOfClass as resolveStudentIdsOfClass } from '@/lib/notices'
 
 type Notice = {
   id: number
@@ -15,9 +16,12 @@ type Notice = {
   pinned: boolean
   parent_visible: boolean
   created_at: string
+  target_class_id: number | null
 }
 
 type StudentLite = { id: number; name: string; school_type: string | null }
+type ClassLite = { id: number; name: string }
+type ClassMember = { class_id: number; student_id: number }
 
 type NoticeComment = {
   id: number; notice_id: number; parent_comment_id: number | null
@@ -29,7 +33,8 @@ const SCHOOL_TYPES = ['초등', '중등', '고등']
 
 const EMPTY = {
   title: '', content: '', pinned: false, parent_visible: true,
-  target_mode: 'all' as 'all' | 'selected', target_student_ids: [] as number[],
+  target_mode: 'all' as 'all' | 'selected' | 'class', target_student_ids: [] as number[],
+  target_class_id: null as number | null,
 }
 
 /* ── 공통 스타일 상수 (v18 CSS 변수 기반) ── */
@@ -56,6 +61,8 @@ export default function NoticesPage() {
   const { mobileMode } = useMobileMode()
   const [notices, setNotices] = useState<Notice[]>([])
   const [students, setStudents] = useState<StudentLite[]>([])
+  const [classes, setClasses] = useState<ClassLite[]>([])
+  const [classMembers, setClassMembers] = useState<ClassMember[]>([])
   const [targetsByNotice, setTargetsByNotice] = useState<Record<number, number[]>>({})
   const [parentsMap, setParentsMap] = useState<Record<number, { phone: string; names: string[] }>>({}) // parent_id -> 전화번호·자녀 이름
   const [loading, setLoading] = useState(true)
@@ -77,7 +84,7 @@ export default function NoticesPage() {
   const [replyOpenFor, setReplyOpenFor] = useState<number | null>(null)
   const [sendingReply, setSendingReply] = useState(false)
 
-  useEffect(() => { fetchNotices(); fetchStudents(); fetchParentsMap() }, [])
+  useEffect(() => { fetchNotices(); fetchStudents(); fetchParentsMap(); fetchClasses() }, [])
   useEffect(() => { if (detail) fetchComments(detail.id) }, [detail?.id])
 
   async function fetchNotices() {
@@ -98,6 +105,19 @@ export default function NoticesPage() {
   async function fetchStudents() {
     const { data } = await supabase.from('students').select('id,name,school_type').order('name')
     setStudents((data ?? []) as StudentLite[])
+  }
+
+  async function fetchClasses() {
+    const [{ data: c }, { data: m }] = await Promise.all([
+      supabase.from('classes').select('id,name').order('name'),
+      supabase.from('class_students').select('class_id,student_id'),
+    ])
+    setClasses((c ?? []) as ClassLite[])
+    setClassMembers((m ?? []) as ClassMember[])
+  }
+
+  function studentIdsOfClass(classId: number) {
+    return resolveStudentIdsOfClass(classMembers, classId)
   }
 
   async function fetchParentsMap() {
@@ -141,8 +161,9 @@ export default function NoticesPage() {
     const targetIds = targetsByNotice[n.id] ?? []
     setForm({
       title: n.title, content: n.content, pinned: n.pinned, parent_visible: n.parent_visible,
-      target_mode: targetIds.length > 0 ? 'selected' : 'all',
+      target_mode: n.target_class_id ? 'class' : targetIds.length > 0 ? 'selected' : 'all',
       target_student_ids: targetIds,
+      target_class_id: n.target_class_id ?? null,
     })
     setPickerSearch(''); setPickerStageFlt([])
     setDetail(null); setModal(true)
@@ -182,8 +203,13 @@ export default function NoticesPage() {
 
   async function save() {
     if (!form.title.trim()) return toast('제목을 입력하세요.', false)
+    if (form.parent_visible && form.target_mode === 'class') {
+      if (!form.target_class_id) return toast('공개할 반을 선택하세요.', false)
+      if (studentIdsOfClass(form.target_class_id).length === 0) return toast('선택한 반에 소속된 학생이 없습니다.', false)
+    }
     setSaving(true)
-    const payload = { title: form.title, content: form.content, pinned: form.pinned, parent_visible: form.parent_visible }
+    const classTargetId = form.parent_visible && form.target_mode === 'class' ? form.target_class_id : null
+    const payload = { title: form.title, content: form.content, pinned: form.pinned, parent_visible: form.parent_visible, target_class_id: classTargetId }
     let noticeId = editId
     if (editId) {
       await supabase.from('notices').update(payload).eq('id', editId)
@@ -192,11 +218,14 @@ export default function NoticesPage() {
       noticeId = data?.id ?? null
     }
 
+    // '반 전체'는 저장 시점의 반 소속 학생 전원을 notice_target_students에 그대로 풀어서 넣는다.
+    // (학부모 화면은 student_id 기준으로만 필터링하므로 별도 조회 로직 변경이 필요 없다.)
+    const resolvedTargetIds = resolveNoticeTargetIds(form.parent_visible, form.target_mode, form.target_student_ids, form.target_class_id, classMembers)
+
     if (noticeId) {
       await supabase.from('notice_target_students').delete().eq('notice_id', noticeId)
-      const targetIds = form.parent_visible && form.target_mode === 'selected' ? form.target_student_ids : []
-      if (targetIds.length > 0) {
-        await supabase.from('notice_target_students').insert(targetIds.map(sid => ({ notice_id: noticeId, student_id: sid })))
+      if (resolvedTargetIds.length > 0) {
+        await supabase.from('notice_target_students').insert(resolvedTargetIds.map(sid => ({ notice_id: noticeId, student_id: sid })))
       }
     }
 
@@ -206,7 +235,7 @@ export default function NoticesPage() {
 
     // 신규 등록 + 학부모 공개인 경우에만 열람 가능한 학부모 전원에게 푸시 발송 (수정 시 알림 스팸 방지)
     if (isNew && form.parent_visible && noticeId) {
-      const targetIds = form.target_mode === 'selected' ? form.target_student_ids : undefined
+      const targetIds = form.target_mode === 'all' ? undefined : resolvedTargetIds
       fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push-notice`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}` },
@@ -283,6 +312,10 @@ export default function NoticesPage() {
 
   function targetLabel(n: Notice): string {
     if (!n.parent_visible) return '비공개'
+    if (n.target_class_id) {
+      const cls = classes.find(c => c.id === n.target_class_id)
+      return cls ? `${cls.name} 공개` : '반 공개'
+    }
     const ids = targetsByNotice[n.id] ?? []
     return ids.length > 0 ? `${ids.length}명 공개` : '전체공개'
   }
@@ -412,9 +445,11 @@ export default function NoticesPage() {
                   {detail.pinned && <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 20, background: goldPale, color: gold, fontWeight: 500 }}>상단 고정</span>}
                   {!detail.parent_visible
                     ? <span className="badge-red">학부모 비공개</span>
-                    : (targetsByNotice[detail.id]?.length ?? 0) > 0
-                      ? <span className="badge-navy">선택 공개 {targetsByNotice[detail.id].length}명</span>
-                      : <span className="badge-green">학부모 전체공개</span>
+                    : detail.target_class_id
+                      ? <span className="badge-navy">{classes.find(c => c.id === detail.target_class_id)?.name ?? '반'} 전체 공개</span>
+                      : (targetsByNotice[detail.id]?.length ?? 0) > 0
+                        ? <span className="badge-navy">선택 공개 {targetsByNotice[detail.id].length}명</span>
+                        : <span className="badge-green">학부모 전체공개</span>
                   }
                 </div>
                 {detail.parent_visible && (targetsByNotice[detail.id]?.length ?? 0) > 0 && (
@@ -549,14 +584,40 @@ export default function NoticesPage() {
               {form.parent_visible && (
                 <div style={{ marginBottom: 14 }}>
                   <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: tx2, marginBottom: 5 }}>공개 대상</label>
-                  <div className="radio-row" style={{ marginBottom: form.target_mode === 'selected' ? 10 : 0 }}>
-                    {[{ v: 'all' as const, l: '전체 학부모' }, { v: 'selected' as const, l: '선택한 학생만' }].map(({ v, l }) => (
+                  <div className="radio-row" style={{ marginBottom: form.target_mode !== 'all' ? 10 : 0 }}>
+                    {[{ v: 'all' as const, l: '전체 학부모' }, { v: 'class' as const, l: '반 전체' }, { v: 'selected' as const, l: '선택한 학생만' }].map(({ v, l }) => (
                       <label key={v}>
                         <input type="radio" name="noticeTargetMode" checked={form.target_mode === v} onChange={() => setForm(f => ({ ...f, target_mode: v }))} />
                         {l}
                       </label>
                     ))}
                   </div>
+
+                  {form.target_mode === 'class' && (
+                    <div style={{ border: `1px solid ${bd}`, borderRadius: 8, padding: 10, background: bg }}>
+                      <p style={{ fontSize: 11, fontWeight: 600, color: tx2, marginBottom: 8 }}>
+                        공개할 반을 선택하세요{form.target_class_id ? ` — ${studentIdsOfClass(form.target_class_id).length}명의 학부모에게 공개됩니다` : ''}
+                      </p>
+                      {classes.length === 0 ? (
+                        <p style={{ fontSize: 12, color: tx3 }}>등록된 반이 없습니다.</p>
+                      ) : (
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {classes.map(c => {
+                            const count = studentIdsOfClass(c.id).length
+                            return (
+                              <button key={c.id} type="button" disabled={count === 0}
+                                className={`pill${form.target_class_id === c.id ? ' active' : ''}`}
+                                style={count === 0 ? { opacity: .4, cursor: 'default' } : undefined}
+                                onClick={() => setForm(f => ({ ...f, target_class_id: f.target_class_id === c.id ? null : c.id }))}
+                              >
+                                {c.name} ({count})
+                              </button>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {form.target_mode === 'selected' && (
                     <div style={{ border: `1px solid ${bd}`, borderRadius: 8, padding: 10, background: bg }}>
