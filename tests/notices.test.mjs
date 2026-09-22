@@ -24,33 +24,19 @@ const members = [
   { class_id: 2, student_id: 201 },
 ]
 
-test('studentIdsOfClass returns only members of the given class, in no particular guaranteed order beyond membership rows', () => {
+test('studentIdsOfClass returns only members of the given class', () => {
   assert.deepEqual(studentIdsOfClass(members, 1), [101, 102, 103])
   assert.deepEqual(studentIdsOfClass(members, 2), [201])
   assert.deepEqual(studentIdsOfClass(members, 999), [])
 })
 
 test('resolveNoticeTargetIds: "all" mode never targets specific students (visible to everyone)', () => {
-  assert.deepEqual(resolveNoticeTargetIds(true, 'all', [101], 1, members), [])
+  assert.deepEqual(resolveNoticeTargetIds('all', [101, 102]), [])
 })
 
-test('resolveNoticeTargetIds: "selected" mode passes through the manually chosen student ids untouched', () => {
-  assert.deepEqual(resolveNoticeTargetIds(true, 'selected', [101, 201], null, members), [101, 201])
-  assert.deepEqual(resolveNoticeTargetIds(true, 'selected', [], null, members), [])
-})
-
-test('resolveNoticeTargetIds: "class" mode resolves to every student currently in that class', () => {
-  assert.deepEqual(resolveNoticeTargetIds(true, 'class', [], 1, members), [101, 102, 103])
-  assert.deepEqual(resolveNoticeTargetIds(true, 'class', [], 2, members), [201])
-})
-
-test('resolveNoticeTargetIds: "class" mode with no class chosen, or a class with no members, targets nobody', () => {
-  assert.deepEqual(resolveNoticeTargetIds(true, 'class', [], null, members), [])
-  assert.deepEqual(resolveNoticeTargetIds(true, 'class', [], 999, members), [])
-})
-
-test('resolveNoticeTargetIds: parent_visible=false always targets nobody regardless of mode (notice is not shown to any parent)', () => {
-  assert.deepEqual(resolveNoticeTargetIds(false, 'selected', [101], null, members), [])
-  assert.deepEqual(resolveNoticeTargetIds(false, 'class', [], 1, members), [])
-  assert.deepEqual(resolveNoticeTargetIds(false, 'all', [], null, members), [])
+test('resolveNoticeTargetIds: "selected" mode passes through the chosen student ids untouched, including ids added via a class quick-pick', () => {
+  assert.deepEqual(resolveNoticeTargetIds('selected', [101, 201]), [101, 201])
+  assert.deepEqual(resolveNoticeTargetIds('selected', []), [])
+  // 반 전체를 눌러 선택된 경우도 selected 모드에서 동일하게 처리된다.
+  assert.deepEqual(resolveNoticeTargetIds('selected', studentIdsOfClass(members, 1)), [101, 102, 103])
 })

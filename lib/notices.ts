@@ -1,4 +1,4 @@
-export type NoticeTargetMode = 'all' | 'selected' | 'class'
+export type NoticeTargetMode = 'all' | 'selected'
 export type ClassMember = { class_id: number; student_id: number }
 
 export function studentIdsOfClass(classMembers: ClassMember[], classId: number): number[] {
@@ -6,17 +6,8 @@ export function studentIdsOfClass(classMembers: ClassMember[], classId: number):
 }
 
 // 공지 저장 시 notice_target_students에 실제로 넣을 학생 id 목록을 계산한다.
-// '반 전체'는 저장 시점의 반 소속 학생 전원으로 풀어서 '선택한 학생만'과 동일한 방식으로 저장하므로,
-// 학부모 화면(app/parent/notices)의 student_id 기준 필터링 로직은 그대로 재사용된다.
-export function resolveNoticeTargetIds(
-  parentVisible: boolean,
-  mode: NoticeTargetMode,
-  selectedStudentIds: number[],
-  classId: number | null,
-  classMembers: ClassMember[],
-): number[] {
-  if (!parentVisible) return []
-  if (mode === 'selected') return selectedStudentIds
-  if (mode === 'class') return classId !== null ? studentIdsOfClass(classMembers, classId) : []
-  return []
+// '반으로 빠르게 선택'은 UI에서 선택한 학생만 모드의 target_student_ids에
+// 미리 풀어 넣어주는 것일 뿐, 저장 시점에는 selected 모드와 동일하게 처리된다.
+export function resolveNoticeTargetIds(mode: NoticeTargetMode, selectedStudentIds: number[]): number[] {
+  return mode === 'selected' ? selectedStudentIds : []
 }

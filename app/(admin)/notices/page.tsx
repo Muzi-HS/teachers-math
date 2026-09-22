@@ -16,7 +16,6 @@ type Notice = {
   pinned: boolean
   parent_visible: boolean
   created_at: string
-  target_class_id: number | null
 }
 
 type StudentLite = { id: number; name: string; school_type: string | null }
@@ -32,9 +31,8 @@ type NoticeComment = {
 const SCHOOL_TYPES = ['초등', '중등', '고등']
 
 const EMPTY = {
-  title: '', content: '', pinned: false, parent_visible: true,
-  target_mode: 'all' as 'all' | 'selected' | 'class', target_student_ids: [] as number[],
-  target_class_id: null as number | null,
+  title: '', content: '', pinned: false,
+  target_mode: 'all' as 'all' | 'selected', target_student_ids: [] as number[],
 }
 
 /* ── 공통 스타일 상수 (v18 CSS 변수 기반) ── */
@@ -160,10 +158,9 @@ export default function NoticesPage() {
     setEditId(n.id)
     const targetIds = targetsByNotice[n.id] ?? []
     setForm({
-      title: n.title, content: n.content, pinned: n.pinned, parent_visible: n.parent_visible,
-      target_mode: n.target_class_id ? 'class' : targetIds.length > 0 ? 'selected' : 'all',
+      title: n.title, content: n.content, pinned: n.pinned,
+      target_mode: targetIds.length > 0 ? 'selected' : 'all',
       target_student_ids: targetIds,
-      target_class_id: n.target_class_id ?? null,
     })
     setPickerSearch(''); setPickerStageFlt([])
     setDetail(null); setModal(true)
@@ -203,13 +200,9 @@ export default function NoticesPage() {
 
   async function save() {
     if (!form.title.trim()) return toast('제목을 입력하세요.', false)
-    if (form.parent_visible && form.target_mode === 'class') {
-      if (!form.target_class_id) return toast('공개할 반을 선택하세요.', false)
-      if (studentIdsOfClass(form.target_class_id).length === 0) return toast('선택한 반에 소속된 학생이 없습니다.', false)
-    }
     setSaving(true)
-    const classTargetId = form.parent_visible && form.target_mode === 'class' ? form.target_class_id : null
-    const payload = { title: form.title, content: form.content, pinned: form.pinned, parent_visible: form.parent_visible, target_class_id: classTargetId }
+    // 모든 공지는 항상 학부모에게 공개된다 (비공개 옵션 없음).
+    const payload = { title: form.title, content: form.content, pinned: form.pinned, parent_visible: true }
     let noticeId = editId
     if (editId) {
       await supabase.from('notices').update(payload).eq('id', editId)
@@ -218,9 +211,8 @@ export default function NoticesPage() {
       noticeId = data?.id ?? null
     }
 
-    // '반 전체'는 저장 시점의 반 소속 학생 전원을 notice_target_students에 그대로 풀어서 넣는다.
-    // (학부모 화면은 student_id 기준으로만 필터링하므로 별도 조회 로직 변경이 필요 없다.)
-    const resolvedTargetIds = resolveNoticeTargetIds(form.parent_visible, form.target_mode, form.target_student_ids, form.target_class_id, classMembers)
+    // '반으로 빠르게 선택'으로 담긴 학생도 선택한 학생만 모드와 동일하게 저장된다.
+    const resolvedTargetIds = resolveNoticeTargetIds(form.target_mode, form.target_student_ids)
 
     if (noticeId) {
       await supabase.from('notice_target_students').delete().eq('notice_id', noticeId)
@@ -233,8 +225,8 @@ export default function NoticesPage() {
     toast(editId ? '공지가 수정되었습니다.' : '공지가 등록되었습니다.')
     setSaving(false); setModal(false); fetchNotices()
 
-    // 신규 등록 + 학부모 공개인 경우에만 열람 가능한 학부모 전원에게 푸시 발송 (수정 시 알림 스팸 방지)
-    if (isNew && form.parent_visible && noticeId) {
+    // 신규 등록인 경우에만 열람 가능한 학부모 전원에게 푸시 발송 (수정 시 알림 스팸 방지)
+    if (isNew && noticeId) {
       const targetIds = form.target_mode === 'all' ? undefined : resolvedTargetIds
       fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push-notice`, {
         method: 'POST',
@@ -312,10 +304,6 @@ export default function NoticesPage() {
 
   function targetLabel(n: Notice): string {
     if (!n.parent_visible) return '비공개'
-    if (n.target_class_id) {
-      const cls = classes.find(c => c.id === n.target_class_id)
-      return cls ? `${cls.name} 공개` : '반 공개'
-    }
     const ids = targetsByNotice[n.id] ?? []
     return ids.length > 0 ? `${ids.length}명 공개` : '전체공개'
   }
@@ -343,8 +331,31 @@ export default function NoticesPage() {
         .radio-row label { display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer; }
         .pill { padding:5px 12px; border-radius:20px; font-size:12px; font-weight:500; cursor:pointer; border:1.5px solid ${bd}; background:#fff; color:${tx2}; font-family:inherit; transition:all .15s; }
         .pill.active { border-color:${navy}; background:${navy}; color:#fff; font-weight:700; }
-        .chip { display:inline-flex; align-items:center; gap:4px; padding:3px 8px 3px 10px; border-radius:20px; font-size:12px; background:${navyMuted}; color:${navy}; font-weight:500; }
-        .chip button { border:none; background:none; cursor:pointer; color:${navy}; font-size:13px; padding:0; line-height:1; display:flex; }
+        .class-pick-chip { padding:6px 13px; border-radius:20px; font-size:12.5px; font-weight:600; cursor:pointer; border:1.5px solid ${bd}; background:#fff; color:${tx2}; font-family:inherit; transition:all .15s; }
+        .class-pick-chip:hover:not(:disabled) { border-color:${navy}; color:${navy}; }
+        .class-pick-chip:disabled { opacity:.4; cursor:default; }
+        .class-pick-chip[data-state="partial"] { border-color:${gold}; background:${goldPale}; color:#8a5a00; }
+        .class-pick-chip[data-state="all"] { border-color:${navy}; background:${navy}; color:#fff; }
+        .chip { display:inline-flex; align-items:center; gap:4px; padding:4px 8px 4px 11px; border-radius:20px; font-size:12px; background:${navyMuted}; color:${navy}; font-weight:500; }
+        .chip button { border:none; background:none; cursor:pointer; color:${navy}; font-size:13px; padding:0; line-height:1; display:flex; opacity:.6; }
+        .chip button:hover { opacity:1; }
+        .seg { display:inline-flex; padding:3px; background:${bg}; border-radius:9px; gap:2px; }
+        .seg button { padding:7px 16px; border-radius:7px; border:none; background:transparent; color:${tx2}; font-size:12.5px; font-weight:600; cursor:pointer; font-family:inherit; transition:all .15s; }
+        .seg button[data-active="true"] { background:#fff; color:${navy}; box-shadow:0 1px 3px rgba(13,42,94,.14); }
+        .field-label { display:flex; align-items:center; justify-content:space-between; margin-bottom:7px; }
+        .field-label span:first-child { font-size:12px; font-weight:600; color:${tx2}; }
+        .field-sub { font-size:11px; color:${tx3}; }
+        .target-panel { border:1px solid ${bd}; border-radius:10px; padding:14px; background:${bg}; }
+        .target-panel-section { margin-bottom:14px; }
+        .target-panel-section:last-child { margin-bottom:0; }
+        .target-panel-title { font-size:11px; font-weight:700; color:${tx2}; letter-spacing:.3px; margin-bottom:8px; text-transform:uppercase; }
+        .student-row { display:flex; align-items:center; gap:9px; padding:9px 12px; border-bottom:1px solid ${bg}; cursor:pointer; font-size:13px; color:${tx}; transition:background .12s; }
+        .student-row:last-child { border-bottom:none; }
+        .student-row:hover { background:${navyMuted}; }
+        .student-row input[type=checkbox] { width:15px; height:15px; accent-color:${navy}; cursor:pointer; }
+        .notice-row { transition:background .12s; }
+        .notice-row:hover { background:${navyMuted} !important; }
+        .vis-badge { display:inline-flex; align-items:center; padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
         .ql-editor img { max-width: 100%; height: auto; cursor: zoom-in; transition: opacity .15s; }
         .ql-editor img:hover { opacity: .85; }
         .ql-editor { max-width: 100%; overflow-x: hidden; word-break: break-word; }
@@ -397,7 +408,7 @@ export default function NoticesPage() {
 
           {/* 헤더 행 (모바일에서는 카드형으로 바뀌므로 생략) */}
           {!mobileMode && (
-            <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 90px 80px 108px', gap: 8, padding: '11px 16px', background: bg, borderBottom: `1px solid ${bd}`, fontSize: 11, fontWeight: 600, color: tx3 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 100px 90px 112px', gap: 10, padding: '11px 18px', background: bg, borderBottom: `1px solid ${bd}`, fontSize: 11, fontWeight: 600, color: tx3 }}>
               <div style={{ textAlign: 'center' }}>번호</div>
               <div>제목</div>
               <div style={{ textAlign: 'center' }}>공개대상</div>
@@ -445,11 +456,9 @@ export default function NoticesPage() {
                   {detail.pinned && <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 20, background: goldPale, color: gold, fontWeight: 500 }}>상단 고정</span>}
                   {!detail.parent_visible
                     ? <span className="badge-red">학부모 비공개</span>
-                    : detail.target_class_id
-                      ? <span className="badge-navy">{classes.find(c => c.id === detail.target_class_id)?.name ?? '반'} 전체 공개</span>
-                      : (targetsByNotice[detail.id]?.length ?? 0) > 0
-                        ? <span className="badge-navy">선택 공개 {targetsByNotice[detail.id].length}명</span>
-                        : <span className="badge-green">학부모 전체공개</span>
+                    : (targetsByNotice[detail.id]?.length ?? 0) > 0
+                      ? <span className="badge-navy">선택 공개 {targetsByNotice[detail.id].length}명</span>
+                      : <span className="badge-green">학부모 전체공개</span>
                   }
                 </div>
                 {detail.parent_visible && (targetsByNotice[detail.id]?.length ?? 0) > 0 && (
@@ -554,122 +563,104 @@ export default function NoticesPage() {
                 />
               </div>
 
-              {/* 고정 여부 + 학부모 열람 — 2칸 그리드 */}
-              <div style={{ display: 'grid', gridTemplateColumns: mobileMode ? '1fr' : '1fr 1fr', gap: 14, marginBottom: 14 }}>
+              {/* 고정 여부 + 공개 대상 — 한 줄에 나란히 */}
+              <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', marginBottom: 14 }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: tx2, marginBottom: 5 }}>고정 여부</label>
-                  <div className="radio-row">
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: tx2, marginBottom: 6 }}>고정 여부</label>
+                  <div className="seg">
                     {[{ v: false, l: '일반' }, { v: true, l: '상단 고정' }].map(({ v, l }) => (
-                      <label key={l}>
-                        <input type="radio" name="noticePin" checked={form.pinned === v} onChange={() => setForm(f => ({ ...f, pinned: v }))} />
-                        {l}
-                      </label>
+                      <button key={l} type="button" data-active={form.pinned === v} onClick={() => setForm(f => ({ ...f, pinned: v }))}>{l}</button>
                     ))}
                   </div>
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: tx2, marginBottom: 5 }}>학부모 열람</label>
-                  <div className="radio-row">
-                    {[{ v: true, l: '공개', c: gr }, { v: false, l: '비공개', c: re }].map(({ v, l, c }) => (
-                      <label key={l}>
-                        <input type="radio" name="noticeParent" checked={form.parent_visible === v} onChange={() => setForm(f => ({ ...f, parent_visible: v }))} />
-                        <span style={{ color: c, fontWeight: 500 }}>{l}</span>
-                      </label>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: tx2, marginBottom: 6 }}>공개 대상</label>
+                  <div className="seg">
+                    {[{ v: 'all' as const, l: '전체' }, { v: 'selected' as const, l: '선택' }].map(({ v, l }) => (
+                      <button key={v} type="button" data-active={form.target_mode === v} onClick={() => setForm(f => ({ ...f, target_mode: v }))}>{l}</button>
                     ))}
                   </div>
                 </div>
               </div>
 
-              {/* 공개 대상 선택 (학부모 열람=공개일 때만) */}
-              {form.parent_visible && (
-                <div style={{ marginBottom: 14 }}>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: tx2, marginBottom: 5 }}>공개 대상</label>
-                  <div className="radio-row" style={{ marginBottom: form.target_mode !== 'all' ? 10 : 0 }}>
-                    {[{ v: 'all' as const, l: '전체 학부모' }, { v: 'class' as const, l: '반 전체' }, { v: 'selected' as const, l: '선택한 학생만' }].map(({ v, l }) => (
-                      <label key={v}>
-                        <input type="radio" name="noticeTargetMode" checked={form.target_mode === v} onChange={() => setForm(f => ({ ...f, target_mode: v }))} />
-                        {l}
-                      </label>
-                    ))}
+              {form.target_mode === 'selected' && (
+                <div className="target-panel" style={{ marginBottom: 14 }}>
+                  {/* 선택된 학생 chips — 바로바로 확인 */}
+                  <div className="target-panel-section">
+                    <div className="field-label"><span>선택됨</span><span className="field-sub">{form.target_student_ids.length}명</span></div>
+                    {form.target_student_ids.length === 0 ? (
+                      <p style={{ fontSize: 12, color: tx3 }}>반을 누르거나 아래 목록에서 학생을 선택하세요</p>
+                    ) : (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {form.target_student_ids.map(sid => (
+                          <span key={sid} className="chip">
+                            {students.find(s => s.id === sid)?.name ?? '?'}
+                            <button onClick={() => toggleTarget(sid)} aria-label="선택 해제">×</button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
-                  {form.target_mode === 'class' && (
-                    <div style={{ border: `1px solid ${bd}`, borderRadius: 8, padding: 10, background: bg }}>
-                      <p style={{ fontSize: 11, fontWeight: 600, color: tx2, marginBottom: 8 }}>
-                        공개할 반을 선택하세요{form.target_class_id ? ` — ${studentIdsOfClass(form.target_class_id).length}명의 학부모에게 공개됩니다` : ''}
-                      </p>
-                      {classes.length === 0 ? (
-                        <p style={{ fontSize: 12, color: tx3 }}>등록된 반이 없습니다.</p>
-                      ) : (
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                          {classes.map(c => {
-                            const count = studentIdsOfClass(c.id).length
-                            return (
-                              <button key={c.id} type="button" disabled={count === 0}
-                                className={`pill${form.target_class_id === c.id ? ' active' : ''}`}
-                                style={count === 0 ? { opacity: .4, cursor: 'default' } : undefined}
-                                onClick={() => setForm(f => ({ ...f, target_class_id: f.target_class_id === c.id ? null : c.id }))}
-                              >
-                                {c.name} ({count})
-                              </button>
-                            )
-                          })}
-                        </div>
-                      )}
+                  {/* 반으로 빠르게 선택 — 누르면 그 반 학생 전원이 선택/해제된다 */}
+                  <div className="target-panel-section">
+                    <p className="target-panel-title">반으로 빠르게 선택</p>
+                    {classes.length === 0 ? (
+                      <p style={{ fontSize: 12, color: tx3 }}>등록된 반이 없습니다.</p>
+                    ) : (
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {classes.map(c => {
+                          const ids = studentIdsOfClass(c.id)
+                          const count = ids.filter(id => form.target_student_ids.includes(id)).length
+                          const state = ids.length === 0 ? 'empty' : count === 0 ? 'none' : count === ids.length ? 'all' : 'partial'
+                          return (
+                            <button key={c.id} type="button" disabled={ids.length === 0}
+                              className="class-pick-chip" data-state={state}
+                              onClick={() => setForm(f => ({
+                                ...f,
+                                target_student_ids: state === 'all'
+                                  ? f.target_student_ids.filter(id => !ids.includes(id))
+                                  : [...new Set([...f.target_student_ids, ...ids])],
+                              }))}
+                            >
+                              {c.name} <span style={{ opacity: .7 }}>{count}/{ids.length}</span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 검색 + 학교급 필터 + 개별 선택 */}
+                  <div className="target-panel-section">
+                    <p className="target-panel-title">개별 학생 선택</p>
+                    <div className="sbox" style={{ marginBottom: 8 }}>
+                      <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke={tx3}><circle cx="11" cy="11" r="8" strokeWidth={2}/><path strokeWidth={2} d="M21 21l-4.35-4.35"/></svg>
+                      <input placeholder="학생 이름 검색" value={pickerSearch} onChange={e => setPickerSearch(e.target.value)} />
                     </div>
-                  )}
-
-                  {form.target_mode === 'selected' && (
-                    <div style={{ border: `1px solid ${bd}`, borderRadius: 8, padding: 10, background: bg }}>
-                      {/* 선택된 학생 chips — 바로바로 확인 */}
-                      <div style={{ marginBottom: 8 }}>
-                        <p style={{ fontSize: 11, fontWeight: 600, color: tx2, marginBottom: 6 }}>선택됨 ({form.target_student_ids.length}명)</p>
-                        {form.target_student_ids.length === 0 ? (
-                          <p style={{ fontSize: 12, color: tx3 }}>아래 목록에서 학생을 선택하세요</p>
-                        ) : (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                            {form.target_student_ids.map(sid => (
-                              <span key={sid} className="chip">
-                                {students.find(s => s.id === sid)?.name ?? '?'}
-                                <button onClick={() => toggleTarget(sid)}>×</button>
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      <div style={{ height: 1, background: bd, margin: '8px 0' }} />
-
-                      {/* 검색 + 학교급 필터 */}
-                      <input className="fi" style={{ marginBottom: 8 }} placeholder="학생 이름 검색" value={pickerSearch} onChange={e => setPickerSearch(e.target.value)} />
-                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
-                        {SCHOOL_TYPES.map(t => (
-                          <button key={t} type="button" className={`pill${pickerStageFlt.includes(t) ? ' active' : ''}`} onClick={() => togglePickerStage(t)}>{t}</button>
-                        ))}
-                      </div>
-
-                      {/* 분류 전/후 전체선택 — 현재 필터된 목록 기준 */}
-                      <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                        <button type="button" className="btn-outline" onClick={selectAllFiltered}>
-                          {pickerStageFlt.length > 0 ? '필터된 학생 전체 선택' : '전체 선택'} ({pickerFiltered.length}명)
-                        </button>
-                        <button type="button" className="btn-outline" onClick={deselectAllFiltered}>전체 해제</button>
-                      </div>
-
-                      {/* 학생 목록 */}
-                      <div style={{ maxHeight: 200, overflowY: 'auto', background: '#fff', border: `1px solid ${bd}`, borderRadius: 6 }}>
-                        {pickerFiltered.length === 0 ? (
-                          <p style={{ fontSize: 12, color: tx3, padding: 14, textAlign: 'center' }}>일치하는 학생이 없습니다</p>
-                        ) : pickerFiltered.map(s => (
-                          <label key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderBottom: `1px solid ${bg}`, cursor: 'pointer', fontSize: 13, color: tx }}>
-                            <input type="checkbox" checked={form.target_student_ids.includes(s.id)} onChange={() => toggleTarget(s.id)} />
-                            {s.name}
-                            {s.school_type && <span style={{ fontSize: 10, color: tx3 }}>{s.school_type}</span>}
-                          </label>
-                        ))}
-                      </div>
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
+                      {SCHOOL_TYPES.map(t => (
+                        <button key={t} type="button" className={`pill${pickerStageFlt.includes(t) ? ' active' : ''}`} onClick={() => togglePickerStage(t)}>{t}</button>
+                      ))}
+                      <span style={{ flex: 1 }} />
+                      <button type="button" className="btn-outline" onClick={selectAllFiltered}>
+                        {pickerStageFlt.length > 0 ? '필터 전체 선택' : '전체 선택'} ({pickerFiltered.length})
+                      </button>
+                      <button type="button" className="btn-outline" onClick={deselectAllFiltered}>전체 해제</button>
                     </div>
-                  )}
+
+                    <div style={{ maxHeight: 200, overflowY: 'auto', background: '#fff', border: `1px solid ${bd}`, borderRadius: 8 }}>
+                      {pickerFiltered.length === 0 ? (
+                        <p style={{ fontSize: 12, color: tx3, padding: 14, textAlign: 'center' }}>일치하는 학생이 없습니다</p>
+                      ) : pickerFiltered.map(s => (
+                        <label key={s.id} className="student-row">
+                          <input type="checkbox" checked={form.target_student_ids.includes(s.id)} onChange={() => toggleTarget(s.id)} />
+                          {s.name}
+                          {s.school_type && <span style={{ fontSize: 10.5, color: tx3, marginLeft: 'auto' }}>{s.school_type}</span>}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -725,38 +716,39 @@ function BoardRow({ notice, index, pinned, canWrite, mobile, visLabel, onClick, 
   }
 
   const visColor = visLabel === '비공개' ? { bg: rbg, color: re } : visLabel === '전체공개' ? { bg: gbg, color: gr } : { bg: navyM, color: navy }
-  const visBadge = <span style={{ background: visColor.bg, color: visColor.color, fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 4 }}>{visLabel}</span>
+  const visBadge = <span className="vis-badge" style={{ background: visColor.bg, color: visColor.color }}>{visLabel}</span>
 
   if (mobile) {
     return (
       <div
+        className="notice-row"
         onClick={onClick}
         style={{
-          padding: '12px 14px', cursor: 'pointer',
+          padding: '13px 15px', cursor: 'pointer',
           background: pinned ? '#FEFAF3' : '#fff',
           borderBottom: isLast ? 'none' : `1px solid ${bd}`,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 7 }}>
           {pinned
-            ? <span style={{ background: gold, color: '#fff', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, flexShrink: 0 }}>공지</span>
-            : <span style={{ fontSize: 11, color: tx3, flexShrink: 0 }}>{index}</span>
+            ? <span style={{ background: gold, color: '#fff', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, flexShrink: 0 }}>공지</span>
+            : <span style={{ fontSize: 11, color: tx3, flexShrink: 0, width: 14, textAlign: 'right' }}>{index}</span>
           }
-          <span style={{ fontSize: 13, fontWeight: pinned ? 700 : 500, color: tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{notice.title}</span>
-          {isNew(notice.created_at) && <span style={{ color: re, fontSize: 11, fontWeight: 700, flexShrink: 0 }}>N</span>}
+          <span style={{ fontSize: 13.5, fontWeight: pinned ? 700 : 500, color: tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{notice.title}</span>
+          {isNew(notice.created_at) && <span style={{ background: rbg, color: re, fontSize: 9.5, fontWeight: 700, flexShrink: 0, padding: '1px 5px', borderRadius: 20 }}>N</span>}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
           {visBadge}
           <span style={{ fontSize: 11, color: tx3 }}>{kstDateOf(notice.created_at)}</span>
           {canWrite && (
             <div style={{ display: 'flex', gap: 5, marginLeft: 'auto' }}>
               <button
                 onClick={e => { e.stopPropagation(); onEdit() }}
-                style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 500, cursor: 'pointer', border: `1px solid ${bd}`, background: 'transparent', color: tx2, fontFamily: 'inherit' }}
+                style={{ padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 500, cursor: 'pointer', border: `1px solid ${bd}`, background: 'transparent', color: tx2, fontFamily: 'inherit' }}
               >수정</button>
               <button
                 onClick={e => { e.stopPropagation(); onDelete() }}
-                style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 500, cursor: 'pointer', border: 'none', background: rbg, color: re, fontFamily: 'inherit' }}
+                style={{ padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 500, cursor: 'pointer', border: 'none', background: rbg, color: re, fontFamily: 'inherit' }}
               >삭제</button>
             </div>
           )}
@@ -767,10 +759,11 @@ function BoardRow({ notice, index, pinned, canWrite, mobile, visLabel, onClick, 
 
   return (
     <div
+      className="notice-row"
       onClick={onClick}
       style={{
-        display: 'grid', gridTemplateColumns: '60px 1fr 90px 80px 108px', gap: 8,
-        padding: '11px 16px', alignItems: 'center', cursor: 'pointer',
+        display: 'grid', gridTemplateColumns: '60px 1fr 100px 90px 112px', gap: 10,
+        padding: '13px 18px', alignItems: 'center', cursor: 'pointer',
         background: pinned ? '#FEFAF3' : '#fff',
         borderBottom: isLast ? 'none' : `1px solid ${bd}`,
         position: 'relative',
@@ -778,19 +771,19 @@ function BoardRow({ notice, index, pinned, canWrite, mobile, visLabel, onClick, 
     >
       <div style={{ textAlign: 'center' }}>
         {pinned ? (
-          <span style={{ background: gold, color: '#fff', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4 }}>공지</span>
+          <span style={{ background: gold, color: '#fff', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20 }}>공지</span>
         ) : (
           <span style={{ fontSize: 12, color: tx3 }}>{index}</span>
         )}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
         <span style={{
-          fontSize: 13, fontWeight: pinned ? 700 : 400, color: tx,
+          fontSize: 13.5, fontWeight: pinned ? 700 : 500, color: tx,
           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
         }}>{notice.title}</span>
         {isNew(notice.created_at) && (
-          <span style={{ color: re, fontSize: 11, fontWeight: 700, flexShrink: 0 }}>N</span>
+          <span style={{ background: rbg, color: re, fontSize: 9.5, fontWeight: 700, flexShrink: 0, padding: '1px 5px', borderRadius: 20 }}>N</span>
         )}
       </div>
 
@@ -800,14 +793,14 @@ function BoardRow({ notice, index, pinned, canWrite, mobile, visLabel, onClick, 
 
       <div style={{ textAlign: 'center' }}>
         {canWrite ? (
-          <div style={{ display: 'flex', gap: 5, justifyContent: 'center' }}>
+          <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
             <button
               onClick={e => { e.stopPropagation(); onEdit() }}
-              style={{ padding: '4px 9px', borderRadius: 6, fontSize: 11, fontWeight: 500, cursor: 'pointer', border: `1px solid ${bd}`, background: 'transparent', color: tx2, fontFamily: 'inherit' }}
+              style={{ padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500, cursor: 'pointer', border: `1px solid ${bd}`, background: 'transparent', color: tx2, fontFamily: 'inherit' }}
             >수정</button>
             <button
               onClick={e => { e.stopPropagation(); onDelete() }}
-              style={{ padding: '4px 9px', borderRadius: 6, fontSize: 11, fontWeight: 500, cursor: 'pointer', border: 'none', background: rbg, color: re, fontFamily: 'inherit' }}
+              style={{ padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500, cursor: 'pointer', border: 'none', background: rbg, color: re, fontFamily: 'inherit' }}
             >삭제</button>
           </div>
         ) : (
