@@ -169,7 +169,7 @@ export default function ClassBulkRecordModal({
     if (key === 'testId' && val) {
       Promise.all([
         supabase.from('tests').select('*').eq('id', Number(val)).single(),
-        supabase.from('test_scores').select('cor,score').eq('test_id', Number(val)).eq('student_id', sid).maybeSingle(),
+        supabase.from('test_scores').select('correct,score').eq('test_id', Number(val)).eq('student_id', sid).maybeSingle(),
       ]).then(([test, score]) => {
         if (test.error || score.error) toast('저장된 시험 점수를 불러오지 못했습니다. 시험을 다시 선택해 주세요.', false)
         setBulkForms(p => {
@@ -179,7 +179,7 @@ export default function ClassBulkRecordModal({
           const items = [...p[sid].testItems]
           items[index] = { ...current, scoreLoading: false, autoGraded: !!test.data?.auto_grading,
             hasSavedScore: !!score.data, tTotal: test.data?.total ?? current.tTotal,
-            tCor: score.data?.cor ?? 0, tScore: score.data?.score ?? null }
+            tCor: score.data?.correct ?? 0, tScore: score.data?.score ?? null }
           return { ...p, [sid]: { ...p[sid], testItems: items } }
         })
       })
@@ -211,12 +211,12 @@ export default function ClassBulkRecordModal({
     const checkedSids = Object.entries(bulkChks).filter(([, v]) => v).map(([k]) => Number(k))
     const selectedTestIds = [...new Set(checkedSids.flatMap(sid => bulkForms[sid]?.has_test ? bulkForms[sid].testItems.map(t => t.testId).filter((id): id is number => id !== null) : []))]
     const autoTestIds = new Set<number>()
-    const savedScores = new Map<string, { cor: number; score: number }>()
+    const savedScores = new Map<string, { correct: number; score: number }>()
     if (selectedTestIds.length) {
       if (checkedSids.some(sid => bulkForms[sid]?.testItems.some(t => t.scoreLoading))) { setSaving(false); return toast('시험 점수를 불러오는 중입니다.', false) }
       const [meta, sc] = await Promise.all([
         supabase.from('tests').select('*').in('id', selectedTestIds),
-        supabase.from('test_scores').select('test_id,student_id,cor,score').in('test_id', selectedTestIds).in('student_id', checkedSids),
+        supabase.from('test_scores').select('test_id,student_id,correct,score').in('test_id', selectedTestIds).in('student_id', checkedSids),
       ])
       if (meta.error || sc.error) { setSaving(false); return toast('시험 성적 확인에 실패했습니다. 다시 시도해 주세요.', false) }
       for (const t of meta.data ?? []) if (t.auto_grading) autoTestIds.add(t.id)
@@ -271,12 +271,12 @@ export default function ClassBulkRecordModal({
             if (td?.total) total = td.total
           }
           const graded = autoTestIds.has(ti.testId) ? savedScores.get(`${ti.testId}:${sid}`) : null
-          const tCorVal = graded?.cor ?? ti.tCor ?? 0
+          const tCorVal = graded?.correct ?? ti.tCor ?? 0
           const autoScore = graded?.score ?? ti.tScore ?? (total > 0 ? Math.round(tCorVal / total * 100) : 0)
           const { error: itemError } = await supabase.from('record_test_items').insert({ record_id: recId, test_id: ti.testId, t_total: total, t_cor: tCorVal, t_score: autoScore })
           if (itemError) { toast('시험 성적 저장 실패: ' + itemError.message, false); errCnt++; continue }
           if (!graded) {
-            const { error: scoreError } = await supabase.from('test_scores').upsert({ test_id: ti.testId, student_id: sid, cor: tCorVal, score: autoScore }, { onConflict: 'test_id,student_id' })
+            const { error: scoreError } = await supabase.from('test_scores').upsert({ test_id: ti.testId, student_id: sid, correct: tCorVal, score: autoScore }, { onConflict: 'test_id,student_id' })
             if (scoreError) { toast('성적 집계 저장 실패: ' + scoreError.message, false); errCnt++ }
           }
         }

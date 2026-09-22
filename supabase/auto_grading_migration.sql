@@ -156,8 +156,9 @@ begin
   v_score := case when total_pts>0 then round(earned::numeric / total_pts * 100)::integer else 0 end;
   update public.test_attempts set submitted_at=least(clock_timestamp(),deadline_at), cor=v_cor,
     score=v_score, earned_points=earned, total_points=total_pts where id=a.id;
-  insert into public.test_scores(test_id,student_id,cor,score) values(a.test_id,a.student_id,v_cor,v_score)
-    on conflict(test_id,student_id) do update set cor=excluded.cor,score=excluded.score;
+  -- 기존 test_scores의 정답 수 컬럼명은 cor가 아니라 correct다.
+  insert into public.test_scores(test_id,student_id,correct,score) values(a.test_id,a.student_id,v_cor,v_score)
+    on conflict(test_id,student_id) do update set correct=excluded.correct,score=excluded.score;
   update public.record_test_items i set t_cor=v_cor,t_score=v_score,
     t_total=(select total from public.tests where id=a.test_id)
     from public.records r where i.record_id=r.id and r.student_id=a.student_id and i.test_id=a.test_id;
@@ -306,7 +307,7 @@ language plpgsql security definer set search_path = public as $$
 declare s record;
 begin
   if exists(select 1 from public.tests where id=new.test_id and auto_grading) then
-    select sc.cor,sc.score,t.total into s from public.test_scores sc
+    select sc.correct as cor,sc.score,t.total into s from public.test_scores sc
       join public.tests t on t.id=sc.test_id join public.records r on r.student_id=sc.student_id
       where r.id=new.record_id and sc.test_id=new.test_id;
     if not found then raise exception '학생 답안 제출 후 수업기록에 시험을 추가하세요.'; end if;

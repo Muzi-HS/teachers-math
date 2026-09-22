@@ -49,7 +49,7 @@ test('PostgreSQL migration and exam lifecycle', async t => {
     create table teachers(user_id uuid primary key,approved boolean,role text);
     create table students(id bigint primary key,name text,phone text,pin text);
     create table tests(id bigint generated always as identity primary key,name text not null,date date not null,total integer not null);
-    create table test_scores(id bigint generated always as identity primary key,test_id bigint references tests(id) on delete cascade,student_id bigint references students(id),cor integer,score integer,unique(test_id,student_id));
+    create table test_scores(id bigint generated always as identity primary key,test_id bigint references tests(id) on delete cascade,student_id bigint references students(id),correct integer,score integer,unique(test_id,student_id));
     create table records(id bigint primary key,student_id bigint references students(id));
     create table record_test_items(id bigint generated always as identity primary key,record_id bigint references records(id),test_id bigint references tests(id) on delete cascade,t_total integer,t_cor integer,t_score integer);
     insert into teachers values('11111111-1111-1111-1111-111111111111',true,'admin');
@@ -126,7 +126,10 @@ test('PostgreSQL migration and exam lifecycle', async t => {
     assert.equal(result.attempt.earned_points, 100)
     const second = await act(id,'submit',{1:[1]},2)
     assert.equal(second.attempt.score, 100)
-    assert.equal((await db.query('select count(*)::int as n from test_scores where test_id=$1',[id])).rows[0].n,1)
+    const stored = (await db.query('select correct,score from test_scores where test_id=$1',[id])).rows
+    assert.equal(stored.length, 1)
+    assert.equal(stored[0].correct, 3)
+    assert.equal(stored[0].score, 100)
     await db.query('insert into record_test_items(record_id,test_id,t_total,t_cor,t_score) values(1,$1,99,0,0)',[id])
     const item = (await db.query('select * from record_test_items where test_id=$1',[id])).rows[0]
     assert.equal(item.t_score,100); assert.equal(item.t_cor,3); assert.equal(item.t_total,3)
@@ -193,7 +196,7 @@ test('PostgreSQL migration and exam lifecycle', async t => {
     await assert.rejects(db.query('delete from test_scores where test_id=$1',[id]))
     await assert.rejects(db.query('update test_scores set test_id=$2 where test_id=$1',[id,manual]))
     await assert.rejects(db.query('update tests set is_published=false where id=$1',[id]))
-    await db.query('insert into test_scores(test_id,student_id,cor,score) values($1,1,8,80)',[manual])
+    await db.query('insert into test_scores(test_id,student_id,correct,score) values($1,1,8,80)',[manual])
     await db.exec('reset role')
     assert.equal((await db.query('select score from test_scores where test_id=$1',[manual])).rows[0].score,80)
   })

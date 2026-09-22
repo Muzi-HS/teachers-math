@@ -95,7 +95,8 @@ export default function TestsPage() {
       .order('score',{ascending:false})
 
     if (!error && sc && sc.length > 0) {
-      setScores(sc)
+      // DB 컬럼명은 correct이지만 화면 곳곳에서 cor로 다루므로 여기서 맞춰준다.
+      setScores(sc.map(row => ({ ...row, cor: (row as { correct: number }).correct })))
       return
     }
 
@@ -175,7 +176,7 @@ export default function TestsPage() {
     const autoScore  = scoreInput || (curTest.total > 0 ? Math.round(cor / curTest.total * 100) : 0)
     const studentId  = editSc.row.student_id
     await supabase.from('test_scores')
-      .upsert({ test_id: curTest.id, student_id: studentId, cor, score: autoScore },
+      .upsert({ test_id: curTest.id, student_id: studentId, correct: cor, score: autoScore },
                { onConflict: 'test_id,student_id' })
     const { data: stuRecs } = await supabase.from('records').select('id').eq('student_id', studentId)
     if (stuRecs && stuRecs.length > 0) {
