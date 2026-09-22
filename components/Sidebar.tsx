@@ -36,6 +36,10 @@ const NAV = [
   { key: 'divider2', href: '', label: '', icon: null },
   { key: 'coupons', href: '/coupons', label: '쿠폰처리',
     icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M9 5H4a1 1 0 00-1 1v3a2 2 0 010 4v3a1 1 0 001 1h5m0-12h11a1 1 0 011 1v3a2 2 0 000 4v3a1 1 0 01-1 1H9m0-12v12"/></svg> },
+  { key: 'special-classes', href: '/special-classes', label: '특강관리',
+    icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M12 2l3 6 6.5 1-4.7 4.4L18 20l-6-3.2L6 20l1.2-6.6L2.5 9l6.5-1z"/></svg> },
+  { key: 'consultations', href: '/consultations', label: '상담신청',
+    icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> },
   { key: 'app-qr', href: '/app-qr', label: '앱 설치 QR',
     icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM14 20h3M20 14v3M20 20v.01M17 17h.01"/></svg> },
 ]
@@ -53,6 +57,21 @@ export default function Sidebar() {
   const { mobileMode } = useMobileMode()
   const [unreadInquiries, setUnreadInquiries] = useState(0)
   const [unreadComments, setUnreadComments] = useState(0)
+  const [unreadConsultations, setUnreadConsultations] = useState(0)
+
+  useEffect(() => {
+    if (role !== 'admin') return
+    let cancelled = false
+    async function fetchUnread() {
+      const { count } = await supabase.from('consultation_requests')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'new')
+      if (!cancelled) setUnreadConsultations(count ?? 0)
+    }
+    fetchUnread()
+    const iv = setInterval(fetchUnread, 60000)
+    return () => { cancelled = true; clearInterval(iv) }
+  }, [role, pathname])
 
   useEffect(() => {
     if (role !== 'admin') return
@@ -128,7 +147,10 @@ export default function Sidebar() {
   }
 
   function unreadCountOf(key: string) {
-    return key === 'inquiries' ? unreadInquiries : key === 'records' ? unreadComments : 0
+    return key === 'inquiries' ? unreadInquiries
+      : key === 'records' ? unreadComments
+      : key === 'consultations' ? unreadConsultations
+      : 0
   }
 
   const css = `

@@ -21,11 +21,15 @@ function isIOS() {
 export default function InstallBanner() {
   const pathname = usePathname()
   const isParentRoute = pathname?.startsWith('/parent') ?? false
+  const isHomePage = pathname === '/'
   const [visible, setVisible] = useState(false)
   const [platform, setPlatform] = useState<'android' | 'ios'>('android')
   const [deferred, setDeferred] = useState<BIPEvent | null>(null)
 
   useEffect(() => {
+    // 메인화면(/)은 자체 설치 안내 섹션(InstallSection)이 있으므로 전역 배너는 띄우지 않는다
+    // (beforeinstallprompt 리스너도 아예 등록하지 않아야, 그 섹션이 이벤트를 받을 수 있다)
+    if (isHomePage) return
     // 이미 홈 화면 앱(standalone)으로 실행 중이면 아예 표시하지 않음
     if (isStandalone()) return
     // 이번 세션에서 이미 닫았으면 표시하지 않음
@@ -45,7 +49,7 @@ export default function InstallBanner() {
     }
     window.addEventListener('beforeinstallprompt', onBIP)
     return () => window.removeEventListener('beforeinstallprompt', onBIP)
-  }, [])
+  }, [isHomePage])
 
   function dismiss() {
     sessionStorage.setItem('installBannerDismissed', '1')

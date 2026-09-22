@@ -43,6 +43,12 @@ export const can = {
 
   // 선생님 계정 관리 — admin만
   manageTeachers:   (role: Role) => role === 'admin',
+
+  // 특강 홍보 게시물 관리 — admin만
+  writeSpecialClass: (role: Role) => role === 'admin',
+
+  // 상담 신청 내역 열람/처리 — admin만
+  manageConsultations: (role: Role) => role === 'admin',
 }
 
 // 메뉴 항목별 접근 가능 여부 (사이드바 렌더링 및 라우트 가드용)
@@ -65,4 +71,8 @@ export const menuAccess: Record<string, (role: Role) => boolean> = {
   student:    (r) => r === 'student',
   // 쿠폰 사용 처리 — admin만
   coupons:    (r) => r === 'admin',
+  // 특강 홍보 게시물 관리 — admin만
+  'special-classes': (r) => r === 'admin',
+  // 상담 신청 내역 — admin만
+  consultations: (r) => r === 'admin',
 }
