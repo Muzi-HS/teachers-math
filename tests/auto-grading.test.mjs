@@ -103,6 +103,20 @@ test('PostgreSQL migration and exam lifecycle', async t => {
     await db.query('select publish_auto_test($1,false)', [id])
     assert.equal((await act(id,'save',{1:[2]},1)).attempt.revision, 1)
   })
+  await t.test('student_test_list shows only assigned/published-or-attempted tests without leaking answer keys', async () => {
+    const published = await create(true)
+    const unpublished = await create(false)
+    await act(published,'start',null,null,1)
+    const forAssignedStudent = (await db.query('select student_test_list(1) as data')).rows[0].data
+    const entry = forAssignedStudent.find(row => row.id === published)
+    assert.ok(entry)
+    assert.equal(entry.attempt.test_id, published)
+    assert.equal(JSON.stringify(forAssignedStudent).includes('correct_answer'), false)
+    assert.equal(JSON.stringify(forAssignedStudent).includes('x = 2'), false)
+    assert.equal(forAssignedStudent.some(row => row.id === unpublished), false)
+    const forUnassignedStudent = (await db.query('select student_test_list(3) as data')).rows[0].data
+    assert.equal(forUnassignedStudent.some(row => row.id === published || row.id === unpublished), false)
+  })
   await t.test('weighted grading, unordered multi-select, trimmed text and idempotent submit', async () => {
     const id = await create()
     await act(id,'start')

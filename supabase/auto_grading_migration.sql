@@ -224,10 +224,12 @@ end $$;
 
 create or replace function public.student_test_list(p_student_id bigint)
 returns jsonb language plpgsql security definer set search_path = public as $$
-declare a record; result jsonb;
+declare pending record; result jsonb;
 begin
-  for a in select id from public.test_attempts where student_id=p_student_id and submitted_at is null and deadline_at<=clock_timestamp() loop
-    perform public.finalize_test_attempt(a.id);
+  -- 변수명이 아래 조회의 test_attempts 별칭(a)과 겹치면 PL/pgSQL이 별칭 대신 이 변수를 참조해
+  -- "record has no field" 오류가 나므로 다른 이름을 쓴다.
+  for pending in select id from public.test_attempts where student_id=p_student_id and submitted_at is null and deadline_at<=clock_timestamp() loop
+    perform public.finalize_test_attempt(pending.id);
   end loop;
   select coalesce(jsonb_agg(jsonb_build_object('id',t.id,'name',t.name,'date',t.date,'total',t.total,
     'is_published',t.is_published,'attempt',case when a.id is null then null else to_jsonb(a) end) order by t.date desc,t.id desc),'[]'::jsonb)
