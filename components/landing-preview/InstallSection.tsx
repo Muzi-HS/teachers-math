@@ -22,6 +22,7 @@ export default function InstallSection() {
   const [installed, setInstalled] = useState(false)
   const [deferred, setDeferred] = useState<BIPEvent | null>(null)
   const [installing, setInstalling] = useState(false)
+  const [notReadyHint, setNotReadyHint] = useState(false)
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- 브라우저 전용 API(matchMedia)라 서버에서는 알 수 없고, 마운트 직후 한 번만 동기화하면 되는 값이다.
@@ -37,7 +38,13 @@ export default function InstallSection() {
   }, [])
 
   async function install() {
-    if (!deferred) return
+    if (!deferred) {
+      // beforeinstallprompt 이벤트가 아직 브라우저에서 발생하지 않은 상태 — 이 API는 브라우저가
+      // 자체적으로 준비했을 때만 호출 가능해 코드로 강제할 수 없다. 잠시 후 다시 시도하도록 안내한다.
+      setNotReadyHint(true)
+      setTimeout(() => setNotReadyHint(false), 4000)
+      return
+    }
     setInstalling(true)
     await deferred.prompt()
     const { outcome } = await deferred.userChoice
@@ -96,16 +103,14 @@ export default function InstallSection() {
 
           <div>
             <p className="lpv-install-way-label">안드로이드 · PC</p>
-            {deferred ? (
-              <>
-                <p style={{ fontSize: 13, color: deep2, lineHeight: 1.85, marginBottom: 14 }}>버튼 한 번으로 바로 설치할 수 있어요.</p>
-                <button className="lpv-install-btn" onClick={install} disabled={installing}>
-                  {installing ? '설치 중...' : '지금 설치하기'}
-                </button>
-              </>
-            ) : (
-              <p style={{ fontSize: 13, color: deep2, lineHeight: 1.85 }}>
-                브라우저 메뉴에서 <strong style={{ color: deep }}>&lsquo;홈 화면에 추가&rsquo;</strong> 또는 <strong style={{ color: deep }}>&lsquo;앱 설치&rsquo;</strong>를 선택해주세요.
+            <p style={{ fontSize: 13, color: deep2, lineHeight: 1.85, marginBottom: 14 }}>버튼 한 번으로 바로 설치할 수 있어요.</p>
+            <button className="lpv-install-btn" onClick={install} disabled={installing}>
+              {installing ? '설치 중...' : '지금 설치하기'}
+            </button>
+            {notReadyHint && (
+              <p role="status" style={{ fontSize: 12, color: deep2, lineHeight: 1.7, marginTop: 10 }}>
+                아직 설치 준비 중이에요. 잠시 후 다시 눌러보시거나, 브라우저 메뉴에서{' '}
+                <strong style={{ color: deep }}>&lsquo;홈 화면에 추가&rsquo;</strong> 또는 <strong style={{ color: deep }}>&lsquo;앱 설치&rsquo;</strong>를 선택해주세요.
               </p>
             )}
           </div>

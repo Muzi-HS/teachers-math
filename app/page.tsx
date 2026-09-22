@@ -15,6 +15,7 @@ import ConsultationSection from '@/components/landing-preview/ConsultationSectio
 import LocationSection from '@/components/landing-preview/LocationSection'
 import InstallSection from '@/components/landing-preview/InstallSection'
 import LoginPanel from '@/components/landing-preview/LoginPanel'
+import ScrollToTopButton from '@/components/landing-preview/ScrollToTopButton'
 
 export default function HomePage() {
   const router = useRouter()
@@ -63,6 +64,7 @@ export default function HomePage() {
       </div>
 
       <LoginPanel open={loginOpen} onClose={() => setLoginOpen(false)} />
+      <ScrollToTopButton />
     </div>
   )
 }
