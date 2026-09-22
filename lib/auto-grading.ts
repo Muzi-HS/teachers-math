@@ -14,3 +14,16 @@ export function toggleChoice(current: number[], value: number, multiple = true) 
 export function remainingSeconds(deadline: number, now: number) {
   return Math.max(0, Math.ceil((deadline - now) / 1000))
 }
+
+export type GradedQuestion = { number: number; points: number; kind: 'choice' | 'text'; correctAnswer: number[] | string }
+// finalize_test_attempt()의 채점 로직과 동일한 기준(정확한 조합 일치 / 공백 제외 완전 일치)을 클라이언트에서 재현한다.
+export function isAnswerCorrect(q: GradedQuestion, submitted: string | number[] | undefined) {
+  if (q.kind === 'choice') {
+    if (!Array.isArray(submitted) || !Array.isArray(q.correctAnswer)) return false
+    const a = [...submitted].sort((x, y) => x - y)
+    const b = [...q.correctAnswer].sort((x, y) => x - y)
+    return a.length === b.length && a.every((v, i) => v === b[i])
+  }
+  if (typeof submitted !== 'string' || typeof q.correctAnswer !== 'string') return false
+  return submitted.trim() === q.correctAnswer
+}

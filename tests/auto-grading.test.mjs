@@ -38,6 +38,19 @@ test('choice selection and countdown handle duplicates, single-choice replacemen
   assert.equal(remainingSeconds(120000, 130000), 0)
 })
 
+test('isAnswerCorrect mirrors server-side grading: unordered multi-select and trimmed exact text', () => {
+  const { isAnswerCorrect } = loadTS('../lib/auto-grading.ts')
+  const choice = { number: 1, points: 10, kind: 'choice', correctAnswer: [1, 3] }
+  assert.equal(isAnswerCorrect(choice, [3, 1]), true)
+  assert.equal(isAnswerCorrect(choice, [1]), false)
+  assert.equal(isAnswerCorrect(choice, [1, 2]), false)
+  assert.equal(isAnswerCorrect(choice, undefined), false)
+  const text = { number: 2, points: 10, kind: 'text', correctAnswer: 'x = 2' }
+  assert.equal(isAnswerCorrect(text, '  x = 2  '), true)
+  assert.equal(isAnswerCorrect(text, 'x=2'), false)
+  assert.equal(isAnswerCorrect(text, undefined), false)
+})
+
 test('PostgreSQL migration and exam lifecycle', async t => {
   const db = new PGlite()
   t.after(() => db.close())

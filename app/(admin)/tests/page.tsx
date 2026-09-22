@@ -8,6 +8,7 @@ import { IconClipboard, IconBarChart, IconTrophy, IconArrowLeft } from '@/compon
 import { useMobileMode } from '@/context/MobileModeContext'
 import TestEditorModal from '@/components/TestEditorModal'
 import AutoTestStatus from '@/components/AutoTestStatus'
+import AutoTestAnswerSheet from '@/components/AutoTestAnswerSheet'
 
 type Test = { id:number; name:string; date:string; total:number; auto_grading?:boolean; is_published?:boolean }
 type ScoreRow = {
@@ -437,6 +438,8 @@ export default function TestsPage() {
           setCurTest(t => t ? {...t,is_published:value} : t)
           setTests(ts => ts.map(t => t.id===curTest.id ? {...t,is_published:value} : t))
         }} onResults={() => { void fetchScores(curTest.id); void fetchAllStats() }} />}
+
+        {curTest.auto_grading && <AutoTestAnswerSheet testId={curTest.id} students={students} />}
 
         {scores.length===0?(
           <div style={{background:'#fff',borderRadius:12,border:`1px solid ${bd}`,padding:'60px 0',textAlign:'center',color:tx3}}>
