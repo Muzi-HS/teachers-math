@@ -3,13 +3,25 @@ import { useEffect, useRef } from 'react'
 import type { Season, SeasonIntensity } from '@/lib/season'
 import { INTENSITY_MULTIPLIER } from '@/lib/season'
 
-type Particle = {
+// 성능 최적화 핵심: 예전에는 매 프레임마다 파티클 하나하나를 벡터로 다시 그리면서
+// 뒤/중간 레이어에는 ctx.filter = blur(...)까지 실시간으로 적용했는데, 캔버스의 실시간
+// 블러 필터는 매우 무겁고(픽셀당 연산) 파티클 수만큼 곱해져서 체감 렉의 주 원인이었다.
+// 지금은 파티클이 생성될 때(또는 화면 밖으로 나가 재생성될 때) "생김새 + 블러"를 작은
+// 오프스크린 캔버스에 딱 한 번만 그려서 스프라이트로 저장해두고, 매 프레임에는 그 스프라이트를
+// drawImage로 붙여넣기만 한다 — 회전/이동만 매 프레임 갱신되고 실제 그리기(도형·블러)는
+// 파티클 수명 동안 한 번만 계산된다.
+type SpriteParticle = {
   x: number; y: number
-  size: number; speed: number
+  speed: number
   rot: number; rotSpeed: number
   swayAmp: number; swayFreq: number; swayPhase: number
-  layer: number; color: string; shapeVariant: number; baseOpacity: number
+  layer: number
+  baseOpacity: number
+  sprite: HTMLCanvasElement
+  halfW: number; halfH: number // 스프라이트를 그릴 절반 크기(CSS px)
 }
+
+type ShapeParams = { size: number; shapeVariant: number }
 
 type SeasonConfig = {
   countPerLayer: [number, number, number] // 뒤/중간/앞 레이어별 기본 파티클 수
@@ -21,7 +33,8 @@ type SeasonConfig = {
   rotSpeed: [number, number]    // rad/s
   sizeRange: [number, number]   // px
   shapeVariants: number
-  draw: (ctx: CanvasRenderingContext2D, p: Particle) => void
+  extent: number                 // 도형이 중심에서 최대 얼마나 뻗어나가는지(스프라이트 크기 계산용)
+  draw: (ctx: CanvasRenderingContext2D, p: ShapeParams) => void
 }
 
 // 뒤(블러+저채도) / 중간 / 앞(선명+큼) — depth감을 위한 레이어별 스케일·투명도·블러·속도
@@ -36,7 +49,7 @@ function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length
 
 // 벚꽃잎 — 끝이 살짝 파인(notch) 하트형 꽃잎 실루엣. 순수 타원보다 벚꽃 특유의
 // 갈라진 꽃잎 끝 느낌이 나도록 베지어 곡선 2개 + 노치로 구성한다.
-function drawPetal(ctx: CanvasRenderingContext2D, p: Particle) {
+function drawPetal(ctx: CanvasRenderingContext2D, p: ShapeParams) {
   const s = p.size
   ctx.beginPath()
   ctx.moveTo(0, s)
@@ -70,7 +83,7 @@ function drawStem(ctx: CanvasRenderingContext2D, s: number, baseY: number) {
 
 // 단풍잎 — 5갈래로 뾰족하게 뻗은 손바닥형 실루엣(각지고 뾰족한 잎끝 사이사이 노치).
 // 잎맥이 중심에서 각 갈래 끝까지 5방향으로 뻗어나가 단풍잎 특유의 결이 보이게 한다.
-function drawMapleLeaf(ctx: CanvasRenderingContext2D, p: Particle) {
+function drawMapleLeaf(ctx: CanvasRenderingContext2D, p: ShapeParams) {
   const s = p.size
   const segments = 16
   const startAngle = -Math.PI * 0.86, endAngle = Math.PI * 0.86 // 아래쪽 줄기 자리는 비워둠
@@ -107,7 +120,7 @@ function drawMapleLeaf(ctx: CanvasRenderingContext2D, p: Particle) {
 
 // 은행잎 — 아래는 줄기로 좁아지고 위로 갈수록 부채꼴로 넓어지다 중앙이 살짝 파인 실루엣.
 // 은행잎 특유의 밑동에서 위로 부챗살처럼 퍼지는 평행 잎맥을 살짝 넣는다.
-function drawGinkgoLeaf(ctx: CanvasRenderingContext2D, p: Particle) {
+function drawGinkgoLeaf(ctx: CanvasRenderingContext2D, p: ShapeParams) {
   const s = p.size
   ctx.beginPath()
   ctx.moveTo(0, s)
@@ -134,7 +147,7 @@ function drawGinkgoLeaf(ctx: CanvasRenderingContext2D, p: Particle) {
 }
 
 // 작은 타원형 잎 — 매끈한 타원 실루엣의 세 번째 variation
-function drawRoundLeaf(ctx: CanvasRenderingContext2D, p: Particle) {
+function drawRoundLeaf(ctx: CanvasRenderingContext2D, p: ShapeParams) {
   const aspect = p.shapeVariant % 2 === 0 ? 0.5 : 0.72
   ctx.beginPath()
   ctx.ellipse(0, 0, p.size, p.size * aspect, 0, 0, Math.PI * 2)
@@ -152,7 +165,7 @@ function drawRoundLeaf(ctx: CanvasRenderingContext2D, p: Particle) {
 }
 
 // 톱니 잎(자작나무/너도밤나무형) — 가장자리가 잘게 들쭉날쭉한 타원형, 네 번째 variation
-function drawSerratedLeaf(ctx: CanvasRenderingContext2D, p: Particle) {
+function drawSerratedLeaf(ctx: CanvasRenderingContext2D, p: ShapeParams) {
   const s = p.size
   const rx = s, ry = s * 0.56
   const teeth = 11
@@ -180,7 +193,7 @@ function drawSerratedLeaf(ctx: CanvasRenderingContext2D, p: Particle) {
 }
 
 // 낙엽 디스패처 — 파티클마다 배정된 shapeVariant로 단풍/은행/작은 잎/톱니 잎을 골고루 섞는다.
-function drawLeaf(ctx: CanvasRenderingContext2D, p: Particle) {
+function drawLeaf(ctx: CanvasRenderingContext2D, p: ShapeParams) {
   const variant = p.shapeVariant % 4
   if (variant === 0) drawMapleLeaf(ctx, p)
   else if (variant === 1) drawGinkgoLeaf(ctx, p)
@@ -188,7 +201,7 @@ function drawLeaf(ctx: CanvasRenderingContext2D, p: Particle) {
   else drawSerratedLeaf(ctx, p)
 }
 
-function drawFlake(ctx: CanvasRenderingContext2D, p: Particle) {
+function drawFlake(ctx: CanvasRenderingContext2D, p: ShapeParams) {
   ctx.beginPath()
   ctx.arc(0, 0, p.size, 0, Math.PI * 2)
   ctx.fill()
@@ -199,28 +212,53 @@ const SEASON_CONFIG: Record<Exclude<Season, 'none'>, SeasonConfig> = {
     countPerLayer: [10, 9, 7], maxTotal: 70,
     colors: ['#F8DCE6', '#F3C7D6', '#FBEAEF', '#EFC0D2', '#F6D3DE'],
     fallSpeed: [16, 32], swayAmp: [12, 30], swayFreq: [.35, .8], rotSpeed: [.25, .7],
-    sizeRange: [6, 13], shapeVariants: 1, draw: drawPetal,
+    sizeRange: [6, 13], shapeVariants: 1, extent: 0.95, draw: drawPetal,
   },
   autumn: {
     countPerLayer: [8, 8, 6], maxTotal: 55,
     colors: ['#B5651D', '#C97C3D', '#D9A441', '#A0522D', '#8B3A1D', '#C2703A'],
     fallSpeed: [24, 44], swayAmp: [16, 36], swayFreq: [.28, .65], rotSpeed: [.6, 1.7],
-    sizeRange: [8, 16], shapeVariants: 4, draw: drawLeaf,
+    sizeRange: [8, 16], shapeVariants: 4, extent: 1.35, draw: drawLeaf,
   },
   winter: {
     countPerLayer: [16, 14, 8], maxTotal: 92,
     colors: ['#FFFFFF'],
     fallSpeed: [12, 28], swayAmp: [4, 12], swayFreq: [.18, .45], rotSpeed: [0, .12],
-    sizeRange: [2, 7], shapeVariants: 1, draw: drawFlake,
+    sizeRange: [2, 7], shapeVariants: 1, extent: 1, draw: drawFlake,
   },
 }
 
-function createParticle(cfg: SeasonConfig, layer: number, width: number, height: number, spawnAnywhere: boolean): Particle {
+// 파티클 생김새(도형+블러)를 작은 오프스크린 캔버스에 한 번만 렌더링해 스프라이트로 만든다.
+function makeSprite(cfg: SeasonConfig, layer: number, size: number, color: string, shapeVariant: number, dpr: number) {
+  const L = LAYERS[layer]
+  const effSize = size * L.scale
+  const blurPx = L.blur
+  const half = Math.ceil(effSize * cfg.extent + blurPx * 3 + 2)
+
+  const sprite = document.createElement('canvas')
+  sprite.width = half * 2 * dpr
+  sprite.height = half * 2 * dpr
+  const sctx = sprite.getContext('2d')!
+  sctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  sctx.translate(half, half)
+  sctx.filter = blurPx > 0 ? `blur(${blurPx}px)` : 'none'
+  sctx.fillStyle = color
+  sctx.globalAlpha = 1
+  cfg.draw(sctx, { size: effSize, shapeVariant })
+
+  return { sprite, half }
+}
+
+type Particle = SpriteParticle
+
+function createParticle(cfg: SeasonConfig, layer: number, width: number, height: number, spawnAnywhere: boolean, dpr: number): Particle {
   const size = rand(cfg.sizeRange[0], cfg.sizeRange[1])
+  const color = pick(cfg.colors)
+  const shapeVariant = Math.floor(Math.random() * cfg.shapeVariants)
+  const { sprite, half } = makeSprite(cfg, layer, size, color, shapeVariant, dpr)
   return {
     x: rand(-40, width + 40),
-    y: spawnAnywhere ? rand(-height, height) : -size - rand(0, 120),
-    size,
+    y: spawnAnywhere ? rand(-height, height) : -half - rand(0, 120),
     speed: rand(cfg.fallSpeed[0], cfg.fallSpeed[1]),
     rot: rand(0, Math.PI * 2),
     rotSpeed: rand(cfg.rotSpeed[0], cfg.rotSpeed[1]) * (Math.random() < 0.5 ? -1 : 1),
@@ -228,9 +266,8 @@ function createParticle(cfg: SeasonConfig, layer: number, width: number, height:
     swayFreq: rand(cfg.swayFreq[0], cfg.swayFreq[1]),
     swayPhase: rand(0, Math.PI * 2),
     layer,
-    color: pick(cfg.colors),
-    shapeVariant: Math.floor(Math.random() * cfg.shapeVariants),
     baseOpacity: rand(0.55, 0.95),
+    sprite, halfW: half, halfH: half,
   }
 }
 
@@ -240,7 +277,7 @@ export default function SeasonCanvas({ season, intensity }: { season: Exclude<Se
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    const ctx = canvas.getContext('2d')
+    const ctx = canvas.getContext('2d', { alpha: true, desynchronized: true })
     if (!ctx) return
 
     const cfg = SEASON_CONFIG[season]
@@ -257,14 +294,16 @@ export default function SeasonCanvas({ season, intensity }: { season: Exclude<Se
           Math.round(cfg.countPerLayer[layer] * mul),
           Math.round(cfg.maxTotal * mul * (cfg.countPerLayer[layer] / (cfg.countPerLayer[0] + cfg.countPerLayer[1] + cfg.countPerLayer[2]))) || 1,
         )
-        for (let i = 0; i < count; i++) particles.push(createParticle(cfg, layer, width, height, true))
+        for (let i = 0; i < count; i++) particles.push(createParticle(cfg, layer, width, height, true, dpr))
       }
     }
 
     function resize() {
       width = window.innerWidth
       height = window.innerHeight
-      dpr = Math.min(window.devicePixelRatio || 1, 2)
+      // 파티클은 작고 이미 블러/애니메이션으로 부드러워서 굳이 고해상도 스프라이트가 필요 없다 —
+      // dpr을 1.5로 제한해 스프라이트 생성 비용과 drawImage 픽셀 양을 줄인다.
+      dpr = Math.min(window.devicePixelRatio || 1, 1.5)
       canvas!.width = width * dpr
       canvas!.height = height * dpr
       canvas!.style.width = width + 'px'
@@ -305,16 +344,17 @@ export default function SeasonCanvas({ season, intensity }: { season: Exclude<Se
 
       ctx!.clearRect(0, 0, width, height)
 
+      // 레이어(뒤→앞) 순서로 그려서 앞 레이어가 뒤 레이어를 자연스럽게 덮도록 한다.
+      // 블러는 이미 스프라이트에 구워져 있으므로 여기서는 filter를 전혀 건드리지 않는다.
       for (let layer = 0; layer < 3; layer++) {
         const L = LAYERS[layer]
-        ctx!.filter = L.blur > 0 ? `blur(${L.blur}px)` : 'none'
         for (const p of particles) {
           if (p.layer !== layer) continue
           p.y += p.speed * L.speedMul * dt
           p.x += Math.sin(now / 1000 * p.swayFreq + p.swayPhase) * p.swayAmp * dt + wind.value * 22 * dt
           p.rot += p.rotSpeed * dt
-          if (p.y - p.size > height + 40) {
-            Object.assign(p, createParticle(cfg, layer, width, height, false))
+          if (p.y - p.halfH > height + 40) {
+            Object.assign(p, createParticle(cfg, layer, width, height, false, dpr))
           }
           if (p.x < -60) p.x = width + 40
           if (p.x > width + 60) p.x = -40
@@ -322,14 +362,11 @@ export default function SeasonCanvas({ season, intensity }: { season: Exclude<Se
           ctx!.save()
           ctx!.translate(p.x, p.y)
           ctx!.rotate(p.rot)
-          ctx!.scale(L.scale, L.scale)
           ctx!.globalAlpha = p.baseOpacity * L.opacityMul * scrollFactor
-          ctx!.fillStyle = p.color
-          cfg.draw(ctx!, p)
+          ctx!.drawImage(p.sprite, -p.halfW, -p.halfH, p.halfW * 2, p.halfH * 2)
           ctx!.restore()
         }
       }
-      ctx!.filter = 'none'
 
       raf = requestAnimationFrame(frame)
     }
