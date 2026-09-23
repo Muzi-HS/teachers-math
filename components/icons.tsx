@@ -2,6 +2,25 @@
 // 이모지 아이콘은 사용하지 않고, 아이콘이 필요한 곳은 이 파일의 컴포넌트를 사용한다.
 type IconProps = { size?: number; color?: string; strokeWidth?: number }
 
+// 사이트 설정(사이드바)과 동일한 모양 — 톱니바퀴, 설정 용도로 재사용
+export function IconSettings({ size = 16, color = 'currentColor', strokeWidth = 2 }: IconProps) {
+  return (
+    <svg width={size} height={size} fill="none" viewBox="0 0 24 24" stroke={color} strokeWidth={strokeWidth}>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+    </svg>
+  )
+}
+
+// 쿠폰처리/쿠폰함(사이드바)과 동일한 모양 — 쿠폰 용도로 재사용
+export function IconCoupon({ size = 16, color = 'currentColor', strokeWidth = 2 }: IconProps) {
+  return (
+    <svg width={size} height={size} fill="none" viewBox="0 0 24 24" stroke={color} strokeWidth={strokeWidth}>
+      <path d="M9 5H4a1 1 0 00-1 1v3a2 2 0 010 4v3a1 1 0 001 1h5m0-12h11a1 1 0 011 1v3a2 2 0 000 4v3a1 1 0 01-1 1H9m0-12v12" />
+    </svg>
+  )
+}
+
 // 공지사항(사이드바)과 동일한 모양 — 공지/알림 용도로 재사용
 export function IconBell({ size = 16, color = 'currentColor', strokeWidth = 2 }: IconProps) {
   return (
@@ -92,6 +111,22 @@ export function IconClock({ size = 16, color = 'currentColor', strokeWidth = 2 }
   return (
     <svg width={size} height={size} fill="none" viewBox="0 0 24 24" stroke={color} strokeWidth={strokeWidth}>
       <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3.5 2" />
+    </svg>
+  )
+}
+
+export function IconFire({ size = 16, color = 'currentColor', strokeWidth = 2 }: IconProps) {
+  return (
+    <svg width={size} height={size} fill="none" viewBox="0 0 24 24" stroke={color} strokeWidth={strokeWidth}>
+      <path d="M12 22c4.5 0 7-2.7 7-6.5 0-3-1.8-4.9-3-7-.3 2-1.3 3-2 3 .5-3 0-5.5-3-8-.3 3-1.5 4.7-3 6.2C6.6 11 5 12.8 5 15.5 5 19.3 7.5 22 12 22z" />
+    </svg>
+  )
+}
+
+export function IconAlertTriangle({ size = 16, color = 'currentColor', strokeWidth = 2 }: IconProps) {
+  return (
+    <svg width={size} height={size} fill="none" viewBox="0 0 24 24" stroke={color} strokeWidth={strokeWidth}>
+      <path d="M12 3.5L22 20H2L12 3.5z" strokeLinejoin="round" /><path d="M12 10v4" /><path d="M12 17h.01" />
     </svg>
   )
 }

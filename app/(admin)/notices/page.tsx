@@ -36,23 +36,23 @@ const EMPTY = {
 }
 
 /* ── 공통 스타일 상수 (v18 CSS 변수 기반) ── */
-const navy    = '#0D2A5E'
-const navyDk  = '#071A3E'
-const navyLt  = '#1A4080'
-const navyMuted = '#E8EEF8'
-const gold    = '#D87E13'
-const goldLt  = '#F09830'
-const goldPale = '#FEF3E2'
-const bg      = '#F5F7FA'
+const navy    = 'var(--ui-primary)'
+const navyDk  = 'var(--ui-primary-text)'
+const navyLt  = 'var(--ui-primary)'
+const navyMuted = 'var(--ui-surface-2)'
+const gold    = 'var(--ui-primary)'
+const goldLt  = 'var(--ui-primary-hover)'
+const goldPale = 'var(--ui-surface-2)'
+const bg      = 'var(--ui-bg)'
 const sf      = '#FFFFFF'
-const bd      = '#DDE3EE'
-const tx      = '#0D1B36'
-const tx2     = '#4B5C7E'
-const tx3     = '#96A4BF'
-const re      = '#C0392B'
-const rbg     = '#FDECEA'
-const gbg     = '#E0F5EB'
-const gr      = '#1A7F4E'
+const bd      = 'var(--ui-border)'
+const tx      = 'var(--ui-text)'
+const tx2     = 'var(--ui-text-2)'
+const tx3     = 'var(--ui-text-3)'
+const re      = 'var(--ui-danger)'
+const rbg     = 'var(--ui-danger-bg)'
+const gbg     = 'var(--ui-success-bg)'
+const gr      = 'var(--ui-success)'
 
 export default function NoticesPage() {
   const { teacher, role } = useAuth()
@@ -707,9 +707,9 @@ function BoardRow({ notice, index, pinned, canWrite, mobile, visLabel, onClick, 
   notice: Notice; index: number | string; pinned: boolean; canWrite: boolean; mobile?: boolean; visLabel: string
   onClick: () => void; onEdit: () => void; onDelete: () => void; isLast: boolean
 }) {
-  const navy = '#0D2A5E', gold = '#D87E13', bd = '#DDE3EE'
-  const tx = '#0D1B36', tx2 = '#4B5C7E', tx3 = '#96A4BF'
-  const re = '#C0392B', rbg = '#FDECEA', gr = '#1A7F4E', gbg = '#E0F5EB', navyM = '#E8EEF8'
+  const navy = 'var(--ui-primary)', gold = 'var(--ui-primary)', bd = 'var(--ui-border)'
+  const tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)'
+  const re = 'var(--ui-danger)', rbg = 'var(--ui-danger-bg)', gr = 'var(--ui-success)', gbg = 'var(--ui-success-bg)', navyM = 'var(--ui-surface-2)'
 
   function isNew(createdAt: string) {
     return Date.now() - new Date(createdAt).getTime() < 24 * 60 * 60 * 1000
@@ -725,7 +725,7 @@ function BoardRow({ notice, index, pinned, canWrite, mobile, visLabel, onClick, 
         onClick={onClick}
         style={{
           padding: '13px 15px', cursor: 'pointer',
-          background: pinned ? '#FEFAF3' : '#fff',
+          background: pinned ? 'var(--ui-info-bg)' : '#fff',
           borderBottom: isLast ? 'none' : `1px solid ${bd}`,
         }}
       >
@@ -764,7 +764,7 @@ function BoardRow({ notice, index, pinned, canWrite, mobile, visLabel, onClick, 
       style={{
         display: 'grid', gridTemplateColumns: '60px 1fr 100px 90px 112px', gap: 10,
         padding: '13px 18px', alignItems: 'center', cursor: 'pointer',
-        background: pinned ? '#FEFAF3' : '#fff',
+        background: pinned ? 'var(--ui-info-bg)' : '#fff',
         borderBottom: isLast ? 'none' : `1px solid ${bd}`,
         position: 'relative',
       }}

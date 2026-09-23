@@ -21,9 +21,9 @@ type SpecialClass = {
 
 const EMPTY = { title: '', subtitle: '', description: '', period: '', target: '', capacity: '', is_active: true, sort_order: 0 }
 
-const navy = '#0D2A5E', navyDk = '#071A3E', gold = '#D87E13'
-const bg = '#F5F7FA', bd = '#DDE3EE', tx = '#0D1B36', tx2 = '#4B5C7E', tx3 = '#96A4BF'
-const re = '#C0392B', rbg = '#FDECEA', gr = '#1A7F4E', gbg = '#E0F5EB'
+const navy = 'var(--ui-primary)', navyDk = 'var(--ui-primary-text)', gold = 'var(--ui-primary)'
+const bg = 'var(--ui-bg)', bd = 'var(--ui-border)', tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)'
+const re = 'var(--ui-danger)', rbg = 'var(--ui-danger-bg)', gr = 'var(--ui-success)', gbg = 'var(--ui-success-bg)'
 
 export default function SpecialClassesPage() {
   const { role } = useAuth()

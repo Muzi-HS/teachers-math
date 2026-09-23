@@ -7,10 +7,10 @@ import TimeSlotInput from '@/components/TimeSlotInput'
 import { IconX } from '@/components/icons'
 import { useMobileMode } from '@/context/MobileModeContext'
 
-const navy='#0D2A5E', bg='#F5F7FA', bd='#DDE3EE'
-const tx='#0D1B36', tx2='#4B5C7E', tx3='#96A4BF'
-const re='#C0392B', rbg='#FDECEA', gr='#1A7F4E', gbg='#E0F5EB'
-const gold='#D87E13', goldPale='#FEF3E2'
+const navy='var(--ui-primary)', bg='var(--ui-bg)', bd='var(--ui-border)'
+const tx='var(--ui-text)', tx2='var(--ui-text-2)', tx3='var(--ui-text-3)'
+const re='var(--ui-danger)', rbg='var(--ui-danger-bg)', gr='var(--ui-success)', gbg='var(--ui-success-bg)'
+const gold='var(--ui-primary)', goldPale='var(--ui-surface-2)'
 
 type Slot = { in: string; out: string }
 type Log = {
@@ -181,7 +181,7 @@ export default function AttendancePage() {
           {label:'승인된 총 근무시간', val:fmtHours(totalMin||null)},
           {label:'승인 대기', val:`${pendingCnt}건`, warn:pendingCnt>0},
         ].map(({label,val,warn})=>(
-          <div key={label} style={{background:'#fff',borderRadius:12,border:`1px solid ${warn?re+'55':bd}`,padding:'14px 16px',boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
+          <div key={label} style={{background:'#fff',borderRadius:12,border:`1px solid ${warn?'var(--ui-danger-border)':bd}`,padding:'14px 16px',boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
             <p style={{fontSize:11,color:warn?re:tx3,marginBottom:6,fontWeight:warn?600:400}}>{label}</p>
             <p style={{fontSize:22,fontWeight:700,color:warn?re:navy,margin:0}}>{val}</p>
           </div>

@@ -49,6 +49,9 @@ export const can = {
 
   // 상담 신청 내역 열람/처리 — admin만
   manageConsultations: (role: Role) => role === 'admin',
+
+  // 사이트 설정(계절 효과 등) 관리 — admin만
+  manageSiteSettings: (role: Role) => role === 'admin',
 }
 
 // 메뉴 항목별 접근 가능 여부 (사이드바 렌더링 및 라우트 가드용)
@@ -75,4 +78,8 @@ export const menuAccess: Record<string, (role: Role) => boolean> = {
   'special-classes': (r) => r === 'admin',
   // 상담 신청 내역 — admin만
   consultations: (r) => r === 'admin',
+  // 사이트 설정(계절 효과 등) — admin만
+  'site-settings': (r) => r === 'admin',
+  // 접속 분석(일일/월별 방문량 등) — admin만
+  analytics: (r) => r === 'admin',
 }

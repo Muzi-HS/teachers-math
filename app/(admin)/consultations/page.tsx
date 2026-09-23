@@ -17,8 +17,8 @@ type ConsultationRequest = {
   created_at: string
 }
 
-const navy = '#0D2A5E', bg = '#F5F7FA', bd = '#DDE3EE', tx = '#0D1B36', tx2 = '#4B5C7E', tx3 = '#96A4BF'
-const re = '#C0392B', rbg = '#FDECEA', gr = '#1A7F4E', gbg = '#E0F5EB', navyMuted = '#E8EEF8'
+const navy = 'var(--ui-primary)', bg = 'var(--ui-bg)', bd = 'var(--ui-border)', tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)'
+const re = 'var(--ui-danger)', rbg = 'var(--ui-danger-bg)', gr = 'var(--ui-success)', gbg = 'var(--ui-success-bg)', navyMuted = 'var(--ui-surface-2)'
 
 const STATUS_LABEL: Record<ConsultationRequest['status'], string> = { new: '신규', contacted: '연락함', done: '완료' }
 const STATUS_COLOR: Record<ConsultationRequest['status'], { bg: string; color: string }> = {

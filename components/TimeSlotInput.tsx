@@ -1,7 +1,7 @@
 'use client'
 import type { CSSProperties } from 'react'
 
-const bd = '#DDE3EE', tx = '#0D1B36'
+const bd = 'var(--ui-border)', tx = 'var(--ui-text)'
 
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
 const MINUTES = ['00', '10', '20', '30', '40', '50']

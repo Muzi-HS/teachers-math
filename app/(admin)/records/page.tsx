@@ -30,18 +30,18 @@ type Rec = {
   }[]
 }
 
-const navy = '#0D2A5E', navyDk = '#071A3E', navyM = '#E8EEF8'
-const gold = '#D87E13', goldL = '#F09830'
-const hlYellow = '#F2B705' // 학부모 의견 카드 강조 테두리색
-const bg = '#F5F7FA', bd = '#DDE3EE'
-const tx = '#0D1B36', tx2 = '#4B5C7E', tx3 = '#96A4BF'
-const re = '#C0392B', rbg = '#FDECEA', gr = '#1A7F4E', gbg = '#E0F5EB'
+const navy = 'var(--ui-primary)', navyDk = 'var(--ui-primary-text)', navyM = 'var(--ui-surface-2)'
+const gold = 'var(--ui-primary)', goldL = 'var(--ui-primary-hover)'
+const hlYellow = 'var(--ui-info-border)' // 학부모 의견은 선택/완료와 별도 색으로 구분
+const bg = 'var(--ui-bg)', bd = 'var(--ui-border)'
+const tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)'
+const re = 'var(--ui-danger)', rbg = 'var(--ui-danger-bg)', gr = 'var(--ui-success)', gbg = 'var(--ui-success-bg)'
 const DOW = ['일', '월', '화', '수', '목', '금', '토']
 
-function rateColor(v: number) { return v >= 80 ? '#1A7F4E' : v >= 60 ? '#C05621' : '#C0392B' }
-function rateBg(v: number) { return v >= 80 ? '#E0F5EB' : v >= 60 ? '#FEF3E2' : '#FDECEA' }
-function attColor(v: number) { return v >= 8 ? '#1A7F4E' : v >= 5 ? '#C05621' : '#C0392B' }
-function attBg(v: number) { return v >= 8 ? '#E0F5EB' : v >= 5 ? '#FEF3E2' : '#FDECEA' }
+function rateColor(v: number) { return v >= 80 ? 'var(--ui-success)' : v >= 60 ? 'var(--ui-warning)' : 'var(--ui-danger)' }
+function rateBg(v: number) { return v >= 80 ? 'var(--ui-success-bg)' : v >= 60 ? 'var(--ui-warning-bg)' : 'var(--ui-danger-bg)' }
+function attColor(v: number) { return v >= 8 ? 'var(--ui-success)' : v >= 5 ? 'var(--ui-warning)' : 'var(--ui-danger)' }
+function attBg(v: number) { return v >= 8 ? 'var(--ui-success-bg)' : v >= 5 ? 'var(--ui-warning-bg)' : 'var(--ui-danger-bg)' }
 function attLabel(v: number) { return v >= 8 ? '우수' : v >= 5 ? '보통' : '노력필요' }
 // 개별 기록의 공개/읽음 상태. 반별 미발송 여부는 일괄 발송 이력으로 판단한다.
 function recordStatus(r: { released_to_parent: boolean; viewed_at: string | null }) {
@@ -537,22 +537,22 @@ export default function RecordsPage() {
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
     .ll-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-top:8px;}
     .ll-dow{text-align:center;font-size:10px;font-weight:600;padding:4px 0;}
-    .ll-day{text-align:center;padding:6px 2px;border-radius:6px;cursor:pointer;font-size:12px;color:${tx};position:relative;transition:background .15s;}
+    .ll-day{text-align:center;padding:6px 2px;border:0;background:transparent;font-family:inherit;border-radius:6px;cursor:pointer;font-size:12px;color:${tx};position:relative;transition:background .15s;min-height:34px;}
     .ll-day:hover{background:${navyM};}
-    .ll-day.today{font-weight:700;background:${navy};color:#fff;}
-    .ll-day.selected{background:${gold};color:#fff;font-weight:700;}
+    .ll-day.today{font-weight:700;box-shadow:inset 0 0 0 1px ${navy};}
     .ll-day.sunday{color:${re};}
     .ll-day.saturday{color:${navy};}
+    .ll-day.selected{background:${navy};color:var(--ui-primary-text);font-weight:700;}
     .ll-day.other-month{color:${tx3};opacity:.4;cursor:default;}
     .ll-dot{width:4px;height:4px;border-radius:50%;background:${gold};margin:2px auto 0;}
-    .ll-day.today .ll-dot,.ll-day.selected .ll-dot{background:#fff;}
+    .ll-day.selected .ll-dot{background:#fff;}
     .ll-dot-comment{position:absolute;top:2px;right:4px;width:6px;height:6px;border-radius:50%;background:${re};border:1.5px solid #fff;}
     .rc{background:#fff;border:1px solid ${bd};border-radius:10px;padding:16px;margin-bottom:10px;min-width:0;box-sizing:border-box;}
     .rch{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid ${bd};}
     .pb{height:6px;background:${bd};border-radius:99px;flex:1;}
     .pf{height:100%;border-radius:99px;}
-    .fb{background:rgba(13,42,94,.05);border-left:3px solid ${navy};border-radius:0 8px 8px 0;padding:10px 12px;margin-top:10px;}
-    .pc{background:rgba(216,126,19,.07);border-left:3px solid ${gold};border-radius:0 8px 8px 0;padding:10px 12px;margin-top:10px;}
+    .fb{background:var(--ui-bg);border-left:3px solid ${navy};border-radius:0 8px 8px 0;padding:10px 12px;margin-top:10px;}
+    .pc{background:var(--ui-info-bg);border-left:3px solid var(--ui-info);border-radius:0 8px 8px 0;padding:10px 12px;margin-top:10px;}
     .sav{width:34px;height:34px;border-radius:50%;background:${navyM};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:${navy};flex-shrink:0;}
     .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;}
     .bgrn{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;background:${gr};color:#fff;font-family:inherit;}
@@ -618,9 +618,9 @@ export default function RecordsPage() {
         {/* 달력 */}
         <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: mobileMode ? 14 : 18, boxShadow: '0 1px 4px rgba(0,0,0,.06)', minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-            <button className={mobileMode ? 'll-nav' : 'bout'} onClick={() => moveLLCal(-1)}>{mobileMode ? '‹' : '◀'}</button>
+            <button aria-label="이전 달" className={mobileMode ? 'll-nav' : 'bout'} onClick={() => moveLLCal(-1)}>{mobileMode ? '‹' : '◀'}</button>
             <span style={{ fontSize: 14, fontWeight: 700, color: tx }}>{llYear}년 {llMonth + 1}월</span>
-            <button className={mobileMode ? 'll-nav' : 'bout'} onClick={() => moveLLCal(1)}>{mobileMode ? '›' : '▶'}</button>
+            <button aria-label="다음 달" className={mobileMode ? 'll-nav' : 'bout'} onClick={() => moveLLCal(1)}>{mobileMode ? '›' : '▶'}</button>
           </div>
           <div className="ll-grid">
             {DOW.map((d, i) => (
@@ -643,11 +643,11 @@ export default function RecordsPage() {
               if (dow === 0) cls += ' sunday'
               if (dow === 6) cls += ' saturday'
               return (
-                <div key={day} className={cls} onClick={() => selectDate(dt)} title={hasUnreadComment ? '확인하지 않은 학부모 의견이 있습니다' : undefined}>
+                <button key={day} className={cls} aria-pressed={isSel} aria-label={`${llMonth + 1}월 ${day}일${hasRec ? ', 수업기록 있음' : ''}${hasUnreadComment ? ', 미확인 학부모 의견 있음' : ''}`} onClick={() => selectDate(dt)} title={hasUnreadComment ? '확인하지 않은 학부모 의견이 있습니다' : undefined}>
                   {day}
-                  {hasRec && <div className="ll-dot" />}
-                  {hasUnreadComment && <div className="ll-dot-comment" />}
-                </div>
+                  {hasRec && <span className="ll-dot" style={{ display: 'block' }} />}
+                  {hasUnreadComment && <span className="ll-dot-comment" />}
+                </button>
               )
             })}
             {Array.from({ length: trail }).map((_, i) => (
@@ -694,7 +694,7 @@ export default function RecordsPage() {
                     <span style={{ fontSize: 13, fontWeight: 700, color: navy }}>{clsG?.name ?? '반 미지정'}</span>
                     <span className="badge" style={{ background: navyM, color: navy }}>{clsRecs.length}명</span>
                     {bulkStatusReady && !bulkSendState.clicked.has(recClsId(clsRecs[0]) ?? 0) && (
-                      <span className="badge" style={{ background: '#FEF3E2', color: gold }}>
+                      <span className="badge" style={{ background: 'var(--ui-warning-bg)', color: gold }}>
                         일괄 발송 전
                       </span>
                     )}
@@ -743,7 +743,7 @@ export default function RecordsPage() {
                       </div>
                       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                         {!r.released_to_parent && (
-                          <button className="bout" style={{ color: gr, borderColor: gr + '66', whiteSpace: 'nowrap' }}
+                      <button className="bout" style={{ color: gr, borderColor: 'var(--ui-success-border)', whiteSpace: 'nowrap' }}
                             disabled={pushing || pushingOneId !== null}
                             onClick={() => sendPushOne(r.id)}>
                             {pushingOneId === r.id ? '발송 중...' : '개별 발송'}
@@ -973,8 +973,8 @@ function TestResultCard({ testName, score, cor, total, pct, testId }: {
   testName: string; score: number; cor: number; total: number; pct: number; testId: number
 }) {
   const [stats, setStats] = useState<{ avg: number; max: number; rank: number; totalCnt: number } | null>(null)
-  const navy='#0D2A5E', tx='#0D1B36', tx2='#4B5C7E', tx3='#96A4BF', bd='#DDE3EE'
-  const gr='#1A7F4E', re='#C0392B', gbg='#E0F5EB'
+  const navy='var(--ui-primary)', tx='var(--ui-text)', tx2='var(--ui-text-2)', tx3='var(--ui-text-3)', bd='var(--ui-border)'
+  const gr='var(--ui-success)', re='var(--ui-danger)', gbg='var(--ui-success-bg)'
 
   useEffect(() => {
     async function load() {

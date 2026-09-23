@@ -6,10 +6,10 @@ import { IconSend } from '@/components/icons'
 
 type Notice = { id: number; content: string; created_at: string }
 
-const navy = '#0D2A5E', gold = '#D87E13'
-const bg = '#F5F7FA', bd = '#DDE3EE'
-const tx = '#0D1B36', tx2 = '#4B5C7E', tx3 = '#96A4BF'
-const re = '#C0392B'
+const navy = 'var(--ui-primary)', gold = 'var(--ui-primary)'
+const bg = 'var(--ui-bg)', bd = 'var(--ui-border)'
+const tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)'
+const re = 'var(--ui-danger)'
 
 // 반관리 > 반 상세에서 여는 "공지하기" — 관리자/선생님이 반 전체 학생 계정에
 // 채팅 형식으로 일방향 공지를 보낸다. 학생 쪽(/student/notices)은 이 내용을
@@ -124,7 +124,7 @@ export default function ClassNoticeModal({
             style={{ flex: 1, padding: '10px 12px', border: `1.5px solid ${bd}`, borderRadius: 8, fontSize: 13, fontFamily: 'inherit', color: tx, outline: 'none', resize: 'none', boxSizing: 'border-box' }}
           />
           <button onClick={send} disabled={sending || !draft.trim()} style={{
-            flexShrink: 0, width: 40, height: 40, borderRadius: 8, border: 'none', background: gold, color: '#071A3E',
+            flexShrink: 0, width: 40, height: 40, borderRadius: 8, border: 'none', background: gold, color: 'var(--ui-primary-text)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: sending || !draft.trim() ? 'not-allowed' : 'pointer',
             opacity: sending || !draft.trim() ? .6 : 1,
           }}>

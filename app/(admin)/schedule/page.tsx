@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { can, Role } from '@/lib/permissions'
@@ -43,19 +43,19 @@ const BLANK: FormState = {
     parent_visible: true, memo: '', useTime: false,
 }
 
-const navy = '#0D2A5E'
-const navyDk = '#071A3E'
-const navyM = '#E8EEF8'
-const gold = '#D87E13'
-const goldL = '#F09830'
-const bg = '#F5F7FA'
-const bd = '#DDE3EE'
-const tx = '#0D1B36'
-const tx2 = '#4B5C7E'
-const tx3 = '#96A4BF'
-const re = '#C0392B'
-const rbg = '#FDECEA'
-const gr = '#1A7F4E'
+const navy = 'var(--ui-primary)'
+const navyDk = 'var(--ui-primary-text)'
+const navyM = 'var(--ui-surface-2)'
+const gold = 'var(--ui-primary)'
+const goldL = 'var(--ui-primary-hover)'
+const bg = 'var(--ui-bg)'
+const bd = 'var(--ui-border)'
+const tx = 'var(--ui-text)'
+const tx2 = 'var(--ui-text-2)'
+const tx3 = 'var(--ui-text-3)'
+const re = 'var(--ui-danger)'
+const rbg = 'var(--ui-danger-bg)'
+const gr = 'var(--ui-success)'
 
 const DOW = ['일', '월', '화', '수', '목', '금', '토']
 
@@ -73,6 +73,9 @@ export default function SchedulePage() {
     const [notif, setNotif] = useState<{ msg: string; ok: boolean } | null>(null)
     const [attNotices, setAttNotices] = useState<AttNotice[]>([])
     const [studentsMap, setStudentsMap] = useState<Record<number, string>>({})
+    const [selectedDate, setSelectedDate] = useState<string | null>(null)
+    const [loadError, setLoadError] = useState(false)
+    const loadVersion = useRef(0)
 
     useEffect(() => { load() }, [yr, mo])
     useEffect(() => { fetchStudents() }, [])
@@ -85,7 +88,11 @@ export default function SchedulePage() {
     }
 
     async function load() {
+        const version = ++loadVersion.current
         setLoading(true)
+        setLoadError(false)
+        setEvts([])
+        setAttNotices([])
 
         const ym = `${yr}-${String(mo + 1).padStart(2, '0')}`
         const from = `${ym}-01`
@@ -94,30 +101,23 @@ export default function SchedulePage() {
         const lastDay = new Date(yr, mo + 1, 0).getDate()
         const to = `${ym}-${String(lastDay).padStart(2, '0')}`
 
-        // ① 이번달에 시작하는 이벤트
-        const { data: A } = await supabase
-            .from('events').select('*')
-            .gte('start_date', from)
-            .lte('start_date', to)
-
-        // ② start_date < from 이면서 end_date >= from 인 이벤트 (이번달에 걸침)
-        const { data: B } = await supabase
-            .from('events').select('*')
-            .lt('start_date', from)
-            .gte('end_date', from)
-
-        // 합치고 중복 제거
-        const map = new Map<number, Evt>()
-        for (const e of [...(A ?? []), ...(B ?? [])]) map.set(e.id, e)
-        setEvts([...map.values()].sort((a, b) => a.start_date.localeCompare(b.start_date)))
-
-        // 학부모가 등록한 결석/지각
-        const { data: N } = await supabase
-            .from('attendance_notices').select('*')
-            .gte('date', from).lte('date', to)
-        setAttNotices(N ?? [])
-
-        setLoading(false)
+        try {
+            const [starts, overlaps, notices] = await Promise.all([
+                supabase.from('events').select('*').gte('start_date', from).lte('start_date', to),
+                supabase.from('events').select('*').lt('start_date', from).gte('end_date', from),
+                supabase.from('attendance_notices').select('*').gte('date', from).lte('date', to),
+            ])
+            if (version !== loadVersion.current) return
+            if (starts.error || overlaps.error || notices.error) throw new Error('schedule-load')
+            const map = new Map<number, Evt>()
+            for (const event of [...(starts.data ?? []), ...(overlaps.data ?? [])]) map.set(event.id, event)
+            setEvts([...map.values()].sort((a, b) => a.start_date.localeCompare(b.start_date) || (a.start_time ?? '').localeCompare(b.start_time ?? '')))
+            setAttNotices(notices.data ?? [])
+        } catch {
+            if (version === loadVersion.current) setLoadError(true)
+        } finally {
+            if (version === loadVersion.current) setLoading(false)
+        }
     }
 
     function toast(msg: string, ok = true) {
@@ -151,6 +151,8 @@ export default function SchedulePage() {
     async function save() {
         if (!form.title.trim()) return toast('제목을 입력하세요.', false)
         if (!form.start_date) return toast('시작 날짜를 입력하세요.', false)
+        if (form.end_date && form.end_date < form.start_date) return toast('종료 날짜는 시작 날짜 이후로 선택해주세요.', false)
+        if (form.useTime && (!form.end_date || form.end_date === form.start_date) && form.start_time && form.end_time && form.end_time <= form.start_time) return toast('종료 시간은 시작 시간 이후로 선택해주세요.', false)
         setSaving(true)
         const row = {
             title: form.title,
@@ -175,8 +177,9 @@ export default function SchedulePage() {
     async function del(id: number, ev: React.MouseEvent) {
         ev.stopPropagation()
         if (!confirm('삭제하시겠습니까?')) return
-        await supabase.from('events').delete().eq('id', id)
-        toast('삭제되었습니다.', false)
+        const { error } = await supabase.from('events').delete().eq('id', id)
+        if (error) return toast('삭제하지 못했습니다. 다시 시도해주세요.', false)
+        toast('삭제되었습니다.')
         await load()
     }
 
@@ -184,7 +187,7 @@ export default function SchedulePage() {
         let m = mo + d, y = yr
         if (m < 0) { m = 11; y-- }
         if (m > 11) { m = 0; y++ }
-        setMo(m); setYr(y)
+        setMo(m); setYr(y); setSelectedDate(null)
     }
 
     const today = kstNow()
@@ -205,44 +208,56 @@ export default function SchedulePage() {
     function dayNotices(ds: string) {
         return attNotices.filter(n => n.date === ds)
     }
+    const visibleEvents = selectedDate ? dayEvts(selectedDate) : evts
+    const visibleNotices = selectedDate ? dayNotices(selectedDate) : attNotices
+    const listTitle = selectedDate ? `${Number(selectedDate.slice(5, 7))}월 ${Number(selectedDate.slice(8))}일` : `${mo + 1}월 전체`
 
     return (
-        <div style={{ padding: mobileMode ? '16px 14px 88px' : '28px 32px', fontFamily: "'Noto Sans KR',sans-serif" }}>
+        <div className="schedule-page" style={{ padding: mobileMode ? '16px 14px 88px' : '28px 32px', fontFamily: "'Noto Sans KR',sans-serif" }}>
             <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
-        .cd{min-height:${mobileMode ? 46 : 72}px;background:#fff;border:1px solid ${bd};border-radius:8px;padding:${mobileMode ? '3px' : '6px'};cursor:pointer;transition:background .15s;}
-        .cd:hover{background:rgba(13,42,94,.03);}
-        .cd.tod{border-color:${navy};background:${navyM};}
-        .cd.om{opacity:.4;cursor:default;}
-        .cd.om:hover{background:#fff;}
-        .cd.hol{background:rgba(222,53,11,.05);}
+        .schedule-page .cd{min-height:${mobileMode ? 46 : 72}px;background:#fff;border:1px solid ${bd};border-radius:8px;padding:${mobileMode ? '3px' : '6px'};cursor:pointer;transition:background .15s;}
+        .schedule-page .cd:hover{background:var(--ui-hover);}
+        .schedule-page .cd.tod{border-color:${navy};background:${navyM};}
+        .schedule-page .cd.om{opacity:.4;cursor:default;}
+        .schedule-page .cd.om:hover{background:#fff;}
+        .schedule-page .cd.hol{background:rgba(222,53,11,.05);}
         ${mobileMode ? `
         /* 학부모 학원일정 캘린더와 동일하게 — 흰 박스/테두리 없는 플랫한 셀 디자인 */
-        .cd{background:none;border:none;border-radius:8px;}
-        .cd:hover{background:rgba(13,42,94,.03);}
-        .cd.tod{border-color:transparent;}
-        .cd.om:hover{background:none;}
-        .cd.hol{background:none;}
-        .bnav{border:none;background:none;color:${tx2};font-size:18px;padding:4px 10px;}
-        .bnav:hover{color:${navy};}
+        .schedule-page .cd{background:none;border:none;border-radius:8px;}
+        .schedule-page .cd:hover{background:var(--ui-hover);}
+        .schedule-page .cd.tod{border-color:transparent;}
+        .schedule-page .cd.om:hover{background:none;}
+        .schedule-page .cd.hol{background:none;}
+        .schedule-page .bnav{border:none;background:none;color:${tx2};font-size:18px;padding:4px 10px;}
+        .schedule-page .bnav:hover{color:${navy};}
         ` : ''}
-        .ce{font-size:10px;padding:1px 5px;border-radius:3px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}
-        .ce.normal{background:${navyM};color:${navy};}
-        .ce.holiday{background:rgba(222,53,11,.15);color:${re};}
-        .ce.absence{background:#F3E7E4;color:#A85D52;font-weight:700;cursor:default;}
-        .ce.late{background:#F3ECDD;color:#A67C3D;font-weight:700;cursor:default;}
-        .bgold{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:none;background:${gold};color:${navyDk};font-family:inherit;}
-        .bgold:hover{background:${goldL};}
-        .bout{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid ${bd};background:transparent;color:${tx2};font-family:inherit;}
-        .bout:hover{border-color:${navy};color:${navy};}
-        .bsm{display:inline-flex;align-items:center;padding:3px 9px;border-radius:6px;font-size:11px;cursor:pointer;border:1px solid ${bd};background:transparent;color:${tx2};font-family:inherit;}
-        .bdng{display:inline-flex;align-items:center;padding:3px 9px;border-radius:6px;font-size:11px;cursor:pointer;border:none;background:${rbg};color:${re};font-family:inherit;}
-        .bnav{padding:5px 12px;border-radius:8px;font-size:12px;border:1px solid ${bd};background:#fff;cursor:pointer;color:${tx2};font-family:inherit;}
-        .fi{width:100%;padding:9px 11px;border:1.5px solid ${bd};border-radius:8px;font-size:13px;font-family:inherit;color:${tx};outline:none;background:#fff;transition:border-color .2s;box-sizing:border-box;}
-        .fi:focus{border-color:${navy};}
-        .rr{display:flex;gap:16px;margin-top:6px;}
-        .rr label{display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;}
-        .lb{display:block;font-size:12px;font-weight:500;color:${tx2};margin-bottom:5px;}
+        .schedule-page .ce{display:flex;align-items:center;gap:4px;width:100%;min-width:0;border:0;text-align:left;font-family:inherit;font-size:11px;line-height:1.5;padding:3px 5px;border-radius:4px;margin-bottom:3px;cursor:pointer;}
+        .schedule-page .ce > svg{display:block;flex:0 0 auto;}
+        .schedule-page .ce > span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+        .schedule-page .cd{min-width:0;position:relative;}
+        .schedule-page .cd.selected{border-color:var(--ui-primary);box-shadow:inset 0 0 0 1px var(--ui-primary);background:var(--ui-bg);}
+        .schedule-page .day-select{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:28px;background:none;border:0;border-radius:4px;color:inherit;font:inherit;text-align:left;cursor:pointer;margin-bottom:3px;}
+        .schedule-page .day-select:focus-visible{outline-offset:-2px;}
+        .schedule-page .calendar-more{display:block;width:100%;border:0;background:none;color:var(--ui-primary);font-size:11px;padding:4px 0;text-align:left;cursor:pointer;}
+        .schedule-page .calendar-tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+        @media(max-width:700px){.schedule-page{padding:16px 12px 88px !important;}.schedule-page .ce{font-size:10px;padding:2px;gap:2px;}.schedule-page .ce > svg{width:10px;height:10px;}}
+        .schedule-page .ce.normal{background:${navyM};color:${navy};}
+        .schedule-page .ce.holiday{background:rgba(222,53,11,.15);color:${re};}
+        .schedule-page .ce.absence{background:var(--ui-danger-bg);color:var(--ui-danger);font-weight:600;cursor:pointer;}
+        .schedule-page .ce.late{background:var(--ui-warning-bg);color:var(--ui-warning);font-weight:600;cursor:pointer;}
+        .schedule-page .bgold{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:none;background:${gold};color:${navyDk};font-family:inherit;}
+        .schedule-page .bgold:hover{background:${goldL};}
+        .schedule-page .bout{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid ${bd};background:transparent;color:${tx2};font-family:inherit;}
+        .schedule-page .bout:hover{border-color:${navy};color:${navy};}
+        .schedule-page .bsm{display:inline-flex;align-items:center;padding:3px 9px;border-radius:6px;font-size:11px;cursor:pointer;border:1px solid ${bd};background:transparent;color:${tx2};font-family:inherit;}
+        .schedule-page .bdng{display:inline-flex;align-items:center;padding:3px 9px;border-radius:6px;font-size:11px;cursor:pointer;border:none;background:${rbg};color:${re};font-family:inherit;}
+        .schedule-page .bnav{padding:5px 12px;border-radius:8px;font-size:12px;border:1px solid ${bd};background:#fff;cursor:pointer;color:${tx2};font-family:inherit;}
+        .schedule-page .fi{width:100%;padding:9px 11px;border:1.5px solid ${bd};border-radius:8px;font-size:13px;font-family:inherit;color:${tx};outline:none;background:#fff;transition:border-color .2s;box-sizing:border-box;}
+        .schedule-page .fi:focus{border-color:${navy};}
+        .schedule-page .rr{display:flex;gap:16px;margin-top:6px;}
+        .schedule-page .rr label{display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;}
+        .schedule-page .lb{display:block;font-size:12px;font-weight:500;color:${tx2};margin-bottom:5px;}
       `}</style>
 
             {notif && (
@@ -256,10 +271,10 @@ export default function SchedulePage() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: mobileMode ? 14 : 20, flexWrap: 'wrap', gap: 10 }}>
                 <div>
                     <h1 style={{ fontSize: mobileMode ? 17 : 21, fontWeight: 700, color: tx }}>학원 일정</h1>
-                    {!mobileMode && <p style={{ fontSize: 13, color: tx2, marginTop: 4 }}>달력에서 일정을 확인하고 추가하세요</p>}
+                    {!mobileMode && <p style={{ fontSize: 13, color: tx2, marginTop: 4 }}>날짜를 선택하면 일정과 결석·지각을 함께 확인할 수 있습니다</p>}
                 </div>
                 {canWrite && (
-                    <button className="bgold" onClick={() => openAdd()}>
+                    <button className="bgold" onClick={() => openAdd(selectedDate ?? kstDateStr())}>
                         <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth={2} d="M12 5v14M5 12h14" /></svg>
                         일정 추가
                     </button>
@@ -267,11 +282,19 @@ export default function SchedulePage() {
             </div>
 
             {/* 달력 */}
+            {loadError && <div role="alert" style={{ background: rbg, color: re, padding: 14, borderRadius: 10, marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                일정을 불러오지 못했습니다.<button className="bout" onClick={load}>다시 불러오기</button>
+            </div>}
             <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: mobileMode ? 12 : 22, boxShadow: '0 1px 4px rgba(0,0,0,.06)', marginBottom: mobileMode ? 12 : 18 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                    <button className="bnav" onClick={() => moveMo(-1)}>{mobileMode ? '‹' : '◀'}</button>
+                    <button className="bnav" aria-label="이전 달" onClick={() => moveMo(-1)}>{mobileMode ? '‹' : '◀'}</button>
                     <span style={{ fontSize: 16, fontWeight: 700, color: tx }}>{yr}년 {mo + 1}월</span>
-                    <button className="bnav" onClick={() => moveMo(1)}>{mobileMode ? '›' : '▶'}</button>
+                    <button className="bnav" aria-label="다음 달" onClick={() => moveMo(1)}>{mobileMode ? '›' : '▶'}</button>
+                </div>
+                <div className="calendar-tools" style={{ marginBottom: 14 }}>
+                    <button className="bout" onClick={() => { const now = kstNow(); setYr(now.getFullYear()); setMo(now.getMonth()); setSelectedDate(kstDateStr()) }}>오늘</button>
+                    <button className="bout" aria-pressed={selectedDate === null} onClick={() => setSelectedDate(null)}>월 전체 보기</button>
+                    <span style={{ fontSize: 12, color: tx2 }} aria-live="polite">{listTitle}{selectedDate ? ' 선택됨' : ''}</span>
                 </div>
 
                 {/* 요일 헤더 */}
@@ -301,43 +324,46 @@ export default function SchedulePage() {
                         let cls = 'cd'
                         if (isTod) cls += ' tod'
                         if (isHol) cls += ' hol'
+                        if (selectedDate === ds) cls += ' selected'
                         const nc = dow === 0 ? re : dow === 6 ? navy : tx
                         const dNotices = dayNotices(ds)
                         return (
-                            <div key={day} className={cls} onClick={() => canWrite && openAdd(ds)}
+                            <div key={day} className={cls} onClick={() => setSelectedDate(ds)}
                                 style={mobileMode ? { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '4px 0 6px' } : undefined}>
-                                <div style={{
+                                <button className="day-select" aria-pressed={selectedDate === ds} aria-label={`${mo + 1}월 ${day}일, 일정 ${de.length}건, 결석·지각 ${dNotices.length}건`} onClick={() => setSelectedDate(ds)}>
+                                <span style={{
                                     fontSize: 12, fontWeight: isTod || isHol ? 700 : 500, marginBottom: mobileMode ? 0 : 2,
                                     color: isHol ? '#fff' : nc,
                                     width: 20, height: 20, lineHeight: '20px', textAlign: 'center',
                                     borderRadius: '50%', background: isHol ? re : 'transparent',
-                                }}>{day}</div>
+                                }}>{day}</span>{isTod && !mobileMode && <span style={{ fontSize: 10, color: navy }}>오늘</span>}
+                                </button>
                                 {mobileMode ? (
-                                    <div style={{ display: 'flex', gap: 2 }}>
+                                    <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', justifyContent: 'center' }}>
                                         {de.slice(0, 3).map(e => (
                                             <div key={'e' + e.id} style={{ width: 4, height: 4, borderRadius: '50%', background: e.type === 'holiday' ? re : navy }} />
                                         ))}
                                         {dNotices.slice(0, 3).map(n => (
-                                            <div key={'n' + n.id} style={{ width: 4, height: 4, borderRadius: '50%', background: n.type === 'absence' ? '#A85D52' : '#A67C3D' }} />
+                                            <div key={'n' + n.id} style={{ width: 4, height: 4, borderRadius: '50%', background: n.type === 'absence' ? 'var(--ui-danger)' : 'var(--ui-warning)' }} />
                                         ))}
                                     </div>
                                 ) : (
                                     <>
-                                        {dNotices.map(n => (
-                                            <div key={'n' + n.id} className={`ce ${n.type}`}
-                                                onClick={ev => ev.stopPropagation()}
+                                        {dNotices.slice(0, 3).map(n => (
+                                            <button key={'n' + n.id} className={`ce ${n.type}`}
+                                                onClick={ev => { ev.stopPropagation(); setSelectedDate(ds) }}
                                                 title={`${n.type === 'absence' ? '결석' : '지각'} 등록 - ${studentsMap[n.student_id] ?? '학생'}${n.reason ? ` (${n.reason})` : ''}`}>
-                                                {n.type === 'late' && <IconClock size={9} strokeWidth={2.5} />} {studentsMap[n.student_id] ?? '학생'} {n.type === 'absence' ? '결석' : '지각'}
-                                            </div>
+                                                {n.type === 'late' && <IconClock size={11} strokeWidth={2} />}<span>{studentsMap[n.student_id] ?? '학생'} · {n.type === 'absence' ? '결석' : '지각'}</span>
+                                            </button>
                                         ))}
-                                        {de.map(e => (
-                                            <div key={e.id} className={`ce ${e.type}`}
-                                                onClick={ev => { ev.stopPropagation(); canWrite && openEdit(e, ev) }}
+                                        {de.slice(0, Math.max(0, 3 - dNotices.length)).map(e => (
+                                            <button key={e.id} className={`ce ${e.type}`}
+                                                onClick={ev => { ev.stopPropagation(); setSelectedDate(ds) }}
                                                 title={e.title + (e.start_time ? ' ' + e.start_time.slice(0, 5) : '')}>
-                                                {e.start_time && <span style={{ opacity: .7, fontSize: 9 }}>{e.start_time.slice(0, 5)} </span>}
-                                                {!e.parent_visible && <IconLock size={9} strokeWidth={2.5} />} {e.title}
-                                            </div>
+                                                {!e.parent_visible && <IconLock size={11} strokeWidth={2} />}<span>{e.start_time ? `${e.start_time.slice(0, 5)} ` : ''}{e.title}</span>
+                                            </button>
                                         ))}
+                                        {de.length + dNotices.length > 3 && <button className="calendar-more" onClick={() => setSelectedDate(ds)}>+{de.length + dNotices.length - 3}건 더보기</button>}
                                     </>
                                 )}
                             </div>
@@ -355,14 +381,14 @@ export default function SchedulePage() {
 
             {/* 이번달 목록 */}
             <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: mobileMode ? 14 : 22, boxShadow: '0 1px 4px rgba(0,0,0,.06)' }}>
-                <h2 style={{ fontSize: 14, fontWeight: 600, color: tx, marginBottom: 14 }}>{mo + 1}월 일정 목록</h2>
+                <h2 style={{ fontSize: 14, fontWeight: 600, color: tx, marginBottom: 14 }}>{listTitle} 일정 목록</h2>
                 {loading ? (
                     <p style={{ color: tx3, fontSize: 13 }}>불러오는 중...</p>
-                ) : evts.length === 0 ? (
+                ) : loadError ? <p style={{ color: re, fontSize: 13 }}>불러오기 실패로 일정을 확인할 수 없습니다.</p> : visibleEvents.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '30px 0', color: tx3 }}>
-                        <p style={{ fontSize: 14 }}>이번달 일정이 없습니다</p>
+                        <p style={{ fontSize: 14 }}>{selectedDate ? '선택한 날짜에' : '이번 달에'} 일정이 없습니다</p>
                     </div>
-                ) : evts.map(e => (
+                ) : visibleEvents.map(e => (
                     <div key={e.id} style={{ padding: '10px 0', borderBottom: `1px solid ${bd}`, display: 'flex', alignItems: 'center', gap: 10, flexWrap: mobileMode ? 'wrap' : 'nowrap' }}>
                         <span style={{
                             fontSize: 10, padding: '2px 7px', borderRadius: 3, flexShrink: 0,
@@ -392,19 +418,19 @@ export default function SchedulePage() {
 
             {/* 이번달 결석·지각 목록 */}
             <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: mobileMode ? 14 : 22, boxShadow: '0 1px 4px rgba(0,0,0,.06)', marginTop: mobileMode ? 12 : 18 }}>
-                <h2 style={{ fontSize: 14, fontWeight: 600, color: tx, marginBottom: 14 }}>{mo + 1}월 결석·지각 목록</h2>
+                <h2 style={{ fontSize: 14, fontWeight: 600, color: tx, marginBottom: 14 }}>{listTitle} 결석·지각 목록</h2>
                 {loading ? (
                     <p style={{ color: tx3, fontSize: 13 }}>불러오는 중...</p>
-                ) : attNotices.length === 0 ? (
+                ) : loadError ? <p style={{ color: re, fontSize: 13 }}>불러오기 실패로 결석·지각을 확인할 수 없습니다.</p> : visibleNotices.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '30px 0', color: tx3 }}>
-                        <p style={{ fontSize: 14 }}>이번달 결석·지각 등록이 없습니다</p>
+                        <p style={{ fontSize: 14 }}>{selectedDate ? '선택한 날짜에' : '이번 달에'} 결석·지각 등록이 없습니다</p>
                     </div>
-                ) : [...attNotices].sort((a, b) => a.date.localeCompare(b.date)).map(n => (
+                ) : [...visibleNotices].sort((a, b) => a.date.localeCompare(b.date)).map(n => (
                     <div key={n.id} style={{ padding: '10px 0', borderBottom: `1px solid ${bd}`, display: 'flex', alignItems: 'center', gap: 10, flexWrap: mobileMode ? 'wrap' : 'nowrap' }}>
                         <span style={{
                             fontSize: 10, padding: '2px 7px', borderRadius: 3, flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 3,
-                            background: n.type === 'late' ? '#F3ECDD' : '#F3E7E4',
-                            color: n.type === 'late' ? '#A67C3D' : '#A85D52',
+                            background: n.type === 'late' ? 'var(--ui-warning-bg)' : 'var(--ui-danger-bg)',
+                            color: n.type === 'late' ? 'var(--ui-warning)' : 'var(--ui-danger)',
                         }}>
                             {n.type === 'late' && <IconClock size={9} />}{n.type === 'late' ? '지각' : '결석'}
                         </span>

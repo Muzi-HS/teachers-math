@@ -5,15 +5,18 @@ import { kstDateStr, kstNow } from '@/lib/kst'
 import AutoGrowTextarea from '@/components/AutoGrowTextarea'
 import { IconBook, IconPencil } from '@/components/icons'
 import { useMobileMode } from '@/context/MobileModeContext'
+import { useAuth } from '@/context/AuthContext'
+import { useDraftProtection } from '@/components/ui/useDraftProtection'
+import DraftNotice from '@/components/ui/DraftNotice'
 
 type Student = { id: number; name: string; school?: string }
 type PreviousProgress = { date: string; content: string | null }
 
-const navy = '#0D2A5E'
-const gold = '#D87E13'
-const bg = '#F5F7FA', bd = '#DDE3EE'
-const tx = '#0D1B36', tx2 = '#4B5C7E', tx3 = '#96A4BF'
-const re = '#C0392B', gr = '#1A7F4E'
+const navy = 'var(--ui-primary)'
+const gold = 'var(--ui-primary)'
+const bg = 'var(--ui-bg)', bd = 'var(--ui-border)'
+const tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)'
+const re = 'var(--ui-danger)', gr = 'var(--ui-success)'
 
 const DOW = ['일', '월', '화', '수', '목', '금', '토']
 
@@ -38,6 +41,8 @@ export default function ClassPrepModal({
   onClose: () => void
 }) {
   const { mobileMode } = useMobileMode()
+  const { teacher } = useAuth()
+  const [workDate] = useState(kstDateStr)
   const [chks, setChks] = useState<Record<number, boolean>>({})
   const [prevHomework, setPrevHomework] = useState<Record<number, string>>({})
   const [previousProgress, setPreviousProgress] = useState<Record<number, PreviousProgress[]>>({})
@@ -47,6 +52,21 @@ export default function ClassPrepModal({
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [notif, setNotif] = useState<{ msg: string; ok: boolean } | null>(null)
+  const protection = useDraftProtection(`prepDraft:${teacher?.userId}:${classId}:${workDate}:${students.map(s => s.id).sort((a,b) => a-b).join('-')}`,
+    { chks, prevHomework, progress, bulkProgress }, !loading && !!teacher?.userId, generating)
+
+  function close() { if (protection.confirmLeave()) onClose() }
+  function restoreDraft() {
+    if (protection.dirty && !window.confirm('현재 입력 내용을 임시저장 내용으로 바꿀까요?')) return
+    const draft = protection.restore()
+    if (!draft || typeof draft !== 'object') return
+    const allowed = new Set(students.map(s => String(s.id)))
+    const strings = (map: Record<number, string>) => Object.fromEntries(Object.entries(map ?? {}).filter(([id, value]) => allowed.has(id) && typeof value === 'string'))
+    setPrevHomework(p => ({ ...p, ...strings(draft.prevHomework) }))
+    setProgress(p => ({ ...p, ...strings(draft.progress) }))
+    setChks(p => ({ ...p, ...Object.fromEntries(Object.entries(draft.chks ?? {}).filter(([id, value]) => allowed.has(id) && typeof value === 'boolean')) }))
+    setBulkProgress(typeof draft.bulkProgress === 'string' ? draft.bulkProgress : '')
+  }
 
   function toast(msg: string, ok = true) { setNotif({ msg, ok }); setTimeout(() => setNotif(null), 3000) }
 
@@ -54,7 +74,7 @@ export default function ClassPrepModal({
 
   async function load() {
     setLoading(true)
-    const today = kstDateStr()
+    const today = workDate
     const ids = students.map(s => s.id)
     const chksInit: Record<number, boolean> = {}
     students.forEach(s => { chksInit[s.id] = true })
@@ -113,7 +133,7 @@ export default function ClassPrepModal({
     if (checkedStudents.length === 0) return toast('학생을 1명 이상 선택하세요.', false)
     setGenerating(true)
     try {
-      const today = kstDateStr()
+      const today = workDate
       const now = kstNow()
       const dateLabel = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')}(${DOW[now.getDay()]})`
 
@@ -157,6 +177,8 @@ export default function ClassPrepModal({
       a.remove()
       URL.revokeObjectURL(url)
       toast(`${checkedStudents.length}명 안내문 생성 완료`)
+      if (checkedStudents.length === students.length) protection.markSaved()
+      else protection.persist()
     } catch (e: any) {
       toast('생성 실패: ' + e.message, false)
     } finally {
@@ -179,14 +201,16 @@ export default function ClassPrepModal({
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.42)', zIndex: 1000, display: 'flex', alignItems: mobileMode ? 'flex-end' : 'center', justifyContent: 'center', padding: mobileMode ? 0 : 16 }}>
       <style>{css}</style>
       <div className="cp-modal" onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: mobileMode ? '16px 16px 0 0' : 12, maxWidth: '100%', maxHeight: mobileMode ? '92vh' : '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
+        <fieldset disabled={generating} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
         <div style={{ padding: '18px 22px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: '#fff', zIndex: 1, borderBottom: `1px solid ${bd}`, marginBottom: 0, paddingBottom: 14 }}>
           <span style={{ fontSize: 15, fontWeight: 600, color: tx }}>{className} 수업 준비</span>
-          <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: bg, cursor: 'pointer', fontSize: 17, color: tx2 }}>×</button>
+          <button onClick={close} aria-label="닫기" style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: bg, cursor: 'pointer', fontSize: 17, color: tx2 }}>×</button>
         </div>
 
         <div style={{ padding: '14px 22px' }}>
+          <DraftNotice available={!!protection.recoverable} status={protection.status} onRestore={restoreDraft} onDiscard={protection.discardRecovery} />
           {notif && (
-            <div style={{ background: notif.ok ? '#E0F5EB' : '#FDECEA', border: `1px solid ${notif.ok ? gr : re}`, borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 12, color: notif.ok ? gr : re }}>
+            <div style={{ background: notif.ok ? 'var(--ui-success-bg)' : 'var(--ui-danger-bg)', border: `1px solid ${notif.ok ? gr : re}`, borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 12, color: notif.ok ? gr : re }}>
               {notif.msg}
             </div>
           )}
@@ -244,14 +268,15 @@ export default function ClassPrepModal({
         </div>
 
         <div style={{ padding: '0 22px 18px', display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', position: 'sticky', bottom: 0, background: '#fff', borderTop: `1px solid ${bd}`, paddingTop: 12 }}>
-          <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, border: `1px solid ${bd}`, background: '#fff', cursor: 'pointer', color: tx2, fontFamily: 'inherit' }}>취소</button>
+          <button onClick={close} style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, border: `1px solid ${bd}`, background: '#fff', cursor: 'pointer', color: tx2, fontFamily: 'inherit' }}>닫기</button>
           <button onClick={generate} disabled={generating || loading} style={{
             padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 700, border: 'none',
-            background: gold, color: '#071A3E', cursor: generating ? 'not-allowed' : 'pointer', opacity: generating ? 0.7 : 1, fontFamily: 'inherit',
+            background: gold, color: 'var(--ui-primary-text)', cursor: generating ? 'not-allowed' : 'pointer', opacity: generating ? 0.7 : 1, fontFamily: 'inherit',
           }}>
             {generating ? '생성 중...' : `파일 생성 (${checkedStudents.length}명)`}
           </button>
         </div>
+        </fieldset>
       </div>
     </div>
   )

@@ -4,8 +4,8 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { IconInbox } from '@/components/icons'
 
-const navy = '#0D2A5E', bg = '#F5F7FA', bd = '#DDE3EE'
-const tx = '#0D1B36', tx2 = '#4B5C7E', tx3 = '#96A4BF'
+const navy = 'var(--ui-primary)', bg = 'var(--ui-bg)', bd = 'var(--ui-border)'
+const tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)'
 
 type Notice = { id: number; content: string; created_at: string; className: string }
 

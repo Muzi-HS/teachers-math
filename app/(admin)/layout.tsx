@@ -10,6 +10,10 @@ import Sidebar from '@/components/Sidebar'
 import { menuAccess, Role } from '@/lib/permissions'
 import { MobileModeProvider, useMobileMode } from '@/context/MobileModeContext'
 import { IconSmartphone } from '@/components/icons'
+import ThemeToggle from '@/components/ui/ThemeToggle'
+import { InternalThemeProvider } from '@/context/InternalThemeContext'
+import SeasonEffect from '@/components/season/SeasonEffect'
+import { useSiteSettings } from '@/lib/use-site-settings'
 
 // 관리자용 FCM 토큰 등록 — 학부모(register-fcm-token 엣지함수)와 달리 관리자는 Supabase Auth
 // 세션이 있어 RLS(본인 user_id만)로 바로 보호되므로 클라이언트에서 직접 upsert한다.
@@ -24,8 +28,6 @@ async function registerAdminFCMToken(userId: string) {
   }
 }
 
-const navy = '#0D2A5E', navyDk = '#071A3E'
-
 function pathToMenuKey(pathname: string): string | null {
   return pathname.split('/').filter(Boolean)[0] ?? null
 }
@@ -37,12 +39,12 @@ function LogoutButton() {
       onClick={logout}
       style={{
         background: 'none', border: 'none', cursor: 'pointer',
-        fontSize: 12, color: 'rgba(255,255,255,.5)',
+        fontSize: 12, color: 'var(--chrome-text-2)',
         fontFamily: "'Noto Sans KR',sans-serif",
         padding: 0, transition: 'color .15s',
       }}
       onMouseEnter={e => (e.currentTarget.style.color = 'rgba(255,255,255,.9)')}
-      onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,.5)')}
+      onMouseLeave={e => (e.currentTarget.style.color = 'var(--chrome-text-2)')}
     >
       로그아웃
     </button>
@@ -50,7 +52,8 @@ function LogoutButton() {
 }
 
 function MobileModeToggle() {
-  const { mobileMode, setMobileMode } = useMobileMode()
+  const { mobileMode, isMobileScreen, setMobileMode } = useMobileMode()
+  if (isMobileScreen) return null
   if (mobileMode) {
     return (
       <button
@@ -63,34 +66,34 @@ function MobileModeToggle() {
           fontFamily: "'Noto Sans KR',sans-serif",
         }}
       >
-        <IconSmartphone size={12} /> PC 화면으로 보기
+        <IconSmartphone size={12} /> 미리보기 종료
       </button>
     )
   }
   return (
     <button
       onClick={() => setMobileMode(true)}
-      title="모바일에서 보기"
+      title="모바일 화면 미리보기"
       style={{
         display: 'flex', alignItems: 'center', gap: 4,
         background: 'none', border: 'none', cursor: 'pointer',
-        fontSize: 11, color: 'rgba(255,255,255,.35)',
+        fontSize: 12, color: 'var(--chrome-text-2)',
         fontFamily: "'Noto Sans KR',sans-serif",
         padding: 0, transition: 'color .15s',
       }}
       onMouseEnter={e => (e.currentTarget.style.color = 'rgba(255,255,255,.85)')}
-      onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,.35)')}
+      onMouseLeave={e => (e.currentTarget.style.color = 'var(--chrome-text-2)')}
     >
-      <IconSmartphone size={12} /> 모바일에서 보기
+      <IconSmartphone size={12} /> 모바일 미리보기
     </button>
   )
 }
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
-    <MobileModeProvider>
+    <InternalThemeProvider><MobileModeProvider>
       <AdminLayoutInner>{children}</AdminLayoutInner>
-    </MobileModeProvider>
+    </MobileModeProvider></InternalThemeProvider>
   )
 }
 
@@ -99,6 +102,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const { mobileMode } = useMobileMode()
   const router   = useRouter()
   const pathname = usePathname()
+  const { settings: siteSettings, effectiveSeason } = useSiteSettings()
 
   // useRef로 초기화 여부 추적 — 리렌더에 영향 없음
   const initDone = useRef(false)
@@ -142,10 +146,10 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   }, [router])
 
   if (loading) return (
-    <div style={{ minHeight: '100vh', background: '#F5F7FA', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{ height: '100dvh', background: 'var(--ui-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ textAlign: 'center' }}>
-        <div style={{ width: 36, height: 36, border: '3px solid #DDE3EE', borderTop: `3px solid ${navy}`, borderRadius: '50%', margin: '0 auto 12px', animation: 'spin 0.8s linear infinite' }} />
-        <p style={{ fontSize: 13, color: '#4B5C7E' }}>로딩 중...</p>
+        <div style={{ width: 36, height: 36, border: '3px solid var(--ui-border)', borderTop: '3px solid var(--ui-primary)', borderRadius: '50%', margin: '0 auto 12px', animation: 'spin 0.8s linear infinite' }} />
+        <p style={{ fontSize: 13, color: 'var(--ui-text-2)' }}>로딩 중...</p>
       </div>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
@@ -154,16 +158,16 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   if (!role || role === 'parent' || role === 'student') return null
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', fontFamily: "'Noto Sans KR',sans-serif" }}>
+    <div className="admin-shell" style={{ display: 'flex', flexDirection: 'column', height: '100dvh', fontFamily: "'Noto Sans KR',sans-serif" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Montserrat:wght@700;800&display=swap');`}</style>
 
       {/* 상단 헤더 */}
       <header style={{
-        background: `linear-gradient(135deg, ${navyDk} 0%, ${navy} 100%)`,
+        background: 'var(--chrome-bg)',
         height: 52, display: 'flex', alignItems: 'center',
         justifyContent: 'space-between', padding: '0 20px',
-        position: 'sticky', top: 0, zIndex: 100,
-        boxShadow: '0 2px 8px rgba(0,0,0,.2)', flexShrink: 0,
+        borderBottom: '1px solid var(--chrome-border)',
+        zIndex: 100, flexShrink: 0,
       }}>
         {/* 왼쪽: 로고 · 학원명 · 배지 · 이름 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, overflow: 'hidden' }}>
@@ -173,7 +177,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
               TEACHERS MATH
             </span>
           )}
-          <span style={{ fontSize: 9, color: 'rgba(255,255,255,.45)', background: 'rgba(255,255,255,.1)', padding: '2px 7px', borderRadius: 10, flexShrink: 0 }}>
+          <span style={{ fontSize: 11, color: 'var(--chrome-text-2)', background: 'rgba(255,255,255,.1)', padding: '2px 7px', borderRadius: 10, flexShrink: 0 }}>
             {role === 'admin' ? '관리자' : role === 'assistant' ? '조교' : '선생님'}
           </span>
           <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,.85)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -182,7 +186,8 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* 오른쪽: 모바일 전환 · 로그아웃 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+          {!mobileMode && <ThemeToggle />}
           <MobileModeToggle />
           <LogoutButton />
         </div>
@@ -191,11 +196,12 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
       {/* 사이드바 + 본문 */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         {!mobileMode && <Sidebar />}
-        <main style={{ flex: 1, background: '#F5F7FA', overflowY: 'auto', minHeight: 0, minWidth: 0 }}>
+        <main style={{ flex: 1, background: 'var(--ui-bg)', overflowY: 'auto', minHeight: 0, minWidth: 0, paddingBottom: mobileMode ? 'env(safe-area-inset-bottom)' : 0 }}>
           {children}
         </main>
       </div>
       {mobileMode && <Sidebar />}
+      <SeasonEffect enabled={siteSettings.seasonEffectEnabled && siteSettings.seasonShowInWorkspace} season={effectiveSeason} intensity={siteSettings.seasonIntensity} />
       <ForegroundNotification />
     </div>
   )

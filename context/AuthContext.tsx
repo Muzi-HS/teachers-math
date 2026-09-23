@@ -46,6 +46,23 @@ const AuthContext = createContext<AuthContextType>({
   loginAsStudent: () => {},
 })
 
+// 학부모/학생 "자동 로그인" 체크 시 localStorage에 { session } 형태로 저장해둔 세션을
+// sessionStorage로 복원한다. sessionStorage는 탭을 닫으면 사라지므로, 앱을 완전히 껐다
+// 다시 켰을 때(새 탭/새 창)는 이 localStorage 값이 없으면 로그인 상태가 복원되지 않는다.
+function restoreAutoLogin(autoKey: string, sessionKey: string): string | null {
+  const existing = sessionStorage.getItem(sessionKey)
+  if (existing) return existing
+  try {
+    const auto = localStorage.getItem(autoKey)
+    if (!auto) return null
+    const parsed = JSON.parse(auto)
+    if (!parsed?.session) return null
+    const raw = JSON.stringify(parsed.session)
+    sessionStorage.setItem(sessionKey, raw)
+    return raw
+  } catch { return null }
+}
+
 async function fetchTeacherProfile(userId: string): Promise<TeacherSession | null> {
   const { data, error } = await supabase
     .from('teachers')
@@ -79,9 +96,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // 2. 학부모 세션 확인 (sessionStorage)
+      // 2. 학부모 세션 확인 (sessionStorage, 없으면 자동 로그인 localStorage에서 복원)
       try {
-        const raw = sessionStorage.getItem('parent_session')
+        const raw = restoreAutoLogin('parent_auto_login', 'parent_session')
         if (raw) {
           const parsed = JSON.parse(raw)
           setParent(parsed)
@@ -90,9 +107,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } catch {}
 
-      // 3. 학생 세션 확인 (sessionStorage)
+      // 3. 학생 세션 확인 (sessionStorage, 없으면 자동 로그인 localStorage에서 복원)
       try {
-        const raw = sessionStorage.getItem('student_session')
+        const raw = restoreAutoLogin('student_auto_login', 'student_session')
         if (raw) {
           const parsed = JSON.parse(raw)
           setStudent(parsed)

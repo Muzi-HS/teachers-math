@@ -3,8 +3,8 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { IconClock, IconCalendar } from '@/components/icons'
 
-const navy='#0D2A5E', tx='#0D1B36', tx2='#4B5C7E', tx3='#96A4BF'
-const bd='#DDE3EE', re='#C0392B', rbg='#FDECEA'
+const navy='var(--ui-primary)', tx='var(--ui-text)', tx2='var(--ui-text-2)', tx3='var(--ui-text-3)'
+const bd='var(--ui-border)', re='var(--ui-danger)', rbg='var(--ui-danger-bg)'
 
 type Event_ = {
   id: number; title: string; start_date: string; end_date: string | null
@@ -16,7 +16,7 @@ type Event_ = {
 function eventColor(e: Event_) {
   return e.type === 'holiday'
     ? { bg: rbg, color: re, dot: re }
-    : { bg: '#E8EEF8', color: navy, dot: navy }
+    : { bg: 'var(--ui-surface-2)', color: navy, dot: navy }
 }
 
 const DOW = ['일','월','화','수','목','금','토']
@@ -127,7 +127,7 @@ export default function AcademyEventsView() {
                 const dow     = idx % 7
                 return (
                   <button key={idx} onClick={() => setSelDate(isSel ? null : dateStr)} style={{
-                    background: isSel ? navy : isToday ? '#E8EEF8' : 'none',
+                    background: isSel ? navy : isToday ? 'var(--ui-surface-2)' : 'none',
                     border: 'none', borderRadius: 8, cursor: 'pointer', padding: '4px 0 6px',
                     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
                     fontFamily: "'Noto Sans KR',sans-serif",

@@ -1,18 +1,28 @@
 'use client'
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, useSyncExternalStore, ReactNode } from 'react'
 
-// 관리자/선생님이 PC에서도 모바일 화면 형태로 볼 수 있도록 하는 수동 전환 스위치.
-// 실제 창 너비와 무관하게 켜고 끌 수 있어야 하므로, 각 화면은 반드시 이 값을 보고
-// 레이아웃을 분기해야 한다 (CSS 미디어쿼리/auto-fit만으로는 전환되지 않음).
+// 작은 화면은 자동 적용하고, 넓은 PC 화면에서는 모바일 미리보기를 허용한다.
+// 터치 기기의 가로 모드도 포함한다. 이전에 저장한 PC 모드는 자동 감지를 막지 않는다.
 const STORAGE_KEY = 'admin_mobile_mode'
+const MOBILE_QUERY = '(max-width: 900px), (max-width: 1100px) and (pointer: coarse)'
+
+function subscribeToScreen(onChange: () => void) {
+  const media = window.matchMedia(MOBILE_QUERY)
+  media.addEventListener('change', onChange)
+  return () => media.removeEventListener('change', onChange)
+}
+function getScreenSnapshot() { return window.matchMedia(MOBILE_QUERY).matches }
+function getServerSnapshot() { return true }
 
 type MobileModeContextType = {
   mobileMode: boolean
+  isMobileScreen: boolean
   setMobileMode: (v: boolean) => void
 }
 
 const MobileModeContext = createContext<MobileModeContextType>({
   mobileMode: false,
+  isMobileScreen: false,
   setMobileMode: () => {},
 })
 
@@ -21,7 +31,9 @@ export function useMobileMode() {
 }
 
 export function MobileModeProvider({ children }: { children: ReactNode }) {
-  const [mobileMode, setMobileModeState] = useState(false)
+  const isMobileScreen = useSyncExternalStore(subscribeToScreen, getScreenSnapshot, getServerSnapshot)
+  const [previewMobile, setMobileModeState] = useState(false)
+  const mobileMode = isMobileScreen || previewMobile
 
   useEffect(() => {
     try { setMobileModeState(localStorage.getItem(STORAGE_KEY) === '1') } catch {}
@@ -33,7 +45,7 @@ export function MobileModeProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <MobileModeContext.Provider value={{ mobileMode, setMobileMode }}>
+    <MobileModeContext.Provider value={{ mobileMode, isMobileScreen, setMobileMode }}>
       {children}
     </MobileModeContext.Provider>
   )

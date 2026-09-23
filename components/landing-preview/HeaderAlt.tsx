@@ -72,7 +72,7 @@ export default function HeaderAlt({ onLoginClick }: { onLoginClick: () => void }
       `}</style>
 
       <button className="lpv-header-brand" onClick={() => window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })} aria-label="맨 위로">
-        <Image src="/logo2.png" alt="티처스 수학학원" width={195} height={34} priority />
+        <Image src="/logo2.png" alt="티처스 수학학원" width={195} height={34} quality={100} priority />
       </button>
 
       <ul className="lpv-header-nav">

@@ -8,10 +8,10 @@ import * as XLSX from 'xlsx-js-style'
 import { IconX } from '@/components/icons'
 import { useMobileMode } from '@/context/MobileModeContext'
 
-const navy='#0D2A5E', navyDk='#071A3E', navyM='#E8EEF8'
-const gold='#D87E13', goldL='#F09830', bg='#F5F7FA', bd='#DDE3EE'
-const tx='#0D1B36', tx2='#4B5C7E', tx3='#96A4BF'
-const re='#C0392B', rbg='#FDECEA', gr='#1A7F4E', gbg='#E0F5EB'
+const navy='var(--ui-primary)', navyDk='var(--ui-primary-text)', navyM='var(--ui-surface-2)'
+const gold='var(--ui-primary)', goldL='var(--ui-primary-hover)', bg='var(--ui-bg)', bd='var(--ui-border)'
+const tx='var(--ui-text)', tx2='var(--ui-text-2)', tx3='var(--ui-text-3)'
+const re='var(--ui-danger)', rbg='var(--ui-danger-bg)', gr='var(--ui-success)', gbg='var(--ui-success-bg)'
 
 type Teacher = {
   id:number; user_id:string; name:string; email:string
@@ -431,7 +431,7 @@ export default function TeachersPage(){
     .bnav{padding:7px 11px;border-radius:8px;font-size:12px;border:1px solid ${bd};background:#fff;cursor:pointer;color:${tx2};font-family:inherit;}
     .bnav:hover{border-color:${navy};color:${navy};}
     .bxls{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:none;background:${gr};color:#fff;font-family:inherit;transition:background .15s;}
-    .bxls:hover{background:#156B40;}
+    .bxls:hover{background:var(--ui-success-hover);}
   `
 
   return(
@@ -529,7 +529,7 @@ export default function TeachersPage(){
                       <span style={{fontSize:13,fontWeight:600,color:tx}}>{teacherName(l.teacher_id)}</span>
                       <div style={{display:'flex',gap:6,alignItems:'center'}}>
                         <span style={{fontSize:11,padding:'2px 7px',borderRadius:20,fontWeight:600,
-                          background:l.approved?gbg:'#FEF3E2',color:l.approved?gr:'#D87E13'}}>
+                          background:l.approved?gbg:'var(--ui-warning-bg)',color:l.approved?gr:'var(--ui-warning)'}}>
                           {l.approved?'승인':'대기'}
                         </span>
                         <button className="bedt" onClick={()=>{setCalDay(null);openEditLog(l)}}>수정·승인</button>
@@ -685,7 +685,7 @@ export default function TeachersPage(){
             <>
               {/* 대기 건수 배너 */}
               {attLogs.filter(l=>!l.approved).length>0&&(
-                <div style={{background:'#FEF3E2',border:'1px solid #D87E13',borderRadius:8,padding:'10px 14px',marginBottom:14,fontSize:13,color:'#D87E13',fontWeight:600}}>
+                <div style={{background:'var(--ui-warning-bg)',border:'1px solid var(--ui-warning)',borderRadius:8,padding:'10px 14px',marginBottom:14,fontSize:13,color:'var(--ui-warning)',fontWeight:600}}>
                   승인 대기 {attLogs.filter(l=>!l.approved).length}건
                 </div>
               )}
@@ -727,7 +727,7 @@ export default function TeachersPage(){
                               <div key={'e'+e.id} style={{width:4,height:4,borderRadius:'50%',background:e.type==='holiday'?re:navy}}/>
                             ))}
                             {dLogs.slice(0,3).map(l=>(
-                              <div key={l.id} style={{width:4,height:4,borderRadius:'50%',background:l.approved?gr:'#D87E13'}}/>
+                              <div key={l.id} style={{width:4,height:4,borderRadius:'50%',background:l.approved?gr:'var(--ui-warning)'}}/>
                             ))}
                           </div>
                         ):(
@@ -744,14 +744,14 @@ export default function TeachersPage(){
                             {dLogs.map(l=>(
                               <div key={l.id} style={{
                                 fontSize:9,padding:'2px 4px',borderRadius:3,marginBottom:2,
-                                background:l.approved?gbg:'#FEF3E2',
-                                color:l.approved?gr:'#D87E13',
+                                background:l.approved?gbg:'var(--ui-warning-bg)',
+                                color:l.approved?gr:'var(--ui-warning)',
                                 whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
                                 {teacherName(l.teacher_id)} {fmtHours(l.work_minutes)}
                               </div>
                             ))}
                             {pending>0&&(
-                              <div style={{fontSize:9,color:'#D87E13',fontWeight:700}}>대기 {pending}</div>
+                              <div style={{fontSize:9,color:'var(--ui-warning)',fontWeight:700}}>대기 {pending}</div>
                             )}
                           </>
                         )}
@@ -784,7 +784,7 @@ export default function TeachersPage(){
                         <td style={{fontWeight:600}}>{t.name}</td>
                         <td style={{color:totalDays>0?navy:tx3}}>{totalDays}일</td>
                         <td style={{color:approvedDays>0?gr:tx3}}>{approvedDays}일</td>
-                        <td style={{color:pendingDays>0?'#D87E13':tx3}}>{pendingDays}건</td>
+                        <td style={{color:pendingDays>0?'var(--ui-warning)':tx3}}>{pendingDays}건</td>
                         <td style={{color:totalMin>0?navy:tx3,fontWeight:600}}>{fmtHours(totalMin||null)}</td>
                       </tr>
                     ))}
@@ -824,7 +824,7 @@ export default function TeachersPage(){
                             <td style={{color:l.approved?gr:tx,fontWeight:600,whiteSpace:'nowrap'}}>{fmtHours(l.work_minutes)}</td>
                             <td>
                               <span style={{fontSize:10,padding:'2px 6px',borderRadius:20,fontWeight:600,
-                                background:l.approved?gbg:'#FEF3E2',color:l.approved?gr:'#D87E13'}}>
+                                background:l.approved?gbg:'var(--ui-warning-bg)',color:l.approved?gr:'var(--ui-warning)'}}>
                                 {l.approved?'승인':'대기'}
                               </span>
                             </td>

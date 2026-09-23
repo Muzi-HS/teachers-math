@@ -2,11 +2,12 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useMobileMode } from '@/context/MobileModeContext'
+import { IconCoupon } from '@/components/icons'
 
-const navy = '#0D2A5E', gold = '#D87E13'
-const bg = '#F5F7FA', bd = '#DDE3EE'
-const tx = '#0D1B36', tx2 = '#4B5C7E', tx3 = '#96A4BF'
-const re = '#C0392B', gr = '#1A7F4E', gbg = '#E0F5EB'
+const navy = 'var(--ui-primary)', gold = 'var(--ui-primary)'
+const bg = 'var(--ui-bg)', bd = 'var(--ui-border)'
+const tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)'
+const re = 'var(--ui-danger)', gr = 'var(--ui-success)', gbg = 'var(--ui-success-bg)'
 
 type FoundCoupon = { id: number; code: string; milestone: number; claimed_at: string; used: boolean; studentName: string }
 type RecentCoupon = { id: number; code: string; milestone: number; claimed_at: string; used: boolean; studentName: string }
@@ -75,7 +76,7 @@ export default function CouponsPage() {
   return (
     <div style={{ padding: mobileMode ? '16px 14px 88px' : '28px 32px', fontFamily: "'Noto Sans KR',sans-serif" }}>
       {notif && (
-        <div style={{ background: notif.ok ? gbg : '#FDECEA', border: `1px solid ${notif.ok ? gr : re}`, borderRadius: 8, padding: '8px 12px', marginBottom: 14, fontSize: 12, color: notif.ok ? gr : re }}>
+        <div style={{ background: notif.ok ? gbg : 'var(--ui-danger-bg)', border: `1px solid ${notif.ok ? gr : re}`, borderRadius: 8, padding: '8px 12px', marginBottom: 14, fontSize: 12, color: notif.ok ? gr : re }}>
           {notif.msg}
         </div>
       )}
@@ -87,7 +88,7 @@ export default function CouponsPage() {
 
       {/* 코드 검색 */}
       <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: mobileMode ? 14 : 18, marginBottom: 20, boxShadow: '0 1px 4px rgba(0,0,0,.06)' }}>
-        <p style={{ fontSize: 13, fontWeight: 600, color: tx, margin: '0 0 10px' }}>🎟️ 쿠폰 코드로 검색</p>
+        <p style={{ fontSize: 13, fontWeight: 600, color: tx, margin: '0 0 10px', display: 'flex', alignItems: 'center', gap: 6 }}><IconCoupon size={14} /> 쿠폰 코드로 검색</p>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <input
             value={codeInput}

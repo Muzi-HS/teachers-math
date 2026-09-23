@@ -3,15 +3,16 @@ import { useEffect, useState } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { supabase } from '@/lib/supabase'
 import { computeStreak, COUPON_MILESTONES } from '@/lib/streak'
+import { IconTrophy } from '@/components/icons'
 
-const navy='#0D2A5E', gold='#D87E13', tx='#0D1B36', tx2='#4B5C7E', tx3='#96A4BF', bd='#DDE3EE'
+const navy='var(--ui-primary)', gold='var(--ui-primary)', tx='var(--ui-text)', tx2='var(--ui-text-2)', tx3='var(--ui-text-3)', bd='var(--ui-border)'
 
 // 쿠폰 마일스톤(5일부터 5일 단위로 30일까지)과 동일한 기준으로 뱃지를 보여준다
 const STREAK_TIERS = COUPON_MILESTONES
 
 type StatRec = { date: string; hw_rate: number; hw_cor: number }
 
-function rateColor(v: number) { return v >= 80 ? '#1A7F4E' : v >= 60 ? '#C05621' : '#C0392B' }
+function rateColor(v: number) { return v >= 80 ? 'var(--ui-success)' : v >= 60 ? 'var(--ui-warning)' : 'var(--ui-danger)' }
 
 // 학부모/학생 화면이 공유하는 수업기록 통계 뷰 — 숙제 이행률/정답률 추이 그래프와
 // 연속 100% 이행률 스트릭·뱃지를 보여준다. 이미 화면에서 불러온 records 배열을
@@ -65,7 +66,7 @@ export default function HomeworkStatsView({ recs, studentId }: { recs: StatRec[]
 
       {/* 스트릭 + 뱃지 */}
       <div style={{
-        background: `linear-gradient(135deg,${navy} 0%,#0D2A5E 100%)`, borderRadius: 14,
+        background: `linear-gradient(135deg,${navy} 0%,var(--ui-primary) 100%)`, borderRadius: 14,
         padding: '16px 18px', marginBottom: 16, color: '#fff',
       }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 12 }}>
@@ -80,7 +81,7 @@ export default function HomeworkStatsView({ recs, studentId }: { recs: StatRec[]
                 display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
                 opacity: unlocked ? 1 : .35, minWidth: 46,
               }}>
-                <span style={{ fontSize: 22 }}>{unlocked ? '🏅' : '⚪'}</span>
+                <span style={{ display: 'flex' }}><IconTrophy size={22} /></span>
                 <span style={{ fontSize: 10, color: 'rgba(255,255,255,.85)' }}>{tier}일</span>
               </div>
             )
@@ -116,7 +117,7 @@ export default function HomeworkStatsView({ recs, studentId }: { recs: StatRec[]
                 <XAxis dataKey="date" tick={{ fontSize: 10, fill: tx3 }} axisLine={{ stroke: bd }} />
                 <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: tx3 }} axisLine={{ stroke: bd }} />
                 <Tooltip formatter={(v: any) => v + '%'} contentStyle={{ fontSize: 12, borderRadius: 8, border: `1px solid ${bd}` }} />
-                <Line type="monotone" dataKey="hwCor" stroke={gold} strokeWidth={2.5} dot={{ r: 4, fill: gold }} connectNulls />
+                <Line type="monotone" dataKey="hwCor" stroke="var(--ui-chart-2)" strokeWidth={2.5} dot={{ r: 4, fill: "var(--ui-chart-2)" }} connectNulls />
               </LineChart>
             </ResponsiveContainer>
           </div>

@@ -6,11 +6,11 @@ import { kstDateOf, kstTimeOf } from '@/lib/kst'
 import { IconChat, IconPencil, IconTrash, IconArrowLeft } from '@/components/icons'
 import { useMobileMode } from '@/context/MobileModeContext'
 
-const navy = '#0D2A5E', navyDk = '#071A3E', navyM = '#E8EEF8'
-const gold = '#D87E13', goldL = '#F09830'
-const bg = '#F5F7FA', bd = '#DDE3EE'
-const tx = '#0D1B36', tx2 = '#4B5C7E', tx3 = '#96A4BF'
-const re = '#C0392B', rbg = '#FDECEA', gr = '#1A7F4E', gbg = '#E0F5EB'
+const navy = 'var(--ui-primary)', navyDk = 'var(--ui-primary-text)', navyM = 'var(--ui-surface-2)'
+const gold = 'var(--ui-primary)', goldL = 'var(--ui-primary-hover)'
+const bg = 'var(--ui-bg)', bd = 'var(--ui-border)'
+const tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)'
+const re = 'var(--ui-danger)', rbg = 'var(--ui-danger-bg)', gr = 'var(--ui-success)', gbg = 'var(--ui-success-bg)'
 
 type Msg = {
   id: number; parent_id: number; sender_type: 'parent' | 'admin'

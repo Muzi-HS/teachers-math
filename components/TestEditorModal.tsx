@@ -3,13 +3,14 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { kstDateStr } from '@/lib/kst'
 import { ExamQuestionDraft, toggleChoice } from '@/lib/auto-grading'
+import { IconLock } from '@/components/icons'
 
 export type EditableTest = { id: number; name: string; date: string; total: number; auto_grading?: boolean; is_published?: boolean }
 type Student = { id: number; name: string; school: string }
 type ClassRow = { id: number; name: string }
 const blank = (): ExamQuestionDraft => ({ points: null, choices: [], text: '' })
-const navy = '#0D2A5E', gold = '#D87E13', bd = '#DDE3EE', bg = '#F5F7FA'
-const tx = '#0D1B36', tx2 = '#4B5C7E', tx3 = '#96A4BF', gr = '#1A7F4E', re = '#C0392B'
+const navy = 'var(--ui-primary)', gold = 'var(--ui-primary)', bd = 'var(--ui-border)', bg = 'var(--ui-bg)'
+const tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)', gr = 'var(--ui-success)', re = 'var(--ui-danger)'
 
 // 숫자와 소수점(둘째 자리까지)만 남기고, 키보드로 직접 타이핑할 때 "12." 같은 중간 상태도 허용한다.
 function filterPointsInput(raw: string) {
@@ -120,7 +121,7 @@ export default function TestEditorModal({ test, students, onClose, onSaved }: {
       .exam-editor fieldset{margin:0;border:0;padding:22px 24px;min-width:0}
       .exam-editor input:not([type=checkbox]){width:100%;padding:10px 12px;border:1.5px solid ${bd};border-radius:9px;font:inherit;font-size:15px;box-sizing:border-box;color:${tx};transition:border-color .15s}
       .exam-editor input:not([type=checkbox]):focus{outline:none;border-color:${navy}}
-      .exam-editor .exam-save{padding:10px 22px;border:none;border-radius:9px;background:${gold};color:#3A2205;font-weight:700;font-size:14.5px;cursor:pointer}
+      .exam-editor .exam-save{padding:10px 22px;border:none;border-radius:9px;background:${gold};color:var(--ui-primary-text);font-weight:700;font-size:14.5px;cursor:pointer}
       .exam-editor .exam-save:disabled{opacity:.55;cursor:default}
       .exam-editor .exam-cancel{padding:10px 16px;border:1.5px solid ${bd};border-radius:9px;background:#fff;color:${tx2};font-weight:600;font-size:14.5px;cursor:pointer}
       .exam-editor .exam-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
@@ -131,7 +132,7 @@ export default function TestEditorModal({ test, students, onClose, onSaved }: {
       .exam-editor h3{font-size:15px;font-weight:700;margin:0;color:${tx}}
       .exam-editor .exam-help{font-size:12.5px;color:${tx3};line-height:1.75;margin:0 0 14px}
       .exam-editor .exam-auto-toggle{display:flex;align-items:center;gap:10px;padding:14px 16px;border:1.5px solid ${bd};border-radius:10px;cursor:pointer;background:${bg}}
-      .exam-editor .exam-auto-toggle[data-on=true]{border-color:${navy};background:#EAF0FB}
+      .exam-editor .exam-auto-toggle[data-on=true]{border-color:${navy};background:var(--ui-accent-bg)}
       .exam-editor .exam-switch{width:38px;height:22px;border-radius:99px;background:${bd};position:relative;flex-shrink:0;transition:background .15s}
       .exam-editor .exam-switch[data-on=true]{background:${navy}}
       .exam-editor .exam-switch::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .15s;box-shadow:0 1px 3px rgba(0,0,0,.25)}
@@ -147,10 +148,10 @@ export default function TestEditorModal({ test, students, onClose, onSaved }: {
       .exam-editor .exam-choice{width:44px;height:44px;border-radius:50%;border:1.5px solid ${bd};background:#fff;color:${tx};font-size:17px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;transition:all .15s;flex-shrink:0}
       .exam-editor .exam-choice:hover:not(:disabled){border-color:${navy};color:${navy}}
       .exam-editor .exam-choice:disabled{opacity:.5;cursor:default}
-      .exam-editor .exam-choice[aria-pressed=true]{background:${navy};border-color:${navy};color:#fff;box-shadow:0 0 0 3px rgba(13,42,94,.18)}
+      .exam-editor .exam-choice[aria-pressed=true]{background:${navy};border-color:${navy};color:#fff;box-shadow:0 0 0 3px var(--ui-focus-ring)}
       .exam-editor .exam-qstatus{font-size:11.5px;font-weight:600;margin-top:7px;display:inline-flex;align-items:center;gap:4px}
       .exam-editor .exam-qstatus[data-ok=true]{color:${gr}}.exam-editor .exam-qstatus[data-ok=false]{color:${tx3}}
-      .exam-editor .exam-count-badge{font-size:12.5px;font-weight:700;color:${navy};background:#EAF0FB;padding:3px 10px;border-radius:20px;flex-shrink:0}
+      .exam-editor .exam-count-badge{font-size:12.5px;font-weight:700;color:${navy};background:var(--ui-accent-bg);padding:3px 10px;border-radius:20px;flex-shrink:0}
       .exam-editor .exam-class-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(126px,1fr));gap:8px;margin-bottom:16px}
       .exam-editor .exam-class-chip{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:10px 12px;border-radius:10px;border:1.5px solid ${bd};background:#fff;cursor:pointer;text-align:left;transition:all .15s;font-family:inherit}
       .exam-editor .exam-class-chip:disabled{opacity:.4;cursor:default}
@@ -158,7 +159,7 @@ export default function TestEditorModal({ test, students, onClose, onSaved }: {
       .exam-editor .exam-class-name{font-size:12.5px;font-weight:700;color:${tx};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
       .exam-editor .exam-class-count{font-size:11px;font-weight:600;color:${tx3}}
       .exam-editor .exam-class-chip[data-state=partial]{border-color:${gold};background:#FFF7EA}
-      .exam-editor .exam-class-chip[data-state=partial] .exam-class-count{color:#B36A00}
+      .exam-editor .exam-class-chip[data-state=partial] .exam-class-count{color:var(--ui-warning)}
       .exam-editor .exam-class-chip[data-state=all]{border-color:${navy};background:${navy}}
       .exam-editor .exam-class-chip[data-state=all] .exam-class-name,.exam-editor .exam-class-chip[data-state=all] .exam-class-count{color:#fff}
       .exam-editor .exam-roster-head{display:flex;gap:8px;align-items:center;margin-bottom:8px}
@@ -171,14 +172,14 @@ export default function TestEditorModal({ test, students, onClose, onSaved }: {
       .exam-editor .exam-roster-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid ${bg};cursor:pointer;font-size:13.5px}
       .exam-editor .exam-roster-row:last-child{border-bottom:none}
       .exam-editor .exam-roster-row:hover{background:${bg}}
-      .exam-editor .exam-roster-row[data-checked=true]{background:#EAF0FB}
+      .exam-editor .exam-roster-row[data-checked=true]{background:var(--ui-accent-bg)}
       .exam-editor .exam-roster-row input[type=checkbox]{width:17px;height:17px;accent-color:${navy};flex-shrink:0;cursor:pointer}
       .exam-editor .exam-roster-name{font-weight:600;color:${tx}}
       .exam-editor .exam-roster-school{font-size:11.5px;color:${tx3};margin-left:auto}
       .exam-editor .exam-roster-empty{padding:20px;text-align:center;color:${tx3};font-size:13px;margin:0}
       .exam-editor .exam-publish-note{display:flex;gap:10px;align-items:flex-start;padding:14px 16px;border-radius:10px;background:#FFF7EA;border:1px solid #F3DDB0;color:#6B4A0E;font-size:12.5px;line-height:1.7;margin-top:20px}
       .exam-editor .exam-locked{display:flex;gap:10px;align-items:flex-start;padding:14px 16px;border-radius:10px;background:#FDF3ED;border:1px solid #F5CBA7;color:#8A4B14;font-size:12.5px;line-height:1.7;margin:16px 24px 0}
-      .exam-editor .exam-error{color:${re};background:#FDECEA;border-radius:8px;padding:10px 14px;margin:16px 24px 0;font-size:13px}
+      .exam-editor .exam-error{color:${re};background:var(--ui-danger-bg);border-radius:8px;padding:10px 14px;margin:16px 24px 0;font-size:13px}
       @media(max-width:560px){.exam-editor-overlay{padding:0}.exam-editor{border-radius:0;max-height:100dvh}.exam-editor fieldset{padding:16px}.exam-editor .exam-grid{grid-template-columns:1fr}.exam-editor .exam-question{grid-template-columns:1fr}.exam-editor .exam-qmeta{flex-direction:row;align-items:center;justify-content:space-between}.exam-editor .exam-class-grid{grid-template-columns:repeat(auto-fill,minmax(108px,1fr))}}
     `}</style>
     <section className="exam-editor" role="dialog" aria-modal="true" aria-label={test ? '테스트 편집' : '테스트 추가'}>
@@ -210,7 +211,7 @@ export default function TestEditorModal({ test, students, onClose, onSaved }: {
             <section className="exam-section">
               <div className="exam-section-head">
                 <h3>문항별 배점 · 정답</h3>
-                <span style={{ fontSize: 12.5, fontWeight: 700, color: navy, background: '#EAF0FB', padding: '3px 10px', borderRadius: 20 }}>배점 합계 {totalPoints}점</span>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: navy, background: 'var(--ui-accent-bg)', padding: '3px 10px', borderRadius: 20 }}>배점 합계 {totalPoints}점</span>
               </div>
               <p className="exam-help">1~5 중에서 누르면 객관식(복수 선택 가능), 빈칸에 입력하면 주관식입니다. 객관식은 정답 조합이 정확히 일치해야 하고 부분 점수는 없습니다. 주관식은 앞뒤 공백을 제외하고 완전히 일치해야 합니다. 성적은 배점 합계를 기준으로 100점 만점으로 환산됩니다.</p>
               {questions.map((q, i) => {
@@ -288,7 +289,7 @@ export default function TestEditorModal({ test, students, onClose, onSaved }: {
             </section>
 
             <div className="exam-publish-note">
-              <span>🔒</span>
+              <span style={{ display: 'flex' }}><IconLock size={14} /></span>
               <span>학생 공개는 여기서 하지 않습니다. 저장 후 <strong>테스트 상세 화면의 &lsquo;학생에게 공개&rsquo; 버튼</strong>을 눌러야 대상 학생이 답안을 입력할 수 있습니다.</span>
             </div>
           </>}

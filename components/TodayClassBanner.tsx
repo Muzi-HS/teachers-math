@@ -2,8 +2,9 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { kstNow } from '@/lib/kst'
+import { IconClock } from '@/components/icons'
 
-const navy = '#0D2A5E'
+const navy = 'var(--ui-primary)'
 
 const DOW = ['일', '월', '화', '수', '목', '금', '토']
 
@@ -37,8 +38,8 @@ export default function TodayClassBanner({ studentId }: { studentId: number | nu
   if (!classes || classes.length === 0) return null
 
   return (
-    <div style={{ background: '#fff', border: `1.5px solid ${navy}33`, borderRadius: 12, padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
-      <span style={{ fontSize: 20, flexShrink: 0 }}>🕐</span>
+    <div style={{ background: '#fff', border: `1.5px solid color-mix(in srgb, ${navy} 20%, transparent)`, borderRadius: 12, padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+      <span style={{ flexShrink: 0, color: navy, display: 'flex' }}><IconClock size={20} /></span>
       <p style={{ fontSize: 13, fontWeight: 700, color: navy, margin: 0, lineHeight: 1.5 }}>
         오늘 {classes.map(c => `${c.time.split('~')[0]?.trim()} ${c.name}`).join(', ')} 수업이 있어요
       </p>

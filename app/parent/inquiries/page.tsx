@@ -6,12 +6,12 @@ import { kstDateOf, kstTimeOf } from '@/lib/kst'
 import { useParentChild } from '../layout'
 import { IconChat, IconSend, IconClock } from '@/components/icons'
 
-const navy = '#0D2A5E', navyDk = '#071A3E'
-const bg = '#F5F7FA', bd = '#DDE3EE'
-const tx = '#0D1B36', tx2 = '#4B5C7E', tx3 = '#96A4BF'
-const re = '#C0392B', gold = '#D87E13'
+const navy = 'var(--ui-primary)', navyDk = 'var(--ui-primary-text)'
+const bg = 'var(--ui-bg)', bd = 'var(--ui-border)'
+const tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)'
+const re = 'var(--ui-danger)', gold = 'var(--ui-primary)'
 // 결석/지각 등록용 — 알림 색(re/gold)보다 톤을 낮춘 차분한 색
-const absCol='#A85D52', absBg='#F3E7E4', lateCol='#A67C3D', lateBg='#F3ECDD'
+const absCol='var(--ui-danger)', absBg='var(--ui-danger-bg)', lateCol='var(--ui-warning)', lateBg='var(--ui-warning-bg)'
 
 type Msg = {
   id: number; parent_id: number; sender_type: 'parent' | 'admin'
@@ -189,7 +189,7 @@ export default function ParentInquiriesPage() {
         </div>
         <button onClick={openNoticeModal} style={{
           flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '9px 14px', borderRadius: 20,
-          border: `1.5px solid ${absCol}55`, background: absBg, color: absCol, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+          border: `1.5px solid color-mix(in srgb, ${absCol} 33%, transparent)`, background: absBg, color: absCol, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
         }}>
           결석지각 등록
         </button>
@@ -202,7 +202,7 @@ export default function ParentInquiriesPage() {
           {notices.map(n => {
             const nc = noticeColor(n)
             return (
-              <div key={n.id} style={{ background: nc.bg, borderRadius: 12, padding: '12px 16px', marginBottom: 8, border: `1px solid ${nc.color}33` }}>
+              <div key={n.id} style={{ background: nc.bg, borderRadius: 12, padding: '12px 16px', marginBottom: 8, border: `1px solid color-mix(in srgb, ${nc.color} 20%, transparent)` }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ background: '#fff', color: nc.color, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4, display: 'inline-flex', alignItems: 'center', gap: 3 }}>{nc.clock && <IconClock size={10} />}{nc.label}</span>
                   <p style={{ fontSize: 14, fontWeight: 700, color: nc.color, margin: 0 }}>{childName(n.student_id)}</p>

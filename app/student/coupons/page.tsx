@@ -2,10 +2,11 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
+import { IconCoupon } from '@/components/icons'
 
-const navy = '#0D2A5E', navyDk = '#071A3E', gold = '#D87E13'
-const bg = '#F5F7FA', bd = '#DDE3EE'
-const tx = '#0D1B36', tx2 = '#4B5C7E', tx3 = '#96A4BF', gr = '#1A7F4E', gbg = '#E0F5EB'
+const navy = 'var(--ui-primary)', navyDk = 'var(--ui-primary)', gold = 'var(--ui-primary)'
+const bg = 'var(--ui-bg)', bd = 'var(--ui-border)'
+const tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)', gr = 'var(--ui-success)', gbg = 'var(--ui-success-bg)'
 
 type Coupon = { id: number; milestone: number; streak_value: number; claimed_at: string; used: boolean; code: string }
 
@@ -45,7 +46,7 @@ export default function StudentCoupons() {
         <p style={{ textAlign: 'center', color: tx3, padding: '40px 0' }}>불러오는 중...</p>
       ) : coupons.length === 0 ? (
         <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: '60px 0', textAlign: 'center', color: tx3 }}>
-          <p style={{ fontSize: 32, marginBottom: 8 }}>🎟️</p>
+          <p style={{ marginBottom: 8, display: 'flex', justifyContent: 'center' }}><IconCoupon size={32} /></p>
           <p style={{ fontSize: 14 }}>아직 받은 쿠폰이 없습니다</p>
           <p style={{ fontSize: 12, marginTop: 4 }}>숙제 이행률 100%를 며칠 연속 달성해보세요!</p>
         </div>
@@ -80,9 +81,10 @@ function CouponCard({ c }: { c: Coupon }) {
         <div style={{
           width: 52, height: 52, borderRadius: '50%', flexShrink: 0,
           background: c.used ? '#fff' : 'rgba(255,255,255,.15)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: c.used ? navy : '#fff',
         }}>
-          🎟️
+          <IconCoupon size={24} />
         </div>
         <div style={{ flex: 1 }}>
           <p style={{ fontSize: 15, fontWeight: 800, color: c.used ? tx : '#fff', margin: 0 }}>

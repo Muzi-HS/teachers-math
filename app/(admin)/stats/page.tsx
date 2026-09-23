@@ -15,14 +15,14 @@ type Rec = {
   record_test_items?: { test_id:number; t_total:number; t_cor:number; t_score:number; tests:{name:string}|null }[]
 }
 
-const navy='#0D2A5E', navyDk='#071A3E', navyM='#E8EEF8'
-const gold='#D87E13', goldL='#F09830'
-const bg='#F5F7FA', bd='#DDE3EE'
-const tx='#0D1B36', tx2='#4B5C7E', tx3='#96A4BF'
-const re='#C0392B', rbg='#FDECEA', gr='#1A7F4E', gbg='#E0F5EB'
+const navy='var(--ui-primary)', navyDk='var(--ui-primary-text)', navyM='var(--ui-surface-2)'
+const gold='var(--ui-primary)', goldL='var(--ui-primary-hover)'
+const bg='var(--ui-bg)', bd='var(--ui-border)'
+const tx='var(--ui-text)', tx2='var(--ui-text-2)', tx3='var(--ui-text-3)'
+const re='var(--ui-danger)', rbg='var(--ui-danger-bg)', gr='var(--ui-success)', gbg='var(--ui-success-bg)'
 
-function rateColor(v:number){ return v>=80?'#1A7F4E':v>=60?'#C05621':'#C0392B' }
-function rateBg(v:number){    return v>=80?'#E0F5EB':v>=60?'#FEF3E2':'#FDECEA' }
+function rateColor(v:number){ return v>=80?'var(--ui-success)':v>=60?'var(--ui-warning)':'var(--ui-danger)' }
+function rateBg(v:number){    return v>=80?'var(--ui-success-bg)':v>=60?'var(--ui-warning-bg)':'var(--ui-danger-bg)' }
 function ageOf(b:number){ return new Date().getFullYear()-b+1 }
 
 export default function StatsPage(){
@@ -135,7 +135,7 @@ export default function StatsPage(){
     .rc{background:#fff;border:1px solid ${bd};border-radius:10px;padding:16px;margin-bottom:10px;}
     .rch{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid ${bd};}
     .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;}
-    .fb{background:rgba(13,42,94,.05);border-left:3px solid ${navy};border-radius:0 8px 8px 0;padding:10px 12px;margin-top:10px;}
+    .fb{background:var(--ui-bg);border-left:3px solid ${navy};border-radius:0 8px 8px 0;padding:10px 12px;margin-top:10px;}
     .fdv{font-size:11px;font-weight:600;color:${tx3};letter-spacing:1px;margin-bottom:8px;}
   `
 
@@ -168,7 +168,7 @@ export default function StatsPage(){
               const isSel=selStu?.id===s.id
               return(
                 <div key={s.id} className="ssl-item" onClick={()=>selectStu(s)}
-                  style={{background:isSel?navyM:undefined,border:isSel?`1px solid ${navy}33`:'1px solid transparent'}}>
+                  style={{background:isSel?navyM:undefined,border:isSel?`1px solid color-mix(in srgb, ${navy} 20%, transparent)`:'1px solid transparent'}}>
                   <div className="sav" style={isSel?{background:navy,color:'#fff'}:undefined}>{s.name[0]}</div>
                   <div>
                     <p style={{fontSize:13,fontWeight:600,color:isSel?navy:tx}}>{s.name}</p>
@@ -271,7 +271,7 @@ export default function StatsPage(){
                           <XAxis dataKey="date" tick={{fontSize:10,fill:tx3}} axisLine={{stroke:bd}}/>
                           <YAxis domain={[0,100]} tick={{fontSize:10,fill:tx3}} axisLine={{stroke:bd}}/>
                           <Tooltip formatter={(v:any)=>v+'%'} contentStyle={{fontSize:12,borderRadius:8,border:`1px solid ${bd}`}}/>
-                          <Line type="monotone" dataKey="hwCor" stroke={gold} strokeWidth={2.5} dot={{r:4,fill:gold}} connectNulls/>
+                          <Line type="monotone" dataKey="hwCor" stroke="var(--ui-chart-2)" strokeWidth={2.5} dot={{ r: 4, fill: "var(--ui-chart-2)" }} connectNulls/>
                         </LineChart>
                       </ResponsiveContainer>
                       <div style={{display:'flex',alignItems:'center',gap:6,marginTop:6}}>

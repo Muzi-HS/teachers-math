@@ -2,9 +2,12 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { kstDateStr } from '@/lib/kst'
-import { IconChat, IconBook, IconPencil, IconSave, IconX } from '@/components/icons'
+import { IconChat, IconBook, IconPencil, IconX } from '@/components/icons'
 import AutoGrowTextarea from '@/components/AutoGrowTextarea'
 import { useMobileMode } from '@/context/MobileModeContext'
+import { useAuth } from '@/context/AuthContext'
+import { useDraftProtection } from '@/components/ui/useDraftProtection'
+import DraftNotice from '@/components/ui/DraftNotice'
 
 type Student = { id: number; name: string; school?: string }
 type Test = { id: number; name: string; date: string; total: number }
@@ -22,11 +25,11 @@ const BLANK_REC = (sid: number): RecForm => ({
   late: false, has_test: false, testItems: [], feedback: ''
 })
 
-const navy = '#0D2A5E', navyM = '#E8EEF8'
-const gold = '#D87E13', wa = '#C05621', wbg = '#FEF3E2'
-const bg = '#F5F7FA', bd = '#DDE3EE'
-const tx = '#0D1B36', tx2 = '#4B5C7E', tx3 = '#96A4BF'
-const re = '#C0392B', gr = '#1A7F4E', gbg = '#E0F5EB'
+const navy = 'var(--ui-primary)', navyM = 'var(--ui-surface-2)'
+const gold = 'var(--ui-primary)'
+const bg = 'var(--ui-bg)', bd = 'var(--ui-border)'
+const tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)'
+const re = 'var(--ui-danger)', gr = 'var(--ui-success)', gbg = 'var(--ui-success-bg)'
 
 // 반 소속 학생 전체를 대상으로 특정 날짜의 수업기록을 일괄 작성/수정하는 공용 팝업.
 // '반관리 > 수업기록 작성'과 '수업기록 > 일괄수정'이 동일한 인터페이스를 쓰도록 공유된다.
@@ -45,9 +48,11 @@ export default function ClassBulkRecordModal({
   // '모바일로 보기'는 실제 창 너비와 무관하게 켜고 끌 수 있는 수동 스위치이므로
   // 반응형 2열 배치는 반드시 이 값으로 분기해야 한다 (CSS 미디어쿼리만으로는 전환되지 않음)
   const { mobileMode } = useMobileMode()
+  const { teacher } = useAuth()
   // 반 소속 전체 학생 대상(class_id 있음)이든 개별 학생 1명 대상(class_id 없을 수 있음)이든
-  // 동일한 세션 임시저장 슬롯을 쓸 수 있도록 학생 구성으로 키를 만든다
-  const draftKey = 'bulkDraft_' + (classId ?? 'ind-' + students.map(s => s.id).sort().join('-'))
+  // 동일한 세션 임시저장 슬롯을 쓸 수 있도록 학생 구성으로 키를 만든다. 계정별로 구분해
+  // 같은 기기를 여러 선생님/조교가 쓸 때 임시저장이 섞이지 않게 한다.
+  const draftKey = `bulkDraft:${teacher?.userId ?? 'anon'}:${classId ?? 'ind-' + students.map(s => s.id).sort().join('-')}`
   const [bulkDate, setBulkDate] = useState(initialDate || kstDateStr())
   const [bulkChks, setBulkChks] = useState<Record<number, boolean>>({})
   const [bulkForms, setBulkForms] = useState<Record<number, RecForm>>({})
@@ -57,13 +62,30 @@ export default function ClassBulkRecordModal({
   const [bulkContentText, setBulkContentText] = useState('')
   const [bulkHomeworkText, setBulkHomeworkText] = useState('')
   const [bulkFeedbackText, setBulkFeedbackText] = useState('')
-  const [hasDraft, setHasDraft] = useState(false)
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(false)
   const [notif, setNotif] = useState<{ msg: string; ok: boolean } | null>(null)
   const scoreLookup = useRef(0)
+  const protection = useDraftProtection(draftKey,
+    { bulkDate, bulkChks, bulkForms, bulkShowTest }, !loading && !!teacher?.userId, saving)
 
   function toast(msg: string, ok = true) { setNotif({ msg, ok }); setTimeout(() => setNotif(null), 3000) }
+
+  function close() { if (protection.confirmLeave()) onClose() }
+
+  function restoreDraft() {
+    if (protection.dirty && !window.confirm('현재 입력 내용을 임시저장 내용으로 바꿀까요?')) return
+    const draft = protection.restore()
+    if (!draft || typeof draft !== 'object') return
+    const allowed = new Set(students.map(s => String(s.id)))
+    const byId = <T,>(map: Record<string, T> | undefined) =>
+      Object.fromEntries(Object.entries(map ?? {}).filter(([id]) => allowed.has(id)))
+    if (typeof draft.bulkDate === 'string') setBulkDate(draft.bulkDate)
+    setBulkChks(p => ({ ...p, ...byId(draft.bulkChks) }))
+    setBulkForms(p => ({ ...p, ...byId(draft.bulkForms) }))
+    setBulkShowTest(p => ({ ...p, ...byId(draft.bulkShowTest) }))
+    toast('임시저장 내용을 불러왔습니다')
+  }
 
   useEffect(() => { loadForDate(bulkDate) }, [bulkDate, classId]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -124,31 +146,7 @@ export default function ClassBulkRecordModal({
       }
     }
     setBulkChks(chks); setBulkForms(forms); setBulkShowTest(showT); setBulkRecIds(recIds); setBulkReleased(released)
-    setHasDraft(!!sessionStorage.getItem(draftKey))
     setLoading(false)
-  }
-
-  function loadBulkDraft() {
-    const raw = sessionStorage.getItem(draftKey)
-    if (!raw) return
-    try {
-      const d = JSON.parse(raw)
-      if (d.date) setBulkDate(d.date)
-      setBulkChks(p => ({ ...p, ...(d.chks || {}) }))
-      setBulkForms(p => ({ ...p, ...(d.forms || {}) }))
-      setBulkShowTest(p => ({ ...p, ...(d.showTest || {}) }))
-      setHasDraft(false)
-      toast('임시저장 내용을 불러왔습니다')
-    } catch { }
-  }
-  function clearBulkDraft() {
-    sessionStorage.removeItem(draftKey)
-    setHasDraft(false)
-  }
-  function saveBulkDraft() {
-    sessionStorage.setItem(draftKey, JSON.stringify({ date: bulkDate, chks: bulkChks, forms: bulkForms, showTest: bulkShowTest }))
-    setHasDraft(true)
-    toast('반 수업기록이 임시저장되었습니다')
   }
 
   function setBF(sid: number, key: keyof RecForm, val: any) {
@@ -285,18 +283,16 @@ export default function ClassBulkRecordModal({
     }
     setSaving(false)
     if (errCnt > 0) {
-      sessionStorage.setItem(draftKey, JSON.stringify({ date: bulkDate, chks: bulkChks, forms: bulkForms, showTest: bulkShowTest }))
-      setHasDraft(true)
+      protection.persist()
       toast('일부 항목을 저장하지 못했습니다. 작성 내용은 유지됩니다. 확인 후 다시 저장해 주세요.', false)
       return
     }
-    sessionStorage.removeItem(draftKey)
-    setHasDraft(false)
     if (cnt === 0 && errCnt === 0) {
       toast('저장할 내용이 없습니다. 수업 내용·숙제·피드백이나 수치 항목을 수정 후 저장하세요.', false)
       return
     }
     if (cnt > 0) {
+      protection.markSaved()
       toast(cnt + '명 수업기록 저장됨')
       onSaved()
       onClose()
@@ -326,10 +322,10 @@ export default function ClassBulkRecordModal({
     .bcr-fdv{font-size:11px;font-weight:600;color:${tx3};letter-spacing:1px;margin:16px 0 10px;padding-bottom:7px;border-bottom:1px solid ${bd};}
     .bcr-bout{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid ${bd};background:transparent;color:${tx2};font-family:inherit;}
     .bcr-bout:hover{border-color:${navy};color:${navy};}
-    .bcr-bdng{display:inline-flex;align-items:center;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;border:none;background:#FDECEA;color:${re};font-family:inherit;}
+    .bcr-bdng{display:inline-flex;align-items:center;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;border:none;background:var(--ui-danger-bg);color:${re};font-family:inherit;}
     .bcr-bprim{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;background:${navy};color:#fff;font-family:inherit;}
-    .bcr-bprim:hover{background:#1A4080;}
-    .bcr-bgold{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:none;background:${gold};color:#071A3E;font-family:inherit;}
+    .bcr-bprim:hover{background:var(--ui-primary-hover);}
+    .bcr-bgold{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:none;background:${gold};color:var(--ui-primary-text);font-family:inherit;}
     .bcr-modal{width:820px;}
     .bcr-content-hw{display:flex;flex-direction:column;gap:10px;margin-bottom:10px;}
     .bcr-grid{display:flex;flex-direction:column;}
@@ -358,12 +354,13 @@ export default function ClassBulkRecordModal({
       <div className="bcr-modal" onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: mobileMode ? '16px 16px 0 0' : 12, width: mobileMode ? '100%' : (isSingleStudent ? 560 : undefined), maxWidth: '100%', maxHeight: mobileMode ? '92vh' : '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
         <div style={{ padding: mobileMode ? '14px 16px 0' : '18px 22px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: '#fff', zIndex: 1, borderBottom: `1px solid ${bd}`, marginBottom: 0 }}>
           <span style={{ fontSize: 15, fontWeight: 600, color: tx }}>{title ?? `${className} 수업기록 작성`}</span>
-          <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: bg, cursor: 'pointer', fontSize: 17, color: tx2 }}>×</button>
+          <button onClick={close} style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: bg, cursor: 'pointer', fontSize: 17, color: tx2 }}>×</button>
         </div>
 
         <div style={{ padding: mobileMode ? '12px 16px' : '14px 22px' }}>
+          <DraftNotice available={!!protection.recoverable} status={protection.status} onRestore={restoreDraft} onDiscard={protection.discardRecovery} />
           {notif && (
-            <div style={{ background: notif.ok ? gbg : '#FDECEA', border: `1px solid ${notif.ok ? gr : re}`, borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 12, color: notif.ok ? gr : re }}>
+            <div style={{ background: notif.ok ? gbg : 'var(--ui-danger-bg)', border: `1px solid ${notif.ok ? gr : re}`, borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 12, color: notif.ok ? gr : re }}>
               {notif.msg}
             </div>
           )}
@@ -387,15 +384,6 @@ export default function ClassBulkRecordModal({
               </div>
             </div>
           </div>
-
-          {/* 임시저장 배너 */}
-          {hasDraft && (
-            <div style={{ background: wbg, border: `1px solid ${wa}`, borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: wa, display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><IconSave size={13} /> 임시저장된 내용이 있습니다.</span>
-              <button onClick={loadBulkDraft} style={{ padding: '3px 10px', borderRadius: 6, border: `1px solid ${wa}`, background: 'transparent', color: wa, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12 }}>불러오기</button>
-              <button onClick={clearBulkDraft} style={{ padding: '3px 10px', borderRadius: 6, border: `1px solid ${bd}`, background: 'transparent', color: tx3, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12 }}>무시</button>
-            </div>
-          )}
 
           {/* 일괄 작성 — 수업 내용/숙제/피드백을 선택된 학생 전원에게 한 번에 반영 */}
           <div style={{ background: bg, borderRadius: 8, padding: 12, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -564,8 +552,7 @@ export default function ClassBulkRecordModal({
         </div>
 
         <div style={{ padding: mobileMode ? '0 16px 14px' : '0 22px 18px', display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', position: 'sticky', bottom: 0, background: '#fff', borderTop: `1px solid ${bd}`, paddingTop: 12 }}>
-          <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, border: `1px solid ${bd}`, background: '#fff', cursor: 'pointer', color: tx2, fontFamily: 'inherit' }}>취소</button>
-          <button onClick={saveBulkDraft} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 13, border: `1px solid ${wa}`, background: 'transparent', cursor: 'pointer', color: wa, fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 5 }}><IconSave size={13} /> 임시저장</button>
+          <button onClick={close} style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, border: `1px solid ${bd}`, background: '#fff', cursor: 'pointer', color: tx2, fontFamily: 'inherit' }}>취소</button>
           <button className="bcr-bprim" onClick={saveBulkRec} disabled={saving} style={{ opacity: saving ? 0.7 : 1 }}>{saving ? '저장 중...' : '전체 저장'}</button>
         </div>
       </div>

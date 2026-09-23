@@ -16,11 +16,15 @@ import LocationSection from '@/components/landing-preview/LocationSection'
 import InstallSection from '@/components/landing-preview/InstallSection'
 import LoginPanel from '@/components/landing-preview/LoginPanel'
 import ScrollToTopButton from '@/components/landing-preview/ScrollToTopButton'
+import SeasonEffect from '@/components/season/SeasonEffect'
+import { useSiteSettings } from '@/lib/use-site-settings'
+import { supabase } from '@/lib/supabase'
 
 export default function HomePage() {
   const router = useRouter()
   const { role, loading: authLoading } = useAuth()
   const [loginOpen, setLoginOpen] = useState(false)
+  const { settings: siteSettings, effectiveSeason } = useSiteSettings()
 
   // 로그인 패널에서 로그인에 성공하면 실제 계정 유형에 맞는 화면으로 이동한다.
   useEffect(() => {
@@ -29,6 +33,20 @@ export default function HomePage() {
     else if (role === 'parent') router.replace('/parent/records')
     else if (role === 'student') router.replace('/student/records')
   }, [role, authLoading, router])
+
+  // 방문 로그 — 관리자 분석 페이지의 일일/월별 접속량 집계용. 브라우저 세션(탭)마다 한 번만 기록한다.
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem('visit_logged')) return
+      sessionStorage.setItem('visit_logged', '1')
+      const sessionId = (crypto as { randomUUID?: () => string }).randomUUID?.() ?? String(Date.now())
+      supabase.from('site_visits').insert({
+        session_id: sessionId,
+        path: '/',
+        is_mobile: window.matchMedia('(max-width: 768px)').matches,
+      }).then(() => {})
+    } catch {}
+  }, [])
 
   return (
     <div style={{ fontFamily: "'Noto Sans KR',sans-serif", position: 'relative', overflowX: 'hidden' }}>
@@ -63,6 +81,7 @@ export default function HomePage() {
         <InstallSection />
       </div>
 
+      <SeasonEffect enabled={siteSettings.seasonEffectEnabled} season={effectiveSeason} intensity={siteSettings.seasonIntensity} />
       <LoginPanel open={loginOpen} onClose={() => setLoginOpen(false)} />
       <ScrollToTopButton />
     </div>

@@ -3,9 +3,10 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { kstDateStr } from '@/lib/kst'
 import { computeStreak, generateCouponCode, COUPON_MILESTONES, type StreakRec } from '@/lib/streak'
+import { IconCoupon } from '@/components/icons'
 
-const navy = '#0D2A5E', navyDk = '#071A3E', gold = '#D87E13'
-const tx2 = '#4B5C7E'
+const navy = 'var(--ui-primary)', navyDk = 'var(--ui-primary)', gold = 'var(--ui-primary)'
+const tx2 = 'var(--ui-text-2)'
 
 // 숙제 이행률 100% 연속 달성 마일스톤(5/10/15/20/25/30일)에 새로 도달했을 때 한 번만
 // "쿠폰 받기 vs 다음 목표 도전" 선택지를 보여준다.
@@ -93,11 +94,11 @@ export default function StreakCouponPrompt({ studentId, chronoRecs }: { studentI
       }}>
         {claimedCode ? (
           <>
-            <p style={{ fontSize: 44, margin: '0 0 10px' }}>🎟️</p>
+            <p style={{ margin: '0 0 10px', color: navy, display: 'flex', justifyContent: 'center' }}><IconCoupon size={44} strokeWidth={1.5} /></p>
             <p style={{ fontSize: 17, fontWeight: 900, color: navyDk, margin: '0 0 4px' }}>쿠폰 발급 완료!</p>
             <p style={{ fontSize: 12.5, color: tx2, margin: '0 0 18px' }}>학원에서 이 코드를 선생님께 보여주세요</p>
             <div style={{
-              background: '#F5F7FA', border: `1.5px dashed ${navy}55`, borderRadius: 12, padding: '16px 10px', marginBottom: 18,
+              background: 'var(--ui-bg)', border: `1.5px dashed color-mix(in srgb, ${navy} 33%, transparent)`, borderRadius: 12, padding: '16px 10px', marginBottom: 18,
             }}>
               <p style={{ fontSize: 28, fontWeight: 900, color: navy, letterSpacing: 3, margin: 0, fontFamily: 'monospace' }}>
                 {claimedCode}
@@ -105,11 +106,11 @@ export default function StreakCouponPrompt({ studentId, chronoRecs }: { studentI
             </div>
             <button onClick={() => { setClaimedCode(null); setPrompt(null) }} style={{
               width: '100%', padding: 14, borderRadius: 12, border: 'none', background: gold,
-              color: navyDk, fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
+              color: 'var(--ui-primary-text)', fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
             }}>
               확인
             </button>
-            <p style={{ fontSize: 11, color: '#96A4BF', margin: '14px 0 0' }}>
+            <p style={{ fontSize: 11, color: 'var(--ui-text-3)', margin: '14px 0 0' }}>
               이 코드는 "쿠폰함"에서 언제든 다시 볼 수 있어요
             </p>
           </>
@@ -125,10 +126,11 @@ export default function StreakCouponPrompt({ studentId, chronoRecs }: { studentI
 
             <button onClick={claim} disabled={busy} style={{
               width: '100%', padding: 14, borderRadius: 12, border: 'none', background: gold,
-              color: navyDk, fontSize: 15, fontWeight: 800, cursor: busy ? 'not-allowed' : 'pointer',
+              color: 'var(--ui-primary-text)', fontSize: 15, fontWeight: 800, cursor: busy ? 'not-allowed' : 'pointer',
               fontFamily: 'inherit', marginBottom: 10, opacity: busy ? .7 : 1,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}>
-              🎟️ {prompt.milestone}일 연속 달성 쿠폰 받기
+              <IconCoupon size={15} /> {prompt.milestone}일 연속 달성 쿠폰 받기
             </button>
 
             <button onClick={decline} disabled={busy} style={{
@@ -139,7 +141,7 @@ export default function StreakCouponPrompt({ studentId, chronoRecs }: { studentI
               {prompt.nextMilestone ? `${prompt.nextMilestone}일 연속 도전하기` : '계속 도전하기'}
             </button>
 
-            <p style={{ fontSize: 11, color: '#96A4BF', margin: '14px 0 0' }}>
+            <p style={{ fontSize: 11, color: 'var(--ui-text-3)', margin: '14px 0 0' }}>
               받은 쿠폰은 "쿠폰함"에서 확인할 수 있어요
             </p>
           </>

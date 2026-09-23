@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
-const navy = '#0D2A5E', tx = '#0D1B36', tx2 = '#4B5C7E', tx3 = '#96A4BF', bd = '#DDE3EE'
+const navy = 'var(--ui-primary)', tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)', bd = 'var(--ui-border)'
 
 // 학부모/학생 화면이 공유하는 시험 결과 카드 — 등수는 관리자 화면에서만 노출하고
 // 여기서는 시험평균/최고점만 보여준다.

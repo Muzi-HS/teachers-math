@@ -4,7 +4,7 @@ import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { can } from '@/lib/permissions'
 import { kstDateStr, kstNow } from '@/lib/kst'
-import { IconUsers, IconLightbulb } from '@/components/icons'
+import { IconUsers, IconLightbulb, IconCoupon } from '@/components/icons'
 import { useMobileMode } from '@/context/MobileModeContext'
 
 type Student = {
@@ -29,12 +29,12 @@ const BLANK: Omit<Student, 'id'> = {
   reg_date: kstDateStr(),
 }
 
-const navy = '#0D2A5E', navyDk = '#071A3E', navyM = '#E8EEF8'
-const gold = '#D87E13', goldL = '#F09830'
-const bg = '#F5F7FA', bd = '#DDE3EE'
-const tx = '#0D1B36', tx2 = '#4B5C7E', tx3 = '#96A4BF'
-const re = '#C0392B', rbg = '#FDECEA'
-const gr = '#1A7F4E', gbg = '#E0F5EB'
+const navy = 'var(--ui-primary)', navyDk = 'var(--ui-primary-text)', navyM = 'var(--ui-surface-2)'
+const gold = 'var(--ui-primary)', goldL = 'var(--ui-primary-hover)'
+const bg = 'var(--ui-bg)', bd = 'var(--ui-border)'
+const tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)'
+const re = 'var(--ui-danger)', rbg = 'var(--ui-danger-bg)'
+const gr = 'var(--ui-success)', gbg = 'var(--ui-success-bg)'
 const pu = '#7C3AED', pubg = '#F3E8FF'
 
 const SCHOOL_TYPES = ['초등', '중등', '고등'] as const
@@ -799,7 +799,7 @@ export default function StudentsPage() {
                   {detailCoupons.map(c => (
                     <div key={c.id} style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:'6px 0' }}>
                       <div>
-                        <p style={{ fontSize:13,fontWeight:600,color:tx,margin:0 }}>🎟️ {c.milestone}일 연속 달성 쿠폰</p>
+                        <p style={{ fontSize:13,fontWeight:600,color:tx,margin:0,display:'flex',alignItems:'center',gap:5 }}><IconCoupon size={13} /> {c.milestone}일 연속 달성 쿠폰</p>
                         <p style={{ fontSize:11,color:tx3,margin:'2px 0 0' }}>{c.claimed_at.slice(0,10)} 획득 · 코드 {c.code}</p>
                       </div>
                       <button className="bdng" onClick={() => toggleCouponUsed(c.id, !c.used)}>

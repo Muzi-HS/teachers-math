@@ -6,8 +6,8 @@ import { ExamAttempt, GradedQuestion, isAnswerCorrect } from '@/lib/auto-grading
 type QuestionRow = { number: number; points: number; kind: 'choice' | 'text'; correct_answer: number[] | string }
 type Student = { id: number; name: string; school?: string }
 
-const navy = '#0D2A5E', gold = '#D87E13', bd = '#DDE3EE', bg = '#F5F7FA'
-const tx = '#0D1B36', tx2 = '#4B5C7E', tx3 = '#96A4BF', gr = '#1A7F4E', gbg = '#E0F5EB', re = '#C0392B', rbg = '#FDECEA'
+const navy = 'var(--ui-primary)', gold = 'var(--ui-primary)', bd = 'var(--ui-border)', bg = 'var(--ui-bg)'
+const tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)', gr = 'var(--ui-success)', gbg = 'var(--ui-success-bg)', re = 'var(--ui-danger)', rbg = 'var(--ui-danger-bg)'
 
 function fmtAnswer(kind: 'choice' | 'text', value: string | number[] | undefined) {
   if (kind === 'choice') return Array.isArray(value) && value.length ? value.join(', ') : '(미입력)'
@@ -77,7 +77,7 @@ export default function AutoTestAnswerSheet({ testId, students }: { testId: numb
             <span className="ans-qnum">{q.number}번</span>
             <span className="ans-qkind">{q.kind === 'text' ? '주관식' : '객관식'} · {q.points}점</span>
             <div className="ans-bar"><div className="ans-bar-fill" style={{ width: `${q.pct}%`, background: q.pct >= 70 ? gr : q.pct >= 40 ? gold : re }} /></div>
-            <span className="ans-qpct" style={{ color: q.pct >= 70 ? gr : q.pct >= 40 ? '#B36A00' : re }}>{q.correct}/{q.total} · {q.pct}%</span>
+            <span className="ans-qpct" style={{ color: q.pct >= 70 ? gr : q.pct >= 40 ? 'var(--ui-warning)' : re }}>{q.correct}/{q.total} · {q.pct}%</span>
           </div>
         ))}
       </div>
@@ -141,7 +141,7 @@ const css = `
   .ans-card{background:#fff;border:1px solid ${bd};border-radius:14px;padding:18px 20px;margin-bottom:18px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
   .ans-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
   .ans-head h3{font-size:14px;font-weight:700;margin:0;color:${tx}}
-  .ans-badge{font-size:12px;font-weight:700;color:${navy};background:#EAF0FB;padding:3px 10px;border-radius:20px}
+  .ans-badge{font-size:12px;font-weight:700;color:${navy};background:var(--ui-accent-bg);padding:3px 10px;border-radius:20px}
   .ans-empty{font-size:13px;color:${tx3};margin:10px 0 0}
   .ans-qstats{display:flex;flex-direction:column;gap:8px;margin-top:12px}
   .ans-qrow{display:grid;grid-template-columns:52px 108px 1fr 108px;align-items:center;gap:10px}
@@ -154,7 +154,7 @@ const css = `
   .ans-chip{padding:7px 13px;border-radius:20px;border:1.5px solid ${bd};background:#fff;font-size:12.5px;font-weight:600;color:${tx2};cursor:pointer;font-family:inherit;transition:all .15s}
   .ans-chip:hover{border-color:${navy}}
   .ans-chip[data-status=done]{background:${gbg};border-color:#BFE6D2;color:${gr}}
-  .ans-chip[data-status=progress]{background:#FFF3E0;border-color:#F3D9A8;color:#B36A00}
+  .ans-chip[data-status=progress]{background:var(--ui-warning-bg);border-color:#F3D9A8;color:var(--ui-warning)}
   .ans-chip[data-active=true]{outline:2px solid ${navy};outline-offset:1px}
   .ans-sheet{margin-top:16px;border-top:1px solid ${bd};padding-top:16px}
   .ans-sheet-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;font-size:13px;color:${tx2}}

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 
-const navy = '#0D2A5E', navyDk = '#071A3E'
+const navy = 'var(--ui-primary)', navyDk = 'var(--ui-primary)'
 
 type BIPEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> }
 
@@ -88,7 +88,7 @@ export default function InstallBanner() {
       {platform === 'android' && (
         <button onClick={install} style={{
           flexShrink: 0, border: 'none', borderRadius: 8, padding: '8px 14px',
-          background: '#D87E13', color: navyDk, fontWeight: 700, fontSize: 12,
+          background: 'var(--ui-primary)', color: 'var(--ui-primary-text)', fontWeight: 700, fontSize: 12,
           cursor: 'pointer', fontFamily: 'inherit',
         }}>설치</button>
       )}

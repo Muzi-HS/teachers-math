@@ -4,10 +4,10 @@ import { QRCodeCanvas } from 'qrcode.react'
 import { IconSmartphone, IconShare } from '@/components/icons'
 import { useMobileMode } from '@/context/MobileModeContext'
 
-const navy = '#0D2A5E', navyDk = '#071A3E', navyM = '#E8EEF8'
-const gold = '#D87E13'
-const bg = '#F5F7FA', bd = '#DDE3EE'
-const tx = '#0D1B36', tx2 = '#4B5C7E', tx3 = '#96A4BF'
+const navy = 'var(--ui-primary)', navyDk = 'var(--ui-primary)', navyM = 'var(--ui-surface-2)'
+const gold = 'var(--ui-primary)'
+const bg = 'var(--ui-bg)', bd = 'var(--ui-border)'
+const tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)'
 
 export default function AppQrPage() {
   const { mobileMode } = useMobileMode()
@@ -51,7 +51,7 @@ export default function AppQrPage() {
           <p style={{ fontSize: 12, color: tx2, wordBreak: 'break-all', textAlign: 'center', margin: 0 }}>{url}</p>
           <button onClick={download} disabled={!url} style={{
             padding: '9px 18px', borderRadius: 8, border: 'none',
-            background: gold, color: navyDk, fontWeight: 700, fontSize: 13,
+            background: gold, color: 'var(--ui-primary-text)', fontWeight: 700, fontSize: 13,
             cursor: url ? 'pointer' : 'not-allowed', fontFamily: 'inherit', opacity: url ? 1 : .5,
           }}>QR 이미지 다운로드</button>
         </div>

@@ -183,53 +183,53 @@ export default function StudentTestsPage() {
   return <div className="student-exams">
     <style>{`
       @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap');
-      .student-exams{max-width:640px;margin:0 auto;padding:20px 16px 110px;color:#0D1B36}
+      .student-exams{max-width:640px;margin:0 auto;padding:20px 16px 110px;color:var(--ui-text)}
       .student-exams h1{font-size:19px;font-weight:800;margin:0 0 14px}
       .student-exams p{font-size:13px;line-height:1.6}
-      .student-exams button{border:1.5px solid #DDE3EE;border-radius:10px;padding:10px 16px;font:inherit;font-size:13px;font-weight:600;background:#fff;color:#0D2A5E;cursor:pointer;transition:all .15s}
+      .student-exams button{border:1.5px solid var(--ui-border);border-radius:10px;padding:10px 16px;font:inherit;font-size:13px;font-weight:600;background:#fff;color:var(--ui-primary);cursor:pointer;transition:all .15s}
       .student-exams button:disabled{opacity:.5;cursor:default}
-      .student-exams .exam-primary,.student-exams button[aria-pressed=true]{background:#0D2A5E;color:#fff;border-color:#0D2A5E}
-      .student-exams input{border:1.5px solid #DDE3EE;border-radius:10px;padding:13px;font:inherit;font-size:16px;width:100%;box-sizing:border-box}
-      .student-exams input:focus{outline:none;border-color:#0D2A5E}
-      .student-exams .exam-card{background:#fff;border:1px solid #DDE3EE;border-radius:14px;padding:18px;margin:12px 0;box-shadow:0 1px 3px rgba(13,27,54,.05)}
+      .student-exams .exam-primary,.student-exams button[aria-pressed=true]{background:var(--ui-primary);color:var(--ui-primary-text);border-color:var(--ui-primary)}
+      .student-exams input{border:1.5px solid var(--ui-border);border-radius:10px;padding:13px;font:inherit;font-size:16px;width:100%;box-sizing:border-box}
+      .student-exams input:focus{outline:none;border-color:var(--ui-primary)}
+      .student-exams .exam-card{background:#fff;border:1px solid var(--ui-border);border-radius:14px;padding:18px;margin:12px 0;box-shadow:0 1px 3px rgba(13,27,54,.05)}
       .student-exams .exam-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-      .student-exams .exam-list-card{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fff;border:1px solid #DDE3EE;border-radius:14px;padding:16px 18px;margin:12px 0;box-shadow:0 1px 3px rgba(13,27,54,.05)}
+      .student-exams .exam-list-card{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fff;border:1px solid var(--ui-border);border-radius:14px;padding:16px 18px;margin:12px 0;box-shadow:0 1px 3px rgba(13,27,54,.05)}
       .student-exams .exam-badge{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:20px;margin-top:6px}
-      .student-exams .exam-clock{position:sticky;top:8px;z-index:10;background:linear-gradient(135deg,#0D2A5E,#153a7d);color:#fff;padding:14px 16px;border-radius:14px;display:flex;justify-content:space-between;align-items:center;gap:10px;box-shadow:0 6px 18px rgba(13,42,94,.25)}
+      .student-exams .exam-clock{position:sticky;top:8px;z-index:10;background:linear-gradient(135deg,var(--chrome-bg),var(--chrome-bg-2));color:#fff;padding:14px 16px;border-radius:14px;display:flex;justify-content:space-between;align-items:center;gap:10px;box-shadow:0 6px 18px rgba(13,42,94,.25)}
       .student-exams .exam-clock strong{font-variant-numeric:tabular-nums;font-size:26px;letter-spacing:.5px}
       .student-exams .exam-clock span{font-size:11.5px;opacity:.75}
-      .student-exams .exam-clock .exam-primary{background:#D87E13;border-color:#D87E13;color:#3A2205;font-weight:700}
-      .student-exams .exam-progress{height:6px;background:#DDE3EE;border-radius:99px;overflow:hidden;margin:12px 0 4px}
-      .student-exams .exam-progress-fill{height:100%;background:#D87E13;border-radius:99px;transition:width .2s}
-      .student-exams .exam-status-line{font-size:12.5px;color:#4B5C7E;display:flex;align-items:center;gap:6px;margin:6px 0 14px}
+      .student-exams .exam-clock .exam-primary{background:var(--ui-accent);border-color:var(--ui-accent);color:#fff;font-weight:700}
+      .student-exams .exam-progress{height:6px;background:var(--ui-border);border-radius:99px;overflow:hidden;margin:12px 0 4px}
+      .student-exams .exam-progress-fill{height:100%;background:var(--ui-accent);border-radius:99px;transition:width .2s}
+      .student-exams .exam-status-line{font-size:12.5px;color:var(--ui-text-2);display:flex;align-items:center;gap:6px;margin:6px 0 14px}
       .student-exams .exam-answers{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
       .student-exams .exam-choice{width:50px;height:50px;border-radius:50%;font-size:19px;font-weight:700;padding:0;flex-shrink:0;display:flex;align-items:center;justify-content:center}
-      .student-exams .exam-choice[aria-pressed=true]{box-shadow:0 0 0 3px rgba(13,42,94,.18)}
-      .student-exams .exam-error{background:#FDECEA;color:#C0392B;padding:12px 14px;border-radius:10px;font-size:13px}
+      .student-exams .exam-choice[aria-pressed=true]{box-shadow:0 0 0 3px var(--ui-focus-ring)}
+      .student-exams .exam-error{background:var(--ui-danger-bg);color:var(--ui-danger);padding:12px 14px;border-radius:10px;font-size:13px}
       .student-exams .exam-result{text-align:center;padding:30px 20px}
-      .student-exams .exam-result-score{font-size:52px;font-weight:800;color:#0D2A5E;margin:4px 0}
-      .student-exams .exam-result-badge{display:inline-block;background:#E0F5EB;color:#1A7F4E;font-size:13px;font-weight:700;padding:5px 14px;border-radius:20px;margin-bottom:10px}
+      .student-exams .exam-result-score{font-size:52px;font-weight:800;color:var(--ui-primary);margin:4px 0}
+      .student-exams .exam-result-badge{display:inline-block;background:var(--ui-success-bg);color:var(--ui-success);font-size:13px;font-weight:700;padding:5px 14px;border-radius:20px;margin-bottom:10px}
     `}</style>
     <h1>{active ? active.name : '시험 답안 입력'}</h1>
     {error && <p className="exam-error" role="alert">{error}</p>}
     {needsPin ? <section className="exam-card">
       <p style={{ marginTop: 0 }}>시험 답안을 안전하게 제출하기 위해 학생 계정의 PIN을 한 번 확인해 주세요.</p>
-      <label style={{ fontSize: 12.5, fontWeight: 700, color: '#4B5C7E' }}>학생 PIN
+      <label style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ui-text-2)' }}>학생 PIN
         <input type="password" inputMode="numeric" maxLength={4} autoComplete="off" style={{ marginTop: 6, letterSpacing: 6, textAlign: 'center', fontSize: 20 }} value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, ''))} />
       </label>
       <button className="exam-primary" disabled={busy || pin.length !== 4} onClick={verify} style={{ marginTop: 14, width: '100%' }}>PIN 확인</button>
     </section> : !active ? <>
       <div className="exam-row"><p style={{ margin: 0 }}>공개된 시험의 답안을 입력하세요. 시작 후 2분이 지나면 자동 제출됩니다.</p><button disabled={busy} onClick={load}>새로고침</button></div>
       {busy && <p>불러오는 중...</p>}
-      {!busy && !tests.length && !error && <section className="exam-card" style={{ textAlign: 'center', color: '#96A4BF' }}>공개된 시험이 없습니다.</section>}
+      {!busy && !tests.length && !error && <section className="exam-card" style={{ textAlign: 'center', color: 'var(--ui-text-3)' }}>공개된 시험이 없습니다.</section>}
       {tests.map(test => {
         const done = test.attempt?.submitted_at
         const started = !!test.attempt && !done
         return <div className="exam-list-card" key={test.id}>
           <div>
             <strong style={{ fontSize: 14.5 }}>{test.name}</strong>
-            <p style={{ margin: '3px 0 0', color: '#4B5C7E', fontSize: 12.5 }}>{test.date} · {test.total}문항</p>
-            <span className="exam-badge" style={done ? { background: '#E0F5EB', color: '#1A7F4E' } : started ? { background: '#FFF3E0', color: '#B36A00' } : { background: '#F5F7FA', color: '#96A4BF' }}>
+            <p style={{ margin: '3px 0 0', color: 'var(--ui-text-2)', fontSize: 12.5 }}>{test.date} · {test.total}문항</p>
+            <span className="exam-badge" style={done ? { background: 'var(--ui-success-bg)', color: 'var(--ui-success)' } : started ? { background: 'var(--ui-warning-bg)', color: 'var(--ui-warning)' } : { background: 'var(--ui-bg)', color: 'var(--ui-text-3)' }}>
               {done ? `제출 완료 · ${test.attempt!.score}점` : started ? '응시 시작됨' : '미응시'}
             </span>
           </div>
@@ -239,8 +239,8 @@ export default function StudentTestsPage() {
     </> : finished ? <section className="exam-card exam-result">
       <span className="exam-result-badge">제출 완료</span>
       <p className="exam-result-score">{active.attempt.score}점</p>
-      <p style={{ color: '#4B5C7E' }}>정답 {active.attempt.cor}/{active.questions.length}개 · 획득 배점 {active.attempt.earned_points}/{active.attempt.total_points}점</p>
-      <p style={{ color: '#96A4BF', fontSize: 12 }}>점수는 100점 만점으로 환산되어 저장되었습니다.</p>
+      <p style={{ color: 'var(--ui-text-2)' }}>정답 {active.attempt.cor}/{active.questions.length}개 · 획득 배점 {active.attempt.earned_points}/{active.attempt.total_points}점</p>
+      <p style={{ color: 'var(--ui-text-3)', fontSize: 12 }}>점수는 100점 만점으로 환산되어 저장되었습니다.</p>
       <button className="exam-primary" style={{ marginTop: 10 }} onClick={() => { setActive(null); activeRef.current = null; void load() }}>시험 목록으로</button>
     </section> : <>
       <div className="exam-clock">
@@ -250,13 +250,13 @@ export default function StudentTestsPage() {
       <div className="exam-progress"><div className="exam-progress-fill" style={{ width: `${active.questions.length ? Math.round(answeredCount / active.questions.length * 100) : 0}%` }} /></div>
       <p className="exam-status-line" role="status">
         <span>{answeredCount}/{active.questions.length}문항 입력됨</span>
-        <span aria-hidden style={{ color: '#DDE3EE' }}>·</span>
+        <span aria-hidden style={{ color: 'var(--ui-border)' }}>·</span>
         <span>{seconds === 0 ? '입력이 마감되었습니다. 저장된 답안을 제출하고 있습니다.' : error ? '저장 상태를 확인해 주세요.' : pendingSaves > 0 ? '저장 중...' : '저장됨'}</span>
       </p>
       {active.questions.map(q => <section className="exam-card" key={q.number}>
         <div className="exam-row">
           <strong style={{ fontSize: 14.5 }}>{q.number}번</strong>
-          <span style={{ fontSize: 11.5, color: '#4B5C7E', fontWeight: 600 }}>{q.points}점 · {q.kind === 'text' ? '주관식' : q.multiple ? '객관식 · 복수 선택' : '객관식'}</span>
+          <span style={{ fontSize: 11.5, color: 'var(--ui-text-2)', fontWeight: 600 }}>{q.points}점 · {q.kind === 'text' ? '주관식' : q.multiple ? '객관식 · 복수 선택' : '객관식'}</span>
         </div>
         {q.kind === 'choice' ? <div className="exam-answers">{[1, 2, 3, 4, 5].map(choice => {
           const value = Array.isArray(answers[q.number]) ? answers[q.number] as number[] : []

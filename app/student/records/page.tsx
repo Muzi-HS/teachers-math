@@ -8,8 +8,8 @@ import HomeworkStatsView from '@/components/HomeworkStatsView'
 import TodayClassBanner from '@/components/TodayClassBanner'
 import StreakCouponPrompt from '@/components/StreakCouponPrompt'
 
-const navy='#0D2A5E', gold='#D87E13', tx='#0D1B36', tx2='#4B5C7E', tx3='#96A4BF'
-const bd='#DDE3EE', bg='#F5F7FA', re='#C0392B', rbg='#FDECEA', gr='#1A7F4E', gbg='#E0F5EB'
+const navy='var(--ui-primary)', gold='var(--ui-primary)', tx='var(--ui-text)', tx2='var(--ui-text-2)', tx3='var(--ui-text-3)'
+const bd='var(--ui-border)', bg='var(--ui-bg)', re='var(--ui-danger)', rbg='var(--ui-danger-bg)', gr='var(--ui-success)', gbg='var(--ui-success-bg)'
 
 type Rec = {
   id: number; date: string; content: string; homework: string
@@ -18,7 +18,7 @@ type Rec = {
   record_test_items?: { test_id: number; t_total: number; t_cor: number; t_score: number; tests: { name: string } | null }[]
 }
 
-function rateColor(v: number) { return v >= 80 ? gr : v >= 60 ? '#C05621' : re }
+function rateColor(v: number) { return v >= 80 ? gr : v >= 60 ? 'var(--ui-warning)' : re }
 
 // 학생 계정용 수업기록 화면 — 학부모 화면과 같은 기록을 보여주되, 학생에게 필요한
 // 숙제 이행률/정답률/숙제/진도(수업 내용)와 시험 결과만 노출한다(수업 태도, 수업
@@ -131,7 +131,7 @@ export default function StudentRecords() {
         <>
           {/* 이번 숙제 — 반이 2개 이상이면 반별로 각각의 최신 숙제를 보여준다 */}
           <div style={{
-            background: `linear-gradient(135deg,${navy} 0%,#0D2A5E 100%)`, borderRadius: 14,
+            background: `linear-gradient(135deg,${navy} 0%,var(--ui-primary) 100%)`, borderRadius: 14,
             padding: '18px 18px', marginBottom: 16, color: '#fff',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
@@ -142,7 +142,7 @@ export default function StudentRecords() {
               <div key={classId ?? 'none'} style={{ marginTop: idx > 0 ? 14 : 0, paddingTop: idx > 0 ? 14 : 0, borderTop: idx > 0 ? '1px solid rgba(255,255,255,.15)' : undefined }}>
                 {latestByClass.length > 1 && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: '#F09830', background: 'rgba(255,255,255,.12)', padding: '2px 8px', borderRadius: 20 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--ui-primary-text)', background: 'rgba(255,255,255,.12)', padding: '2px 8px', borderRadius: 20 }}>
                       {classId != null ? (classNames[classId] ?? '반 정보 없음') : '반 정보 없음'}
                     </span>
                     <span style={{ fontSize: 11, color: 'rgba(255,255,255,.55)' }}>{rec.date}</span>
@@ -172,7 +172,7 @@ export default function StudentRecords() {
                     ? <span style={{ background: rbg, color: re, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>지각</span>
                     : <span style={{ background: gbg, color: gr, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>정시 등원</span>
                   }
-                  {r.has_test && <span style={{ background: '#E8EEF8', color: navy, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>시험</span>}
+                  {r.has_test && <span style={{ background: 'var(--ui-surface-2)', color: navy, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>시험</span>}
                 </div>
 
                 {/* 숙제 이행률/정답률 — 원형 게이지 (수업 태도는 학생에게 비노출) */}

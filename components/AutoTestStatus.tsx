@@ -4,8 +4,8 @@ import { supabase } from '@/lib/supabase'
 import { ExamAttempt } from '@/lib/auto-grading'
 import { EditableTest } from './TestEditorModal'
 
-const navy = '#0D2A5E', gold = '#D87E13', bd = '#DDE3EE', bg = '#F5F7FA'
-const tx2 = '#4B5C7E', tx3 = '#96A4BF', gr = '#1A7F4E', gbg = '#E0F5EB', re = '#C0392B'
+const navy = 'var(--ui-primary)', gold = 'var(--ui-primary)', bd = 'var(--ui-border)', bg = 'var(--ui-bg)'
+const tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)', gr = 'var(--ui-success)', gbg = 'var(--ui-success-bg)', re = 'var(--ui-danger)'
 
 export default function AutoTestStatus({ test, students, onPublished, onResults }: {
   test: EditableTest; students: { id: number; name: string }[]
@@ -56,7 +56,7 @@ export default function AutoTestStatus({ test, students, onPublished, onResults 
       .ats-btn{padding:9px 16px;border-radius:9px;border:none;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
       .ats-btn:disabled{opacity:.6;cursor:default}
       .ats-btn.on{background:#fff;color:${tx2};border:1.5px solid ${bd}}
-      .ats-btn.off{background:${gold};color:#3A2205}
+      .ats-btn.off{background:${gold};color:var(--ui-primary-text)}
       .ats-stats{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
       .ats-stat{flex:1;min-width:88px;background:${bg};border-radius:10px;padding:10px 12px;text-align:center}
       .ats-stat b{display:block;font-size:19px;line-height:1.3}
@@ -91,7 +91,7 @@ export default function AutoTestStatus({ test, students, onPublished, onResults 
       const style = a?.submitted_at
         ? { background: gbg, color: gr }
         : a
-        ? { background: '#FFF3E0', color: '#B36A00' }
+        ? { background: 'var(--ui-warning-bg)', color: 'var(--ui-warning)' }
         : { background: bg, color: tx3 }
       return <span key={id} className="ats-chip" style={style}>
         {label} · {a?.submitted_at ? `${a.score}점` : a ? '응시 중' : '미응시'}

@@ -6,8 +6,13 @@ import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { requestFCMToken, isFCMSupported } from '@/lib/firebase'
 import ForegroundNotification from '@/components/ForegroundNotification'
+import { InternalThemeProvider } from '@/context/InternalThemeContext'
+import { MobileModeProvider } from '@/context/MobileModeContext'
+import ThemeToggle from '@/components/ui/ThemeToggle'
+import SeasonEffect from '@/components/season/SeasonEffect'
+import { useSiteSettings } from '@/lib/use-site-settings'
 
-const navy='#0D2A5E', navyDk='#071A3E', bd='#DDE3EE', bg='#F5F7FA', tx2='#4B5C7E', tx3='#96A4BF'
+const navy='var(--ui-primary)', navyDk='var(--ui-primary)', bd='var(--ui-border)', bg='var(--ui-bg)', tx2='var(--ui-text-2)', tx3='var(--ui-text-3)'
 
 // ── 자녀 선택 Context ──
 type Child = { id: number; name: string; birth_year: number; school: string }
@@ -37,9 +42,14 @@ const NAV = [
 ]
 
 export default function ParentLayout({ children }: { children: React.ReactNode }) {
+  return <InternalThemeProvider><MobileModeProvider><ParentLayoutContent>{children}</ParentLayoutContent></MobileModeProvider></InternalThemeProvider>
+}
+
+function ParentLayoutContent({ children }: { children: React.ReactNode }) {
   const { parent, role, loading, logout } = useAuth()
   const router   = useRouter()
   const pathname = usePathname()
+  const { settings: siteSettings, effectiveSeason } = useSiteSettings()
 
   const [selChild, setSelChild] = useState<number | null>(null)
   const [ready,    setReady]    = useState(false)
@@ -186,7 +196,7 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
   if (loading || !ready) return (
     <div style={{ minHeight: '100vh', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ textAlign: 'center' }}>
-        <div style={{ width: 36, height: 36, border: '3px solid #DDE3EE', borderTop: `3px solid ${navy}`, borderRadius: '50%', margin: '0 auto 12px', animation: 'spin 0.8s linear infinite' }} />
+        <div style={{ width: 36, height: 36, border: `3px solid ${bd}`, borderTop: `3px solid ${navy}`, borderRadius: '50%', margin: '0 auto 12px', animation: 'spin 0.8s linear infinite' }} />
         <p style={{ fontSize: 13, color: tx2 }}>로딩 중...</p>
       </div>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
@@ -208,29 +218,32 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
 
       {/* 상단 헤더 */}
       <header style={{
-        background: `linear-gradient(135deg,${navyDk} 0%,${navy} 100%)`,
+        background: 'linear-gradient(135deg, var(--chrome-bg) 0%, var(--chrome-bg-2) 100%)',
         padding: '0 16px', height: 54,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         position: 'sticky', top: 0, zIndex: 100,
         boxShadow: '0 2px 8px rgba(0,0,0,.2)', flexShrink: 0,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, overflow: 'hidden' }}>
           <Image src="/logo.png" alt="로고" width={30} height={30} style={{ objectFit: 'contain', flexShrink: 0 }} />
-          <span style={{ fontFamily: 'Montserrat,sans-serif', fontSize: 13, fontWeight: 800, color: '#fff', letterSpacing: 0.5 }}>
+          <span style={{ fontFamily: 'Montserrat,sans-serif', fontSize: 13, fontWeight: 800, color: '#fff', letterSpacing: 0.5, flexShrink: 0 }}>
             TEACHERS MATH
           </span>
-          <span style={{ fontSize: 10, color: 'rgba(255,255,255,.5)', background: 'rgba(255,255,255,.1)', padding: '2px 6px', borderRadius: 10 }}>
+          <span style={{ fontSize: 10, color: 'var(--chrome-text-2)', background: 'rgba(255,255,255,.1)', padding: '2px 6px', borderRadius: 10, flexShrink: 0 }}>
             학부모
           </span>
         </div>
-        <button
-          onClick={logout}
-          style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: "'Noto Sans KR',sans-serif", padding: 0 }}
-          onMouseEnter={e => (e.currentTarget.style.color = 'rgba(255,255,255,.9)')}
-          onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,.5)')}
-        >
-          로그아웃
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+          <ThemeToggle />
+          <button
+            onClick={logout}
+            style={{ fontSize: 12, color: 'var(--chrome-text-2)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: "'Noto Sans KR',sans-serif", padding: 0 }}
+            onMouseEnter={e => (e.currentTarget.style.color = 'rgba(255,255,255,.9)')}
+            onMouseLeave={e => (e.currentTarget.style.color = 'var(--chrome-text-2)')}
+          >
+            로그아웃
+          </button>
+        </div>
       </header>
 
       {/* 자녀 선택 탭 (다자녀인 경우만) */}
@@ -254,11 +267,11 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
       )}
 
       {/* 본문 */}
-      <main className="parent-main" style={{ flex: 1, padding: '16px 16px 80px', maxWidth: 640, width: '100%', margin: '0 auto' }}>
+      <main className="parent-main" style={{ flex: 1, padding: '16px 16px calc(80px + env(safe-area-inset-bottom))', maxWidth: 640, width: '100%', margin: '0 auto' }}>
         {notifPerm && notifPerm !== 'granted' && !notifBannerDismissed && (
           <div style={{
             display: 'flex', alignItems: 'center', gap: 10,
-            background: '#FEF3E2', border: '1px solid #D87E1355', borderRadius: 12,
+            background: 'var(--ui-warning-bg)', border: '1px solid var(--ui-warning)', borderRadius: 12,
             padding: '12px 14px', marginBottom: 14,
           }}>
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -280,7 +293,7 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
               }}>{notifRequesting ? '확인 중...' : '알림 켜기'}</button>
             )}
             <button onClick={dismissNotifBanner} aria-label="닫기" style={{
-              flexShrink: 0, border: 'none', background: 'rgba(13,42,94,.08)',
+              flexShrink: 0, border: 'none', background: 'var(--ui-surface-2)',
               color: navyDk, borderRadius: '50%', width: 24, height: 24,
               cursor: 'pointer', fontSize: 14, lineHeight: 1,
             }}>×</button>
@@ -319,6 +332,7 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
           )
         })}
       </nav>
+      <SeasonEffect enabled={siteSettings.seasonEffectEnabled && siteSettings.seasonShowInWorkspace} season={effectiveSeason} intensity={siteSettings.seasonIntensity} />
       <ForegroundNotification />
     </div>
   )

@@ -1,8 +1,113 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #F3F7F4;
+  --foreground: #243B32;
+
+  /* 브랜드 팔레트 (LandingPage 히어로 기준 — 그린이 메인, 네이비/골드는 포인트) */
+  --brand-mint: #E7F8EF;
+  --brand-deep: #14532D;
+  --brand-deep-2: #1F5B3A;
+  --brand-line: rgba(20, 83, 45, .35);
+  --brand-navy: #0D2A5E;
+  --brand-navy-dk: #071A3E;
+  --brand-gold: #D87E13;
+
+  /* 헤더는 딥그린, 탐색 영역은 흰색과 민트로 구분 */
+  --chrome-bg: var(--brand-deep);
+  --chrome-bg-2: var(--brand-deep-2);
+  --chrome-border: rgba(255, 255, 255, .14);
+  --chrome-text: #ffffff;
+  --chrome-text-2: #D7E8DD;
+  --chrome-text-3: #C1D9CA;
+  --chrome-active-bg: #E7F8EF;
+  --chrome-active-text: #14532D;
+
+  /* 작업 화면은 채도가 낮은 민트, 주요 동작은 딥그린 */
+  --ui-bg: #F3F7F4;
+  --ui-surface: #ffffff;
+  --ui-surface-2: #E7F3EA;
+  --ui-border: #DEE7E1;
+  --ui-text: #243B32;
+  --ui-text-2: #496556;
+  --ui-text-3: #586C61;
+  --ui-primary: var(--brand-deep);
+  --ui-primary-text: #ffffff;
+  --ui-primary-hover: #1F5B3A;
+  --ui-accent: #34704C;
+  --ui-accent-text: #245C3B;
+  --ui-accent-bg: #E7F8EF;
+  --ui-warning: #8A551B;
+  --ui-warning-bg: #FCF3E7;
+  --ui-danger: #C0392B;
+  --ui-danger-bg: rgba(192, 57, 43, .08);
+  --ui-danger-border: rgba(192, 57, 43, .35);
+  /* 브랜드 선택색과 완료/양호 상태를 구분한다. */
+  --ui-success: #176873;
+  --ui-success-bg: #E8F4F4;
+  --ui-success-hover: #10535C;
+  --ui-success-border: #B5D8DC;
+  --ui-info: #655080;
+  --ui-info-bg: #F2EEF7;
+  --ui-info-border: #D5C9E4;
+  --ui-warning-border: #E8D3B3;
+  --ui-focus: #34704C;
+  --ui-focus-ring: rgba(52, 112, 76, .2);
+  --ui-hover: #EDF4EF;
+  --ui-chart-1: #245C3B;
+  --ui-chart-2: #77618C;
+  --ui-chart-3: #287D89;
+  --ui-chart-4: #A77432;
+  --ui-chart-5: #AB625D;
+  --ui-chart-6: #687C94;
+
+  --ui-radius-sm: 8px;
+  --ui-radius-md: 12px;
+  --ui-radius-lg: 16px;
+  --ui-shadow-sm: 0 1px 3px rgba(20, 83, 45, .04);
+  --ui-shadow-md: 0 4px 12px rgba(20, 83, 45, .08);
+}
+
+/* 내부 화면 경계에서만 적용: 랜딩/로그인에 테마가 유출되지 않도록 한다. */
+.internal-ui[data-ui-theme="navy"] {
+  --chrome-bg: var(--brand-navy-dk);
+  --chrome-bg-2: var(--brand-navy);
+  --chrome-border: rgba(255, 255, 255, .14);
+  --chrome-text: #ffffff;
+  --chrome-text-2: #C7D3E8;
+  --chrome-text-3: #93A4C4;
+  --chrome-active-bg: #E4ECF8;
+  --chrome-active-text: var(--brand-navy-dk);
+
+  --ui-bg: #F3F6FB;
+  --ui-surface: #ffffff;
+  --ui-surface-2: #E8EEF8;
+  --ui-border: #DCE3EF;
+  --ui-text: var(--brand-navy-dk);
+  --ui-text-2: #4B5C7E;
+  --ui-text-3: #586981;
+  --ui-primary: var(--brand-navy);
+  --ui-primary-text: #ffffff;
+  --ui-primary-hover: #14336E;
+  --ui-accent: #2F72B0;
+  --ui-accent-text: #1F4E78;
+  --ui-accent-bg: #E4EEF8;
+  --ui-success: #1A7047;
+  --ui-success-bg: #E7F4ED;
+  --ui-success-hover: #145A39;
+  --ui-success-border: #BAD9C8;
+  --ui-focus: #2F72B0;
+  --ui-focus-ring: rgba(47, 114, 176, .2);
+  --ui-hover: #EDF2F9;
+  --ui-chart-1: #284F82;
+  --ui-chart-2: #99733C;
+  --ui-chart-3: #357C60;
+  --ui-chart-4: #806099;
+  --ui-chart-5: #AB625D;
+  --ui-chart-6: #328395;
+
+  --ui-shadow-sm: 0 1px 3px rgba(13, 42, 94, .06);
+  --ui-shadow-md: 0 4px 12px rgba(13, 42, 94, .12);
 }
 
 @theme inline {
@@ -12,15 +117,26 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Noto Sans KR', Arial, Helvetica, sans-serif;
+}
+
+/* 공용 UI 컴포넌트 상호작용 (LandingPage lp-login-btn/lp-card 참고) */
+.ui-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: var(--ui-shadow-sm); }
+.ui-btn:active:not(:disabled) { transform: translateY(0); }
+.ui-btn:disabled { opacity: .5; cursor: not-allowed; }
+.ui-card-hover { transition: transform .2s cubic-bezier(.16,1,.3,1), box-shadow .2s ease, border-color .2s ease; }
+.ui-card-hover:hover { box-shadow: var(--ui-shadow-md); border-color: var(--ui-accent); }
+.admin-shell :is(button, a, input, select, textarea):focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 2px; }
+.admin-shell header button:focus-visible { outline-color: var(--chrome-text); }
+.admin-shell :is(input, select, textarea) { accent-color: var(--ui-primary); }
+.admin-shell input::placeholder, .admin-shell textarea::placeholder { color: var(--ui-text-3); opacity: 1; }
+.admin-shell button:disabled { cursor: not-allowed; }
+.admin-shell :is(button, a) > svg { flex-shrink: 0; }
+.internal-ui :is(button, a, input, select, textarea):focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 2px; }
+.internal-ui :is(input, select, textarea) { accent-color: var(--ui-primary); }
+@media (prefers-reduced-motion: reduce) {
+  .ui-btn, .ui-card-hover { transition: none !important; transform: none !important; }
 }

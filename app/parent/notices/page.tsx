@@ -6,8 +6,8 @@ import { kstDateOf, kstTimeOf } from '@/lib/kst'
 import { IconPin } from '@/components/icons'
 import 'quill/dist/quill.snow.css'
 
-const navy='#0D2A5E', tx='#0D1B36', tx2='#4B5C7E', tx3='#96A4BF', bd='#DDE3EE', bg='#F5F7FA'
-const gold='#D87E13', re='#C0392B'
+const navy='var(--ui-primary)', tx='var(--ui-text)', tx2='var(--ui-text-2)', tx3='var(--ui-text-3)', bd='var(--ui-border)', bg='var(--ui-bg)'
+const gold='var(--ui-primary)', re='var(--ui-danger)'
 
 type Notice = {
   id: number; title: string; content: string
@@ -278,14 +278,14 @@ export default function ParentNotices() {
             <div key={n.id} onClick={() => setDetail(n)} style={{
               display: 'grid', gridTemplateColumns: '60px 1fr 80px', gap: 8,
               padding: '12px 16px', borderBottom: `1px solid ${bd}`,
-              background: '#FEFAF3', cursor: 'pointer', alignItems: 'center',
+              background: 'var(--ui-info-bg)', cursor: 'pointer', alignItems: 'center',
             }}>
               <div style={{ textAlign: 'center' }}>
                 <span style={{ background: gold, color: '#fff', fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>공지</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.title}</span>
-                {isNew(n.created_at) && <span style={{ color: '#C0392B', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>N</span>}
+                {isNew(n.created_at) && <span style={{ color: 'var(--ui-danger)', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>N</span>}
               </div>
               <div style={{ textAlign: 'center', fontSize: 11, color: tx3 }}>{kstDateOf(n.created_at).slice(5, 10)}</div>
             </div>
@@ -303,7 +303,7 @@ export default function ParentNotices() {
               <div style={{ textAlign: 'center', fontSize: 12, color: tx3 }}>{normal.length - i}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
                 <span style={{ fontSize: 13, color: tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.title}</span>
-                {isNew(n.created_at) && <span style={{ color: '#C0392B', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>N</span>}
+                {isNew(n.created_at) && <span style={{ color: 'var(--ui-danger)', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>N</span>}
               </div>
               <div style={{ textAlign: 'center', fontSize: 11, color: tx3 }}>{kstDateOf(n.created_at).slice(5, 10)}</div>
             </div>

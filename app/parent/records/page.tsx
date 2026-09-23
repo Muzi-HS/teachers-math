@@ -2,14 +2,14 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useParentChild } from '../layout'
-import { IconArrowUp, IconInbox, IconSend } from '@/components/icons'
+import { IconArrowUp, IconInbox, IconSend, IconPencil } from '@/components/icons'
 import { RecordComment, groupCommentsByRecord } from '@/lib/records'
 import TestResultCard from '@/components/TestResultCard'
 import HomeworkStatsView from '@/components/HomeworkStatsView'
 import TodayClassBanner from '@/components/TodayClassBanner'
 
-const navy='#0D2A5E', gold='#D87E13', tx='#0D1B36', tx2='#4B5C7E', tx3='#96A4BF'
-const bd='#DDE3EE', bg='#F5F7FA', re='#C0392B', rbg='#FDECEA', gr='#1A7F4E', gbg='#E0F5EB'
+const navy='var(--ui-primary)', gold='var(--ui-primary)', tx='var(--ui-text)', tx2='var(--ui-text-2)', tx3='var(--ui-text-3)'
+const bd='var(--ui-border)', bg='var(--ui-bg)', re='var(--ui-danger)', rbg='var(--ui-danger-bg)', gr='var(--ui-success)', gbg='var(--ui-success-bg)'
 
 type Rec = {
   id: number; date: string; content: string; homework: string
@@ -19,8 +19,8 @@ type Rec = {
   record_test_items?: { test_id: number; t_total: number; t_cor: number; t_score: number; tests: { name: string } | null }[]
 }
 
-function rateColor(v: number) { return v >= 80 ? gr : v >= 60 ? '#C05621' : re }
-function attColor(v: number)  { return v >= 8  ? gr : v >= 5  ? '#C05621' : re }
+function rateColor(v: number) { return v >= 80 ? gr : v >= 60 ? 'var(--ui-warning)' : re }
+function attColor(v: number)  { return v >= 8  ? gr : v >= 5  ? 'var(--ui-warning)' : re }
 function attLabel(v: number)  { return v >= 8  ? '우수' : v >= 5 ? '보통' : '노력필요' }
 
 export default function ParentRecords() {
@@ -158,8 +158,8 @@ export default function ParentRecords() {
       ) : (
         <>
           {editedNotice.length > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#FEF3E2', border: `1px solid ${gold}55`, borderRadius: 12, padding: '12px 14px', marginBottom: 16 }}>
-              <span style={{ fontSize: 18, flexShrink: 0 }}>✏️</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--ui-warning-bg)', border: `1px solid color-mix(in srgb, ${gold} 33%, transparent)`, borderRadius: 12, padding: '12px 14px', marginBottom: 16 }}>
+              <span style={{ flexShrink: 0, color: '#7A4A0A', display: 'flex' }}><IconPencil size={16} /></span>
               <p style={{ flex: 1, fontSize: 13, fontWeight: 600, color: '#7A4A0A', margin: 0, lineHeight: 1.5 }}>
                 {editedNotice.length === 1
                   ? `${editedNotice[0].date} 수업기록이 수정되었습니다`
@@ -214,7 +214,7 @@ export default function ParentRecords() {
                     ? <span style={{ background: rbg, color: re, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>지각</span>
                     : <span style={{ background: gbg, color: gr, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>정시 등원</span>
                   }
-                  {r.has_test && <span style={{ background: '#E8EEF8', color: navy, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>시험</span>}
+                  {r.has_test && <span style={{ background: 'var(--ui-surface-2)', color: navy, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>시험</span>}
                 </div>
 
                 {/* 이행률/정답률/태도 — 원형 게이지 */}
@@ -299,7 +299,7 @@ export default function ParentRecords() {
 
                 {/* 피드백 */}
                 {r.feedback && (
-                  <div style={{ background: 'rgba(13,42,94,.05)', borderLeft: `3px solid ${navy}`, borderRadius: '0 8px 8px 0', padding: '10px 12px' }}>
+                  <div style={{ background: 'var(--ui-bg)', borderLeft: `3px solid ${navy}`, borderRadius: '0 8px 8px 0', padding: '10px 12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 5 }}>
                       <div style={{ width: 3, height: 14, background: navy, borderRadius: 2 }} />
                       <span style={{ fontSize: 13, fontWeight: 600, color: navy }}>수업 피드백</span>
@@ -324,7 +324,7 @@ export default function ParentRecords() {
                             {!isParent && <span style={{ fontSize: 10, color: tx3, marginBottom: 2 }}>선생님</span>}
                             <div style={{
                               maxWidth: '85%', padding: '8px 12px', borderRadius: 12, fontSize: 13, lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                              background: isParent ? '#FEF3E2' : bg, color: tx,
+                              background: isParent ? 'var(--ui-warning-bg)' : bg, color: tx,
                               borderBottomRightRadius: isParent ? 3 : 12, borderBottomLeftRadius: isParent ? 12 : 3,
                             }}>
                               {c.content}

@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from 'next'
 import { AuthProvider } from '@/context/AuthContext'
 import InstallBanner from '@/components/InstallBanner'
+import SplashScreen from '@/components/SplashScreen'
+import './globals.css'
 
 export const metadata: Metadata = {
   title: '티처스 수학학원',
@@ -21,8 +23,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  userScalable: true,
   viewportFit: 'cover',
 }
 
@@ -37,6 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body style={{ margin: 0, padding: 0, overflowX: 'hidden', maxWidth: '100vw' }}>
         <AuthProvider>
+          <SplashScreen />
           {children}
         </AuthProvider>
         <InstallBanner />

@@ -3,14 +3,15 @@ import { useState } from 'react'
 import { supabase, TEACHER_AUTO_LOGIN_KEY } from '@/lib/supabase'
 import { teacherLogin } from '@/lib/auth'
 import { useAuth } from '@/context/AuthContext'
+import { IconCheck, IconAlertTriangle } from '@/components/icons'
 
 // 태블릿 키오스크 전용 화면 — 어떤 메뉴/버튼에서도 링크로 연결되지 않고
 // 이 URL(/checkin)을 직접 입력해야만 들어올 수 있다. role이 'admin'인 계정으로만
 // 로그인해야 체크인 화면이 보이고(선생님/조교 계정은 거부), 자동 로그인은 지원하지
 // 않는다 (탭/브라우저를 닫으면 로그인이 풀리고 다시 로그인해야 한다).
 
-const navyDk = '#071A3E', navy = '#0D2A5E', gold = '#D87E13'
-const re = '#C0392B', gr = '#1A7F4E'
+const navyDk = 'var(--ui-primary)', navy = 'var(--ui-primary)', gold = 'var(--ui-primary)'
+const re = 'var(--ui-danger)', gr = 'var(--ui-success)'
 
 function KioskLoginGate({ children }: { children: React.ReactNode }) {
   const { role, loading, loginAsTeacher } = useAuth()
@@ -77,7 +78,7 @@ function KioskLoginGate({ children }: { children: React.ReactNode }) {
         )}
         <button onClick={handleLogin} disabled={busy} style={{
           width: '100%', padding: 14, borderRadius: 8, border: 'none', background: busy ? '#a86010' : gold,
-          color: navyDk, fontSize: 15, fontWeight: 700, fontFamily: 'inherit', cursor: busy ? 'not-allowed' : 'pointer',
+          color: 'var(--ui-primary-text)', fontSize: 15, fontWeight: 700, fontFamily: 'inherit', cursor: busy ? 'not-allowed' : 'pointer',
         }}>
           {busy ? '로그인 중...' : '로그인'}
         </button>
@@ -260,7 +261,7 @@ function CheckinKioskInner() {
             <p style={{ fontSize: 15, color: 'rgba(255,255,255,.6)', marginBottom: 28 }}>맞으면 등원을 눌러주세요</p>
             <button onClick={() => confirmCheckin(screen.c)} disabled={busy} style={{
               width: '100%', padding: 18, borderRadius: 12, border: 'none', background: gold,
-              color: navyDk, fontSize: 18, fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 12,
+              color: 'var(--ui-primary-text)', fontSize: 18, fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 12,
             }}>
               {busy ? '처리 중...' : '등원'}
             </button>
@@ -270,7 +271,7 @@ function CheckinKioskInner() {
 
         {screen.kind === 'success' && (
           <div style={{ padding: '30px 0' }}>
-            <p style={{ fontSize: 40, marginBottom: 12 }}>✅</p>
+            <p style={{ marginBottom: 12, color: gr, display: 'flex', justifyContent: 'center' }}><IconCheck size={40} strokeWidth={2.5} /></p>
             <p style={{ fontSize: 22, fontWeight: 900, color: '#fff', marginBottom: 8 }}>{screen.name} 학생</p>
             <p style={{ fontSize: 16, color: gr, fontWeight: 700 }}>등원 완료!{screen.late ? ' (지각)' : ''}</p>
             <p style={{ fontSize: 13, color: 'rgba(255,255,255,.4)', marginTop: 18 }}>잠시 후 초기 화면으로 돌아갑니다</p>
@@ -279,7 +280,7 @@ function CheckinKioskInner() {
 
         {screen.kind === 'error' && (
           <div style={{ padding: '20px 0' }}>
-            <p style={{ fontSize: 32, marginBottom: 12 }}>⚠️</p>
+            <p style={{ marginBottom: 12, color: re, display: 'flex', justifyContent: 'center' }}><IconAlertTriangle size={32} strokeWidth={2} /></p>
             <p style={{ fontSize: 16, color: re, fontWeight: 700, marginBottom: 24 }}>{screen.message}</p>
             <button onClick={reset} style={{
               width: '100%', padding: 16, borderRadius: 12, border: 'none', background: navy,

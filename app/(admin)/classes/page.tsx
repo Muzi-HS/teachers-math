@@ -29,16 +29,16 @@ type Rec = RecForm & {
   }[]
 }
 
-const navy = '#0D2A5E', navyDk = '#071A3E', navyM = '#E8EEF8'
-const gold = '#D87E13', goldL = '#F09830', wa = '#C05621'
-const bg = '#F5F7FA', bd = '#DDE3EE'
-const tx = '#0D1B36', tx2 = '#4B5C7E', tx3 = '#96A4BF'
-const re = '#C0392B', rbg = '#FDECEA', gr = '#1A7F4E', gbg = '#E0F5EB'
+const navy = 'var(--ui-primary)', navyDk = 'var(--ui-primary-text)', navyM = 'var(--ui-surface-2)'
+const gold = 'var(--ui-primary)', goldL = 'var(--ui-primary-hover)', wa = 'var(--ui-warning)'
+const bg = 'var(--ui-bg)', bd = 'var(--ui-border)'
+const tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)'
+const re = 'var(--ui-danger)', rbg = 'var(--ui-danger-bg)', gr = 'var(--ui-success)', gbg = 'var(--ui-success-bg)'
 
-function rateColor(v: number) { return v >= 80 ? '#1A7F4E' : v >= 60 ? '#C05621' : '#C0392B' }
-function rateBg(v: number) { return v >= 80 ? '#E0F5EB' : v >= 60 ? '#FEF3E2' : '#FDECEA' }
-function attColor(v: number) { return v >= 8 ? '#1A7F4E' : v >= 5 ? '#C05621' : '#C0392B' }
-function attBg(v: number) { return v >= 8 ? '#E0F5EB' : v >= 5 ? '#FEF3E2' : '#FDECEA' }
+function rateColor(v: number) { return v >= 80 ? 'var(--ui-success)' : v >= 60 ? 'var(--ui-warning)' : 'var(--ui-danger)' }
+function rateBg(v: number) { return v >= 80 ? 'var(--ui-success-bg)' : v >= 60 ? 'var(--ui-warning-bg)' : 'var(--ui-danger-bg)' }
+function attColor(v: number) { return v >= 8 ? 'var(--ui-success)' : v >= 5 ? 'var(--ui-warning)' : 'var(--ui-danger)' }
+function attBg(v: number) { return v >= 8 ? 'var(--ui-success-bg)' : v >= 5 ? 'var(--ui-warning-bg)' : 'var(--ui-danger-bg)' }
 function attLabel(v: number) { return v >= 8 ? '우수' : v >= 5 ? '보통' : '노력필요' }
 
 export default function ClassesPage() {
@@ -78,6 +78,35 @@ export default function ClassesPage() {
   const searchParams = useSearchParams()
   const openDetailHandled = useRef(false)
 
+  // 반 목록 → 상세 → 학생기록으로 들어갈 때마다 히스토리 항목을 쌓아서, 브라우저/기기의
+  // 뒤로가기를 눌렀을 때 페이지를 완전히 벗어나지 않고 바로 이전 화면(목록 등)으로만
+  // 돌아가게 한다. (반 상세 → 뒤로가기 → 다른 메뉴로 튕기던 문제 수정)
+  function goDetail(cls: Class) {
+    window.history.pushState({ clsView: 'detail' }, '')
+    setDetailCls(cls); setCurStu(null); setView('detail')
+  }
+  async function goSturec(s: Student) {
+    setCurStu(s)
+    await fetchStuRecs(s.id)
+    window.history.pushState({ clsView: 'sturec' }, '')
+    setView('sturec')
+  }
+  function backTo(target: 'list' | 'detail') {
+    const levels = view === 'sturec' ? (target === 'list' ? 2 : 1) : view === 'detail' && target === 'list' ? 1 : 0
+    if (levels > 0) window.history.go(-levels)
+    else { setDetailCls(null); setCurStu(null); setView('list') }
+  }
+  useEffect(() => {
+    function onPopState(e: PopStateEvent) {
+      const v = (e.state as { clsView?: 'detail' | 'sturec' } | null)?.clsView ?? 'list'
+      setView(v)
+      if (v === 'list') { setDetailCls(null); setCurStu(null) }
+      else if (v === 'detail') setCurStu(null)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
+
   useEffect(() => { fetchAll() }, [])
 
   useEffect(() => {
@@ -97,6 +126,7 @@ export default function ClassesPage() {
       openDetailHandled.current = true
       setDetailCls(cls)
       setView('detail')
+      if (searchParams.get('prep') === '1') setPrepModal(true)
     }
   }, [classes, searchParams])
 
@@ -269,22 +299,22 @@ export default function ClassesPage() {
     .rch{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid ${bd};}
     .pb{height:6px;background:${bd};border-radius:99px;flex:1;}
     .pf{height:100%;border-radius:99px;}
-    .fb{background:rgba(13,42,94,.05);border-left:3px solid ${navy};border-radius:0 8px 8px 0;padding:10px 12px;margin-top:10px;}
+    .fb{background:var(--ui-bg);border-left:3px solid ${navy};border-radius:0 8px 8px 0;padding:10px 12px;margin-top:10px;}
     .ssl-item{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;transition:background .15s;border-bottom:1px solid ${bd};}
     .ssl-item:last-child{border-bottom:none;}
     .ssl-item:hover{background:${navyM};}
-    .ssl-item.sel{background:rgba(13,42,94,.12);}
+    .ssl-item.sel{background:var(--ui-accent-bg);}
     .bgold{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:none;background:${gold};color:${navyDk};font-family:inherit;}
     .bgold:hover{background:${goldL};}
     .bprim{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;background:${navy};color:#fff;font-family:inherit;}
-    .bprim:hover{background:#1A4080;}
+    .bprim:hover{background:var(--ui-primary-hover);}
     /* 반 상세 헤더 액션 버튼 — 공지하기/수업 준비/학생 추가를 크기·모양 통일된 아웃라인으로,
        수업기록 작성만 채워진 primary로 둬서 넷이 한 세트처럼 보이면서 주 액션이 도드라지게 한다 */
     .chdr-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;}
     .chdr-btn-out{border:1.5px solid ${bd};background:#fff;color:${tx2};}
     .chdr-btn-out:hover{border-color:${navy};color:${navy};background:${navyM};}
     .chdr-btn-primary{border:1.5px solid ${navy};background:${navy};color:#fff;}
-    .chdr-btn-primary:hover{background:#1A4080;}
+    .chdr-btn-primary:hover{background:var(--ui-primary-hover);}
     .bout{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid ${bd};background:transparent;color:${tx2};font-family:inherit;}
     .bout:hover{border-color:${navy};color:${navy};}
     .bdng{display:inline-flex;align-items:center;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;border:none;background:${rbg};color:${re};font-family:inherit;}
@@ -348,12 +378,12 @@ export default function ClassesPage() {
           )}
 
           {filtered.map((c, idx) => {
-            const barColors = [navy, gold, '#1A7F4E', '#7C3AED', '#C0392B', '#0891B2']
+            const barColors = Array.from({ length: 6 }, (_, i) => `var(--ui-chart-${i + 1})`)
             const barColor = barColors[idx % barColors.length]
             return (
               <div
                 key={c.id}
-                onClick={() => { setDetailCls(c); setView('detail') }}
+                onClick={() => goDetail(c)}
                 style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: idx < filtered.length - 1 ? `1px solid ${bd}` : 'none', cursor: 'pointer', opacity: c.active === false ? 0.55 : 1 }}
                 onMouseEnter={e => (e.currentTarget.style.background = navyM)}
                 onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
@@ -370,7 +400,7 @@ export default function ClassesPage() {
                 </div>
                 {canManageClassInfo && (
                   <div style={{ display: 'flex', gap: 5 }} onClick={e => e.stopPropagation()}>
-                    <button className="bout" onClick={() => toggleClsActive(c)} style={{ color: c.active === false ? gr : wa, borderColor: (c.active === false ? gr : wa) + '88' }}>
+                  <button className="bout" onClick={() => toggleClsActive(c)} style={{ color: c.active === false ? gr : wa, borderColor: c.active === false ? 'var(--ui-success-border)' : 'var(--ui-warning-border)' }}>
                       {c.active === false ? '활성화' : '비활성화'}
                     </button>
                     <button className="bout" onClick={() => openEditCls(c)}>수정</button>
@@ -397,7 +427,7 @@ export default function ClassesPage() {
 
       {/* ════ 반 상세 (v18: pg-clsdt) ════ */}
       {view === 'detail' && detailCls && <>
-        <div className="bc"><span onClick={() => setView('list')}>반 관리</span><span>›</span><span>{detailCls.name}</span></div>
+        <div className="bc"><span onClick={() => backTo('list')}>반 관리</span><span>›</span><span>{detailCls.name}</span></div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -432,7 +462,7 @@ export default function ClassesPage() {
         </div>
 
         {classTodayAtt.length > 0 && (
-          <div style={{ background: rbg, border: `1px solid ${re}33`, borderRadius: 12, padding: '12px 16px', marginBottom: 16 }}>
+            <div style={{ background: rbg, border: '1px solid var(--ui-danger-border)', borderRadius: 12, padding: '12px 16px', marginBottom: 16 }}>
             <p style={{ fontSize: 12, fontWeight: 700, color: re, margin: '0 0 8px' }}>오늘 결석·지각 {classTodayAtt.length}명</p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {classTodayAtt.map((n, idx) => {
@@ -441,7 +471,7 @@ export default function ClassesPage() {
                 return (
                   <span key={idx} style={{
                     display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 20,
-                    background: '#fff', border: `1px solid ${isLate ? wa : re}55`, color: isLate ? wa : re, fontSize: 12, fontWeight: 600,
+                    background: '#fff', border: `1px solid var(${isLate ? '--ui-warning-border' : '--ui-danger-border'})`, color: isLate ? wa : re, fontSize: 12, fontWeight: 600,
                   }} title={n.reason ?? undefined}>
                     {isLate && <IconClock size={11} />}
                     {s?.name ?? '학생'} · {isLate ? '지각' : '결석'}
@@ -461,9 +491,9 @@ export default function ClassesPage() {
             : detailStus.map((s, idx) => {
               const avatarColors = [
                 { bg: navyM,    color: navy },
-                { bg: '#FEF3E2', color: '#D87E13' },
-                { bg: '#E0F5EB', color: '#1A7F4E' },
-                { bg: '#FDECEA', color: '#C0392B' },
+                { bg: 'var(--ui-warning-bg)', color: 'var(--ui-warning)' },
+                { bg: 'var(--ui-success-bg)', color: 'var(--ui-success)' },
+                { bg: 'var(--ui-danger-bg)', color: 'var(--ui-danger)' },
                 { bg: '#F3E8FF', color: '#7C3AED' },
               ]
               const ac = avatarColors[idx % avatarColors.length]
@@ -473,7 +503,7 @@ export default function ClassesPage() {
                   style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', cursor: 'pointer', borderBottom: idx < detailStus.length - 1 ? `1px solid ${bg}` : 'none', transition: 'background .12s' }}
                   onMouseEnter={e => (e.currentTarget.style.background = navyM)}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                  onClick={async () => { setCurStu(s); await fetchStuRecs(s.id); setView('sturec') }}
+                  onClick={() => goSturec(s)}
                 >
                   {/* 아바타 */}
                   <div style={{ width: 36, height: 36, borderRadius: '50%', background: ac.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: ac.color, flexShrink: 0 }}>
@@ -515,8 +545,8 @@ export default function ClassesPage() {
       {/* ════ 학생 기록 (v18: pg-sturec) ════ */}
       {view === 'sturec' && curStu && <>
         <div className="bc">
-          <span onClick={() => setView('list')}>반 관리</span><span>›</span>
-          <span onClick={() => setView('detail')}>{detailCls?.name}</span><span>›</span>
+          <span onClick={() => backTo('list')}>반 관리</span><span>›</span>
+          <span onClick={() => backTo('detail')}>{detailCls?.name}</span><span>›</span>
           <span>{curStu.name}</span>
         </div>
         <div style={{ marginBottom: 20 }}>
@@ -816,8 +846,8 @@ function StuTestResultCard({ testName, score, cor, total, pct, testId }: {
   testName: string; score: number; cor: number; total: number; pct: number; testId: number
 }) {
   const [stats, setStats] = useState<{ avg: number; max: number; rank: number; totalCnt: number } | null>(null)
-  const navy = '#0D2A5E', tx = '#0D1B36', tx2 = '#4B5C7E', tx3 = '#96A4BF', bd = '#DDE3EE'
-  const gr = '#1A7F4E', re = '#C0392B', gbg = '#E0F5EB'
+  const navy = 'var(--ui-primary)', tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)', bd = 'var(--ui-border)'
+  const gr = 'var(--ui-success)', re = 'var(--ui-danger)', gbg = 'var(--ui-success-bg)'
 
   useEffect(() => {
     async function load() {
@@ -903,12 +933,12 @@ const Modal = React.memo(function Modal({ onClose, title, children, footer, wide
         onClick={e => e.stopPropagation()}
         style={{ background: '#fff', borderRadius: 12, width: wide ? 820 : 560, maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}
       >
-        <div style={{ padding: '18px 22px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: '#fff', zIndex: 1, borderBottom: `1px solid #DDE3EE`, marginBottom: 0 }}>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#0D1B36' }}>{title}</span>
-          <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: '#F5F7FA', cursor: 'pointer', fontSize: 17, color: '#4B5C7E' }}>×</button>
+        <div style={{ padding: '18px 22px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: '#fff', zIndex: 1, borderBottom: `1px solid var(--ui-border)`, marginBottom: 0 }}>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--ui-text)' }}>{title}</span>
+          <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'var(--ui-bg)', cursor: 'pointer', fontSize: 17, color: 'var(--ui-text-2)' }}>×</button>
         </div>
         <div style={{ padding: '14px 22px' }}>{children}</div>
-        <div style={{ padding: '0 22px 18px', display: 'flex', gap: 8, justifyContent: 'flex-end', position: 'sticky', bottom: 0, background: '#fff', borderTop: `1px solid #DDE3EE`, paddingTop: 12 }}>{footer}</div>
+        <div style={{ padding: '0 22px 18px', display: 'flex', gap: 8, justifyContent: 'flex-end', position: 'sticky', bottom: 0, background: '#fff', borderTop: `1px solid var(--ui-border)`, paddingTop: 12 }}>{footer}</div>
       </div>
     </div>
   )

@@ -11,6 +11,8 @@ import { useMobileMode } from '@/context/MobileModeContext'
 const NAV = [
   { key: 'dashboard', href: '/dashboard', label: '대시보드',
     icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg> },
+  { key: 'analytics', href: '/analytics', label: '접속 분석',
+    icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M3 3v18h18"/><path d="M7 16l4-6 3 4 5-8"/></svg> },
   { key: 'notices', href: '/notices', label: '공지사항',
     icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg> },
   { key: 'schedule', href: '/schedule', label: '학원일정',
@@ -42,6 +44,8 @@ const NAV = [
     icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> },
   { key: 'app-qr', href: '/app-qr', label: '앱 설치 QR',
     icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM14 20h3M20 14v3M20 20v.01M17 17h.01"/></svg> },
+  { key: 'site-settings', href: '/site-settings', label: '사이트 설정',
+    icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg> },
 ]
 
 const NAV_ORDER_KEY = 'admin_mobile_nav_order'
@@ -104,7 +108,7 @@ export default function Sidebar() {
   // 모바일 모드에서는 메뉴 이동 시 자동으로 드로어/편집모드를 닫는다
   useEffect(() => { setDrawerOpen(false); setEditMode(false) }, [pathname])
 
-  const W = expanded ? 130 : 58
+  const W = expanded ? 156 : 58
 
   const visibleNav = role
     ? NAV.filter(item =>
@@ -158,72 +162,74 @@ export default function Sidebar() {
     .sb-tab {
       border: none; background: none; cursor: pointer;
       font-family: 'Noto Sans KR', sans-serif;
-      color: #96A4BF;
+      color: var(--ui-text-2);
       display: flex; align-items: center;
       flex-shrink: 0; width: 100%;
-      transition: color .15s;
+      transition: color .15s, background .15s;
       position: relative;
     }
-    .sb-tab:hover { color: #4B5C7E; }
-    .sb-tab.active { color: #0D2A5E; font-weight: 700; }
+    .sb-tab:hover { color: var(--ui-primary); background: var(--ui-surface-2); }
+    .sb-tab.active { color: var(--chrome-active-text); font-weight: 700; background: var(--chrome-active-bg); }
     .sb-tab.active::before {
       content: '';
-      position: absolute; left: 0;
-      width: 3px; height: 24px;
-      background: #D87E13;
-      border-radius: 0 3px 3px 0;
+      position: absolute; left: 2px;
+      width: 3px; height: 18px;
+      background: var(--ui-accent);
+      border-radius: 3px;
     }
     .toggle-btn {
-      position: absolute; right: -11px; top: 16px;
-      width: 22px; height: 44px;
-      background: #fff; border: 1px solid #EEF0F5; border-left: none;
-      border-radius: 0 8px 8px 0;
+      flex-shrink: 0; width: 30px; height: 30px;
+      background: var(--ui-surface); border: 1px solid var(--ui-border);
+      border-radius: 8px;
       cursor: pointer; display: flex; align-items: center; justify-content: center;
-      box-shadow: 3px 0 6px rgba(0,0,0,.07); z-index: 10; color: #B0B8CC;
+      color: var(--ui-text-2);
     }
-    .toggle-btn:hover { color: #0D2A5E; }
+    .toggle-btn:hover { color: var(--ui-primary); background: var(--ui-hover); border-color: var(--ui-accent); }
+    .desktop-menu .sb-tab { border-radius: 8px; }
+    .desktop-menu { scrollbar-width: thin; scrollbar-color: var(--ui-border) transparent; }
+    @media(prefers-reduced-motion:reduce){.sb-tab,.toggle-btn{transition:none;}}
     .mnav-bar {
       position: fixed; left: 0; right: 0; bottom: 0; z-index: 200;
-      background: #fff; border-top: 1px solid #EEF0F5;
-      box-shadow: 0 -2px 10px rgba(0,0,0,.06);
+      background: var(--ui-surface); border-top: 1px solid var(--ui-border);
+      box-shadow: 0 -2px 10px rgba(20,83,45,.05);
       display: flex; padding-bottom: env(safe-area-inset-bottom);
     }
     .mnav-tab {
       flex: 1; border: none; background: none; cursor: pointer;
       font-family: 'Noto Sans KR', sans-serif;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 3px; padding: 8px 2px 7px; color: #96A4BF; position: relative;
+      gap: 3px; padding: 8px 2px 7px; color: var(--ui-text-2); position: relative;
     }
-    .mnav-tab.active { color: #0D2A5E; }
+    .mnav-tab.active { color: var(--chrome-active-text); background: var(--chrome-active-bg); }
     .mnav-backdrop {
-      position: fixed; inset: 0; background: rgba(13,27,54,.45); z-index: 199;
+      position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 199;
     }
     .mnav-sheet {
       position: fixed; left: 0; right: 0; bottom: 0; z-index: 200;
-      max-height: 70vh; background: #fff;
+      max-height: 70vh; background: var(--ui-surface);
       border-radius: 16px 16px 0 0;
       display: flex; flex-direction: column;
-      box-shadow: 0 -8px 30px rgba(0,0,0,.15);
+      box-shadow: 0 -8px 30px rgba(0,0,0,.2);
       overflow-y: auto;
       padding-bottom: env(safe-area-inset-bottom);
     }
     .mnav-edit-btn {
-      border: none; background: #F5F7FA; color: #4B5C7E; cursor: pointer;
+      border: none; background: var(--ui-surface-2); color: var(--ui-text-2); cursor: pointer;
       font-family: 'Noto Sans KR', sans-serif; font-size: 12px; font-weight: 600;
       padding: 5px 12px; border-radius: 20px;
     }
     .mnav-edit-row {
       display: flex; align-items: center; gap: 10px;
-      padding: 9px 18px; color: #0D1B36;
+      padding: 9px 18px; color: var(--ui-text);
     }
     .mnav-move-btn {
-      border: 1px solid #DDE3EE; background: #fff; color: #4B5C7E; cursor: pointer;
+      border: 1px solid var(--ui-border); background: var(--ui-surface); color: var(--ui-text-2); cursor: pointer;
       width: 26px; height: 26px; border-radius: 6px;
       display: flex; align-items: center; justify-content: center; flex-shrink: 0;
     }
     .mnav-move-btn:disabled { opacity: .3; cursor: default; }
     .mnav-section-lb {
-      padding: 10px 18px 4px; font-size: 11px; font-weight: 600; color: #96A4BF; letter-spacing: .3px;
+      padding: 10px 18px 4px; font-size: 11px; font-weight: 600; color: var(--ui-text-3); letter-spacing: .3px;
     }
   `
 
@@ -233,6 +239,7 @@ export default function Sidebar() {
     return (
       <button
         className={`sb-tab${active ? ' active' : ''}`}
+        aria-current={active ? 'page' : undefined}
         onClick={() => router.push(item.href)}
         title={!expanded && !big ? item.label : ''}
         style={
@@ -249,7 +256,7 @@ export default function Sidebar() {
             <span style={{
               position: 'absolute', top: -3, right: -5,
               width: 8, height: 8, borderRadius: '50%',
-              background: '#C0392B', border: '1.5px solid #fff',
+              background: 'var(--ui-danger)', border: '1.5px solid var(--ui-surface)',
             }} />
           )}
         </span>
@@ -257,7 +264,7 @@ export default function Sidebar() {
           ? <span style={{ fontSize: big ? 13 : 12, display: 'flex', alignItems: 'center', gap: 5 }}>
               {item.label}
               {unreadCount > 0 && (
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#C0392B' }}>{unreadCount}</span>
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--ui-danger)' }}>{unreadCount}</span>
               )}
             </span>
           : <span style={{ fontSize: 8, fontWeight: 600 }}>{item.label}</span>
@@ -283,11 +290,11 @@ export default function Sidebar() {
             const active = pathname === item.href || pathname.startsWith(item.href + '/')
             const unreadCount = unreadCountOf(item.key)
             return (
-              <button key={item.key} className={`mnav-tab${active ? ' active' : ''}`} onClick={() => router.push(item.href)}>
+              <button key={item.key} aria-current={active ? 'page' : undefined} className={`mnav-tab${active ? ' active' : ''}`} onClick={() => router.push(item.href)}>
                 <span style={{ display: 'flex', position: 'relative' }}>
                   {item.icon}
                   {unreadCount > 0 && (
-                    <span style={{ position: 'absolute', top: -3, right: -5, width: 8, height: 8, borderRadius: '50%', background: '#C0392B', border: '1.5px solid #fff' }} />
+                    <span style={{ position: 'absolute', top: -3, right: -5, width: 8, height: 8, borderRadius: '50%', background: 'var(--ui-danger)', border: '1.5px solid var(--chrome-bg)' }} />
                   )}
                 </span>
                 <span style={{ fontSize: 10, fontWeight: active ? 700 : 500 }}>{item.label}</span>
@@ -308,13 +315,13 @@ export default function Sidebar() {
             <div className="mnav-backdrop" onClick={() => { setDrawerOpen(false); setEditMode(false) }} />
             <nav className="mnav-sheet">
               <div style={{ padding: '14px 18px 4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: '#0D1B36' }}>전체 메뉴</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ui-text)' }}>전체 메뉴</span>
                 <button className="mnav-edit-btn" onClick={() => setEditMode(e => !e)}>{editMode ? '완료' : '편집'}</button>
               </div>
 
               {editMode ? (
                 <>
-                  <p style={{ padding: '4px 18px 8px', fontSize: 11, color: '#96A4BF' }}>
+                  <p style={{ padding: '4px 18px 8px', fontSize: 11, color: 'var(--ui-text-3)' }}>
                     화살표로 순서를 바꾸면 위 4개가 하단 메뉴바에 표시됩니다
                   </p>
                   {orderedNav.map((item, idx) => (
@@ -349,37 +356,32 @@ export default function Sidebar() {
       <style>{css}</style>
       <aside style={{
         width: W,
-        background: '#fff',
-        borderRight: '1px solid #EEF0F5',
+        background: 'var(--ui-surface)',
+        borderRight: '1px solid var(--ui-border)',
         display: 'flex', flexDirection: 'column',
-        padding: '16px 0',
+        padding: '10px 6px',
         flexShrink: 0,
         position: 'relative',
         transition: 'width .22s cubic-bezier(.4,0,.2,1)',
         overflow: 'visible',
-        minHeight: '100vh',
+        height: '100%',
       }}>
 
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: expanded ? 'space-between' : 'center', padding: '0 6px 10px', gap: 8 }}>
+          {expanded && <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--ui-text-3)' }}>관리 메뉴</span>}
+          <button className="toggle-btn" onClick={() => setExpanded(e => !e)} aria-label={expanded ? '메뉴 접기' : '메뉴 펼치기'} aria-expanded={expanded} aria-controls="desktop-admin-menu" title={expanded ? '메뉴 접기' : '메뉴 펼치기'}>
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ transform: expanded ? 'none' : 'rotate(180deg)' }}><path d="M15 18l-6-6 6-6" /></svg>
+          </button>
+        </div>
         {/* 메뉴 목록 */}
-        <nav style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <nav id="desktop-admin-menu" className="desktop-menu" aria-label="관리 메뉴" style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
           {visibleNav.map((item, idx) => (
             item.key.startsWith('divider')
-              ? (expanded ? <div key={idx} style={{ height: 1, background: '#F5F5F8', margin: '6px 0' }} /> : null)
+              ? (expanded ? <div key={idx} style={{ height: 1, flexShrink: 0, background: 'var(--ui-border)', margin: '8px 12px' }} /> : null)
               : <NavButton key={item.key} item={item} />
           ))}
         </nav>
 
-        {/* 접기/펼치기 버튼 */}
-        <button
-          className="toggle-btn"
-          onClick={() => setExpanded(e => !e)}
-          title="메뉴 접기/펼치기"
-        >
-          <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
-            style={{ transform: expanded ? 'none' : 'rotate(180deg)', transition: 'transform .22s' }}>
-            <path d="M15 18l-6-6 6-6"/>
-          </svg>
-        </button>
       </aside>
     </>
   )

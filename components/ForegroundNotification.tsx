@@ -53,19 +53,19 @@ export default function ForegroundNotification() {
     <aside aria-label="새 알림" style={{
       position: 'fixed', top: 64, right: 12, zIndex: 10000,
       width: 'min(340px, calc(100vw - 24px))', boxSizing: 'border-box',
-      padding: 14, background: '#fff', border: '1px solid #DDE3EE',
-      borderLeft: '4px solid #0D2A5E', borderRadius: 10,
-      boxShadow: '0 4px 18px rgba(0,0,0,.15)', color: '#0D1B36',
+      padding: 14, background: '#fff', border: '1px solid var(--ui-border)',
+      borderLeft: '4px solid var(--ui-primary)', borderRadius: 10,
+      boxShadow: '0 4px 18px rgba(0,0,0,.15)', color: 'var(--ui-text)',
       fontFamily: "'Noto Sans KR',sans-serif",
     }}>
       <div role="status" aria-live="polite" style={{ overflowWrap: 'anywhere' }}>
         <strong style={{ fontSize: 13 }}>{notice.title}</strong>
         <p style={{ fontSize: 13, margin: '6px 0', maxHeight: 96, overflowY: 'auto' }}>{notice.body}</p>
       </div>
-      <p style={{ fontSize: 12, color: '#4B5C7E', margin: '6px 0 10px' }}>작성 중인 내용을 저장한 후 확인해 주세요.</p>
+      <p style={{ fontSize: 12, color: 'var(--ui-text-2)', margin: '6px 0 10px' }}>작성 중인 내용을 저장한 후 확인해 주세요.</p>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-        <button type="button" onClick={() => setNotice(null)} style={{ padding: '6px 10px', border: '1px solid #DDE3EE', borderRadius: 6, background: '#fff', color: '#4B5C7E', cursor: 'pointer', font: 'inherit', fontSize: 12 }}>닫기</button>
-        {notice.link && <button type="button" onClick={openNotice} style={{ padding: '6px 10px', border: 'none', borderRadius: 6, background: '#0D2A5E', color: '#fff', cursor: 'pointer', font: 'inherit', fontSize: 12 }}>내용 확인</button>}
+        <button type="button" onClick={() => setNotice(null)} style={{ padding: '6px 10px', border: '1px solid var(--ui-border)', borderRadius: 6, background: '#fff', color: 'var(--ui-text-2)', cursor: 'pointer', font: 'inherit', fontSize: 12 }}>닫기</button>
+        {notice.link && <button type="button" onClick={openNotice} style={{ padding: '6px 10px', border: 'none', borderRadius: 6, background: 'var(--ui-primary)', color: '#fff', cursor: 'pointer', font: 'inherit', fontSize: 12 }}>내용 확인</button>}
       </div>
     </aside>
   )

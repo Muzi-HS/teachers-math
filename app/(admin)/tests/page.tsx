@@ -17,11 +17,11 @@ type ScoreRow = {
 }
 type Student = { id:number; name:string; school:string }
 
-const navy='#0D2A5E', navyDk='#071A3E', navyM='#E8EEF8'
-const gold='#D87E13', goldL='#F09830'
-const bg='#F5F7FA', bd='#DDE3EE'
-const tx='#0D1B36', tx2='#4B5C7E', tx3='#96A4BF'
-const re='#C0392B', rbg='#FDECEA', gr='#1A7F4E', gbg='#E0F5EB'
+const navy='var(--ui-primary)', navyDk='var(--ui-primary-text)', navyM='var(--ui-surface-2)'
+const gold='var(--ui-primary)', goldL='var(--ui-primary-hover)'
+const bg='var(--ui-bg)', bd='var(--ui-border)'
+const tx='var(--ui-text)', tx2='var(--ui-text-2)', tx3='var(--ui-text-3)'
+const re='var(--ui-danger)', rbg='var(--ui-danger-bg)', gr='var(--ui-success)', gbg='var(--ui-success-bg)'
 
 export default function TestsPage() {
   const { role } = useAuth()
@@ -43,6 +43,18 @@ export default function TestsPage() {
   useEffect(()=>{ fetchAll() },[])
 
   useEffect(()=>{ if(tests.length>0) fetchAllStats() },[tests])
+
+  // 목록 → 상세로 들어갈 때 히스토리 항목을 쌓아서, 뒤로가기를 누르면 페이지를 벗어나지
+  // 않고 목록으로만 돌아가게 한다.
+  useEffect(() => {
+    function onPopState(e: PopStateEvent) {
+      const v = (e.state as { testView?: 'detail' } | null)?.testView ?? 'list'
+      setView(v)
+      if (v === 'list') setCurTest(null)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
 
   async function fetchAllStats(){
     const stats:Record<number,{cnt:number; avg:number; max:number; min:number; dist:number[]}> = {}
@@ -135,7 +147,12 @@ export default function TestsPage() {
   async function openDetail(t:Test) {
     setCurTest(t)
     await fetchScores(t.id)
+    window.history.pushState({ testView: 'detail' }, '')
     setView('detail')
+  }
+  function backToList() {
+    if (view === 'detail') window.history.go(-1)
+    else { setCurTest(null); setView('list') }
   }
 
   function openAdd() {
@@ -238,7 +255,7 @@ export default function TestsPage() {
       rel: n>0 ? Math.round(cnt/n*100) : 0,
     })).reverse()
   }
-  function scoreColor(s:number){ return s>=80?gr:s>=60?'#C05621':re }
+  function scoreColor(s:number){ return s>=80?gr:s>=60?'var(--ui-warning)':re }
 
   // 테스트 관리 메뉴: admin, teacher 모두 전체 기능 (성적 입력/수정/삭제 포함)
   const canManageTests = role ? can.manageTests(role as any) : false
@@ -251,7 +268,7 @@ export default function TestsPage() {
     .bgold{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:none;background:${gold};color:${navyDk};font-family:inherit;}
     .bgold:hover{background:${goldL};}
     .bprim{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;background:${navy};color:#fff;font-family:inherit;}
-    .bprim:hover{background:#1A4080;}
+    .bprim:hover{background:var(--ui-primary-hover);}
     .bout{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;border:1px solid ${bd};background:transparent;color:${tx2};font-family:inherit;}
     .bout:hover{border-color:${navy};color:${navy};}
     .bdng{display:inline-flex;align-items:center;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;border:none;background:${rbg};color:${re};font-family:inherit;}
@@ -421,7 +438,7 @@ export default function TestsPage() {
       {/* ════ 테스트 상세 ════ */}
       {view==='detail'&&curTest&&<>
         <div className="bc">
-          <span onClick={()=>setView('list')}>테스트 관리</span>
+          <span onClick={backToList}>테스트 관리</span>
           <span>›</span>
           <span>{curTest.name}</span>
         </div>
@@ -536,7 +553,7 @@ export default function TestsPage() {
                       <div style={{flex:1,fontSize:13,fontWeight:rank<=3?700:400,color:tx}}>{sc.students?.name??'-'}</div>
                       <div style={{width:64,textAlign:'center',fontSize:12,color:tx2}}>{sc.cor}/{curTest.total}</div>
                       <div style={{width:50,textAlign:'center'}}>
-                        <span style={{fontSize:11,fontWeight:600,color:pct>=80?gr:pct>=60?'#C05621':re}}>{pct}%</span>
+                        <span style={{fontSize:11,fontWeight:600,color:pct>=80?gr:pct>=60?'var(--ui-warning)':re}}>{pct}%</span>
                       </div>
                       <div style={{width:50,textAlign:'right',fontSize:14,fontWeight:700,color:scoreColor(sc.score)}}>{sc.score}점</div>
                       {canManageTests&&!curTest.auto_grading&&(

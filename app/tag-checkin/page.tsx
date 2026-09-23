@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { requestFCMToken } from '@/lib/firebase'
+import { IconCheck, IconAlertTriangle } from '@/components/icons'
 
 // 공용 NFC 카드 등원 체크인 — 로그인 없이 접근 가능한 공개 페이지.
 // 학원 입구에 놓인 NFC 카드 1개를 학생이 자기 폰으로 태그하면 이 페이지가 열린다.
@@ -19,8 +20,8 @@ import { requestFCMToken } from '@/lib/firebase'
 // 여기서는 등원 체크인 자체와 동일한 신뢰 수준(부모 번호 뒷 4자리 확인)만으로 충분하다고
 // 보고 별도 PIN을 요구하지 않는다 — 학생에게 학부모 PIN을 알려줄 필요가 없어진다.
 const AUTO_KEY = 'tag_checkin_auto_login'
-const navyDk = '#071A3E', navy = '#0D2A5E', gold = '#D87E13'
-const re = '#C0392B', gr = '#1A7F4E'
+const navyDk = 'var(--ui-primary)', navy = 'var(--ui-primary)', gold = 'var(--ui-primary)'
+const re = 'var(--ui-danger)', gr = 'var(--ui-success)'
 
 type Child = { id: number; name: string; school: string | null }
 type ParentSession = { parentId: number; phone: string; children: Child[] }
@@ -246,7 +247,7 @@ export default function TagCheckinPage() {
             <p style={{ fontSize: 15, color: 'rgba(255,255,255,.6)', marginBottom: 28 }}>맞으면 등원을 눌러주세요</p>
             <button onClick={() => confirmCheckin(screen.c)} disabled={busy} style={{
               width: '100%', padding: 18, borderRadius: 12, border: 'none', background: gold,
-              color: navyDk, fontSize: 18, fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 12,
+              color: 'var(--ui-primary-text)', fontSize: 18, fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 12,
             }}>
               {busy ? '처리 중...' : '등원'}
             </button>
@@ -256,7 +257,7 @@ export default function TagCheckinPage() {
 
         {screen.kind === 'success' && (
           <div style={{ padding: '30px 0' }}>
-            <p style={{ fontSize: 40, marginBottom: 12 }}>✅</p>
+            <p style={{ marginBottom: 12, color: gr, display: 'flex', justifyContent: 'center' }}><IconCheck size={40} strokeWidth={2.5} /></p>
             <p style={{ fontSize: 22, fontWeight: 900, color: '#fff', marginBottom: 8 }}>{screen.name} 학생</p>
             <p style={{ fontSize: 16, color: gr, fontWeight: 700 }}>
               {screen.already ? '이미 등원 처리되었습니다' : `등원 완료!${screen.late ? ' (지각)' : ''}`}
@@ -266,7 +267,7 @@ export default function TagCheckinPage() {
 
         {screen.kind === 'error' && (
           <div style={{ padding: '20px 0' }}>
-            <p style={{ fontSize: 32, marginBottom: 12 }}>⚠️</p>
+            <p style={{ marginBottom: 12, color: re, display: 'flex', justifyContent: 'center' }}><IconAlertTriangle size={32} strokeWidth={2} /></p>
             <p style={{ fontSize: 16, color: re, fontWeight: 700, marginBottom: 24 }}>{screen.message}</p>
             <button onClick={reset} style={{
               width: '100%', padding: 16, borderRadius: 12, border: 'none', background: navy,
