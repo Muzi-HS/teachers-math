@@ -3,8 +3,9 @@ import { useEffect, useRef, useState } from 'react'
 import { QRCodeCanvas } from 'qrcode.react'
 import { IconSmartphone, IconShare } from '@/components/icons'
 import { useMobileMode } from '@/context/MobileModeContext'
+import AppInstallButton from '@/components/AppInstallButton'
 
-const navy = 'var(--ui-primary)', navyDk = 'var(--ui-primary)', navyM = 'var(--ui-surface-2)'
+const navy = 'var(--ui-primary)'
 const gold = 'var(--ui-primary)'
 const bg = 'var(--ui-bg)', bd = 'var(--ui-border)'
 const tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)'
@@ -14,6 +15,7 @@ export default function AppQrPage() {
   const [url, setUrl] = useState('')
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- 실제 접속 주소는 브라우저에서만 알 수 있다.
   useEffect(() => { setUrl(window.location.origin) }, [])
 
   function download() {
@@ -28,12 +30,13 @@ export default function AppQrPage() {
   return (
     <div style={{ padding: mobileMode ? '16px 14px 88px' : '28px 32px', fontFamily: "'Noto Sans KR',sans-serif" }}>
       <div style={{ marginBottom: mobileMode ? 14 : 20 }}>
-        <h1 style={{ fontSize: mobileMode ? 17 : 21, fontWeight: 700, color: tx }}>앱 설치 QR</h1>
+        <h1 style={{ fontSize: mobileMode ? 17 : 21, fontWeight: 700, color: tx }}>앱 설치 · QR</h1>
         {!mobileMode && <p style={{ fontSize: 13, color: tx2, marginTop: 4 }}>
           학부모/선생님께 이 QR코드를 보여주면 스캔 후 홈 화면에 앱처럼 설치할 수 있습니다
         </p>}
       </div>
 
+      <AppInstallButton />
       <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
         {/* QR 카드 */}
         <div style={{
@@ -44,7 +47,7 @@ export default function AppQrPage() {
         }}>
           {url ? (
             <QRCodeCanvas ref={canvasRef} value={url} size={220} level="M" marginSize={2}
-              fgColor={navyDk} bgColor="#fff" />
+              fgColor="#0D2A5E" bgColor="#fff" />
           ) : (
             <div style={{ width: 220, height: 220, background: bg, borderRadius: 8 }} />
           )}
@@ -58,7 +61,7 @@ export default function AppQrPage() {
 
         {/* 설치 안내 */}
         <div style={{
-          flex: 1, minWidth: 280,
+          flex: 1, minWidth: 0, flexBasis: 280,
           background: '#fff', borderRadius: 12, border: `1px solid ${bd}`,
           boxShadow: '0 1px 4px rgba(0,0,0,.06)', padding: 24,
         }}>
@@ -67,20 +70,20 @@ export default function AppQrPage() {
           <div style={{ background: bg, borderRadius: 10, padding: '12px 14px', marginBottom: 12 }}>
             <p style={{ fontSize: 12, fontWeight: 700, color: navy, margin: '0 0 6px', display: 'flex', alignItems: 'center', gap: 5 }}><IconSmartphone size={12} /> 안드로이드 (Chrome)</p>
             <p style={{ fontSize: 12, color: tx2, margin: 0, lineHeight: 1.6 }}>
-              QR코드 스캔 → 사이트 접속 후 화면 하단 "설치" 배너를 누르면 바로 설치됩니다.
+              교직원은 로그인 후 메뉴의 ‘앱 설치 · QR’에서 ‘이 기기에 앱 설치’를 눌러주세요. QR로 접속한 경우 브라우저 메뉴에서 ‘앱 설치’ 또는 ‘홈 화면에 추가’를 선택해주세요.
             </p>
           </div>
 
           <div style={{ background: bg, borderRadius: 10, padding: '12px 14px' }}>
             <p style={{ fontSize: 12, fontWeight: 700, color: navy, margin: '0 0 6px', display: 'flex', alignItems: 'center', gap: 5 }}><IconSmartphone size={12} /> 아이폰 (Safari)</p>
             <p style={{ fontSize: 12, color: tx2, margin: 0, lineHeight: 1.6 }}>
-              QR코드 스캔 → 사이트 접속 후 화면 하단 안내에 따라, Safari 하단 공유 버튼(<span style={{ color: navy, display: 'inline-flex', verticalAlign: 'middle' }}><IconShare size={12} /></span>)을 누르고<br/>
-              "홈 화면에 추가"를 선택하면 설치됩니다.
+              QR코드 스캔 → 사이트 접속 후 Safari 공유 버튼(<span style={{ color: navy, display: 'inline-flex', verticalAlign: 'middle' }}><IconShare size={12} /></span>)을 누르고<br/>
+              ‘홈 화면에 추가’를 선택하면 설치됩니다.
             </p>
           </div>
 
           <p style={{ fontSize: 11, color: tx3, marginTop: 14 }}>
-            * 이미 홈 화면에 설치되어 있는 경우, 설치 안내 배너는 자동으로 표시되지 않습니다.
+            * 설치한 앱으로 접속 중이면 설치 버튼이 비활성화됩니다.
           </p>
         </div>
       </div>

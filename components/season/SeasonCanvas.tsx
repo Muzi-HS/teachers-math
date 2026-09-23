@@ -3,271 +3,168 @@ import { useEffect, useRef } from 'react'
 import type { Season, SeasonIntensity } from '@/lib/season'
 import { INTENSITY_MULTIPLIER } from '@/lib/season'
 
-// 성능 최적화 핵심: 예전에는 매 프레임마다 파티클 하나하나를 벡터로 다시 그리면서
-// 뒤/중간 레이어에는 ctx.filter = blur(...)까지 실시간으로 적용했는데, 캔버스의 실시간
-// 블러 필터는 매우 무겁고(픽셀당 연산) 파티클 수만큼 곱해져서 체감 렉의 주 원인이었다.
-// 지금은 파티클이 생성될 때(또는 화면 밖으로 나가 재생성될 때) "생김새 + 블러"를 작은
-// 오프스크린 캔버스에 딱 한 번만 그려서 스프라이트로 저장해두고, 매 프레임에는 그 스프라이트를
-// drawImage로 붙여넣기만 한다 — 회전/이동만 매 프레임 갱신되고 실제 그리기(도형·블러)는
-// 파티클 수명 동안 한 번만 계산된다.
-type SpriteParticle = {
-  x: number; y: number
-  speed: number
-  rot: number; rotSpeed: number
-  swayAmp: number; swayFreq: number; swayPhase: number
-  layer: number
-  baseOpacity: number
-  sprite: HTMLCanvasElement
-  halfW: number; halfH: number // 스프라이트를 그릴 절반 크기(CSS px)
-}
-
-type ShapeParams = { size: number; shapeVariant: number }
-
+type ShapeParams = { size: number; variant: number; color: string }
 type SeasonConfig = {
-  countPerLayer: [number, number, number] // 뒤/중간/앞 레이어별 기본 파티클 수
-  maxTotal: number
-  colors: string[]
-  fallSpeed: [number, number]   // px/s
-  swayAmp: [number, number]     // px
-  swayFreq: [number, number]    // Hz
-  rotSpeed: [number, number]    // rad/s
-  sizeRange: [number, number]   // px
-  shapeVariants: number
-  extent: number                 // 도형이 중심에서 최대 얼마나 뻗어나가는지(스프라이트 크기 계산용)
+  counts: readonly number[]
+  colors: readonly string[]
+  speed: readonly [number, number]
+  size: readonly [number, number]
+  sway: number
+  rotation: number
+  variants: number
   draw: (ctx: CanvasRenderingContext2D, p: ShapeParams) => void
 }
+type Particle = {
+  x: number; y: number; speed: number; rotation: number; spin: number
+  phase: number; frequency: number; sway: number; opacity: number; layer: number
+  sprite: HTMLCanvasElement; half: number
+}
 
-// 뒤(블러+저채도) / 중간 / 앞(선명+큼) — depth감을 위한 레이어별 스케일·투명도·블러·속도
 const LAYERS = [
-  { scale: 0.62, opacityMul: 0.55, blur: 2.4, speedMul: 0.62 },
-  { scale: 0.88, opacityMul: 0.8, blur: 0.6, speedMul: 0.88 },
-  { scale: 1.18, opacityMul: 1, blur: 0, speedMul: 1.2 },
+  { scale: 0.62, opacity: 0.55, blur: 0.8, speed: 0.62 },
+  { scale: 0.88, opacity: 0.8, blur: 0.25, speed: 0.88 },
+  { scale: 1.18, opacity: 1, blur: 0, speed: 1.2 },
 ] as const
+const rand = (min: number, max: number) => min + Math.random() * (max - min)
 
-function rand(min: number, max: number) { return min + Math.random() * (max - min) }
-function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)] }
+// 곡선·음영·블러는 작은 스프라이트에 최초 한 번만 그린다.
+function fillShape(ctx: CanvasRenderingContext2D, p: ShapeParams, petal = false) {
+  const s = p.size
+  const gradient = ctx.createLinearGradient(-s * 0.6, -s, s * 0.5, s)
+  gradient.addColorStop(0, petal ? '#FFF5F8' : '#FFE2A0')
+  gradient.addColorStop(0.45, p.color)
+  gradient.addColorStop(1, petal ? '#D984A6' : '#A94E2C')
+  ctx.fillStyle = gradient
+  ctx.fill()
+}
 
-// 벚꽃잎 — 끝이 살짝 파인(notch) 하트형 꽃잎 실루엣. 순수 타원보다 벚꽃 특유의
-// 갈라진 꽃잎 끝 느낌이 나도록 베지어 곡선 2개 + 노치로 구성한다.
 function drawPetal(ctx: CanvasRenderingContext2D, p: ShapeParams) {
   const s = p.size
+  ctx.scale(p.variant === 1 ? 0.78 : 1, 1)
   ctx.beginPath()
-  ctx.moveTo(0, s)
-  ctx.bezierCurveTo(-s * 0.95, s * 0.25, -s * 0.78, -s * 0.55, -s * 0.16, -s * 0.86)
-  ctx.lineTo(0, -s * 0.6)
-  ctx.lineTo(s * 0.16, -s * 0.86)
-  ctx.bezierCurveTo(s * 0.78, -s * 0.55, s * 0.95, s * 0.25, 0, s)
+  ctx.moveTo(0.08 * s, 0.98 * s)
+  ctx.bezierCurveTo(-0.22 * s, 0.7 * s, -0.88 * s, 0.12 * s, -0.68 * s, -0.5 * s)
+  ctx.bezierCurveTo(-0.58 * s, -0.94 * s, -0.2 * s, -1.02 * s, -0.06 * s, -0.78 * s)
+  ctx.quadraticCurveTo(0.02 * s, -0.63 * s, 0.07 * s, -0.78 * s)
+  ctx.bezierCurveTo(0.33 * s, -1.03 * s, 0.72 * s, -0.76 * s, 0.69 * s, -0.34 * s)
+  ctx.bezierCurveTo(0.69 * s, 0.22 * s, 0.36 * s, 0.76 * s, 0.08 * s, 0.98 * s)
   ctx.closePath()
-  ctx.fill()
-  // 중심 결(꽃잎 맥) — 아주 은은하게
-  ctx.globalAlpha *= 0.3
+  fillShape(ctx, p, true)
+  ctx.strokeStyle = 'rgba(255, 249, 252, 0.55)'
+  ctx.lineWidth = Math.max(0.45, s * 0.045)
   ctx.beginPath()
-  ctx.moveTo(0, s * 0.75)
-  ctx.lineTo(0, -s * 0.45)
-  ctx.lineWidth = Math.max(0.4, s * 0.05)
-  ctx.strokeStyle = ctx.fillStyle as string
+  ctx.moveTo(0.08 * s, 0.78 * s)
+  ctx.quadraticCurveTo(-0.22 * s, 0.1 * s, -0.13 * s, -0.54 * s)
   ctx.stroke()
 }
 
-// 잎자루(줄기) — 낙엽 종류 공통으로 아래쪽에 짧은 줄기를 그려 자연스러움을 더한다.
-function drawStem(ctx: CanvasRenderingContext2D, s: number, baseY: number) {
-  ctx.globalAlpha *= 0.35
-  ctx.beginPath()
-  ctx.moveTo(0, baseY)
-  ctx.lineTo(0, baseY + s * 0.22)
-  ctx.lineWidth = Math.max(0.5, s * 0.07)
+function drawVeins(ctx: CanvasRenderingContext2D, s: number, tips: readonly (readonly [number, number])[]) {
+  ctx.strokeStyle = 'rgba(108, 53, 27, 0.30)'
+  ctx.lineWidth = Math.max(0.45, s * 0.035)
   ctx.lineCap = 'round'
-  ctx.strokeStyle = ctx.fillStyle as string
+  ctx.beginPath()
+  for (const [x, y] of tips) {
+    ctx.moveTo(0, s * 0.65)
+    ctx.quadraticCurveTo(x * s * 0.35, s * (0.65 + y) * 0.35, x * s, y * s)
+  }
+  ctx.stroke()
+  ctx.strokeStyle = 'rgba(125, 66, 32, 0.65)'
+  ctx.lineWidth = Math.max(0.6, s * 0.065)
+  ctx.beginPath()
+  ctx.moveTo(0, s * 0.65)
+  ctx.quadraticCurveTo(-0.03 * s, s, 0.12 * s, 1.24 * s)
   ctx.stroke()
 }
 
-// 단풍잎 — 5갈래로 뾰족하게 뻗은 손바닥형 실루엣(각지고 뾰족한 잎끝 사이사이 노치).
-// 잎맥이 중심에서 각 갈래 끝까지 5방향으로 뻗어나가 단풍잎 특유의 결이 보이게 한다.
-function drawMapleLeaf(ctx: CanvasRenderingContext2D, p: ShapeParams) {
-  const s = p.size
-  const segments = 16
-  const startAngle = -Math.PI * 0.86, endAngle = Math.PI * 0.86 // 아래쪽 줄기 자리는 비워둠
-  const lobeAngleOf = (t: number) => startAngle + (endAngle - startAngle) * t - Math.PI / 2
+// 다섯 갈래와 작은 톱니를 명확히 표현해 작은 크기에서도 단풍잎이 보이도록 한다.
+const MAPLE_OUTLINE = [
+  [0, -1.1], [0.18, -0.62], [0.32, -0.73], [0.29, -0.26],
+  [0.75, -0.69], [0.72, -0.33], [1.02, -0.38], [0.8, -0.03],
+  [0.94, 0.09], [0.48, 0.31], [0.65, 0.48], [0.2, 0.53], [0, 0.76],
+  [-0.2, 0.53], [-0.65, 0.48], [-0.48, 0.31], [-0.94, 0.09],
+  [-0.8, -0.03], [-1.02, -0.38], [-0.72, -0.33], [-0.75, -0.69],
+  [-0.29, -0.26], [-0.32, -0.73], [-0.18, -0.62],
+] as const
+
+function drawMaple(ctx: CanvasRenderingContext2D, p: ShapeParams) {
   ctx.beginPath()
-  ctx.moveTo(0, s * 1.05)
-  for (let i = 0; i <= segments; i++) {
-    const t = i / segments
-    const angle = lobeAngleOf(t)
-    const wave = Math.sin(t * Math.PI * 5) // 5개의 뾰족한 갈래
-    const r = s * (0.58 + Math.max(0, wave) * 0.52)
-    ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r)
-  }
+  MAPLE_OUTLINE.forEach(([x, y], i) => {
+    if (i === 0) ctx.moveTo(x * p.size, y * p.size)
+    else ctx.lineTo(x * p.size, y * p.size)
+  })
   ctx.closePath()
-  ctx.fill()
-  if (s > 9) {
-    const veinAlpha = ctx.globalAlpha
-    ctx.lineWidth = Math.max(0.4, s * 0.045)
-    ctx.strokeStyle = ctx.fillStyle as string
-    // 5개 갈래 끝(파형의 피크, t≈0.1/0.3/0.5/0.7/0.9)까지 뻗는 잎맥
-    for (const t of [0.1, 0.3, 0.5, 0.7, 0.9]) {
-      const angle = lobeAngleOf(t)
-      const r = s * 1.10
-      ctx.globalAlpha = veinAlpha * (t === 0.5 ? 0.32 : 0.22)
-      ctx.beginPath()
-      ctx.moveTo(0, 0)
-      ctx.lineTo(Math.cos(angle) * r * 0.95, Math.sin(angle) * r * 0.95)
-      ctx.stroke()
-    }
-    ctx.globalAlpha = veinAlpha
-    drawStem(ctx, s, s * 1.05)
-  }
+  fillShape(ctx, p)
+  drawVeins(ctx, p.size, [[0, -0.95], [-0.69, -0.56], [0.69, -0.56], [-0.74, 0.08], [0.74, 0.08]])
 }
 
-// 은행잎 — 아래는 줄기로 좁아지고 위로 갈수록 부채꼴로 넓어지다 중앙이 살짝 파인 실루엣.
-// 은행잎 특유의 밑동에서 위로 부챗살처럼 퍼지는 평행 잎맥을 살짝 넣는다.
-function drawGinkgoLeaf(ctx: CanvasRenderingContext2D, p: ShapeParams) {
+function drawGinkgo(ctx: CanvasRenderingContext2D, p: ShapeParams) {
   const s = p.size
   ctx.beginPath()
-  ctx.moveTo(0, s)
-  ctx.bezierCurveTo(s * 0.15, s * 0.25, s * 0.98, -s * 0.05, s * 0.6, -s * 0.78)
-  ctx.quadraticCurveTo(s * 0.28, -s * 0.56, 0, -s * 0.84)
-  ctx.quadraticCurveTo(-s * 0.28, -s * 0.56, -s * 0.6, -s * 0.78)
-  ctx.bezierCurveTo(-s * 0.98, -s * 0.05, -s * 0.15, s * 0.25, 0, s)
+  ctx.moveTo(0, s * 0.78)
+  ctx.bezierCurveTo(-0.22 * s, 0.33 * s, -0.85 * s, 0.08 * s, -1.03 * s, -0.47 * s)
+  ctx.bezierCurveTo(-0.88 * s, -0.72 * s, -0.7 * s, -0.81 * s, -0.51 * s, -0.78 * s)
+  ctx.bezierCurveTo(-0.32 * s, -0.94 * s, -0.15 * s, -0.88 * s, 0, -0.59 * s)
+  ctx.bezierCurveTo(0.15 * s, -0.88 * s, 0.32 * s, -0.94 * s, 0.51 * s, -0.78 * s)
+  ctx.bezierCurveTo(0.7 * s, -0.81 * s, 0.88 * s, -0.72 * s, 1.03 * s, -0.47 * s)
+  ctx.bezierCurveTo(0.85 * s, 0.08 * s, 0.22 * s, 0.33 * s, 0, s * 0.78)
   ctx.closePath()
-  ctx.fill()
-  if (s > 9) {
-    const veinAlpha = ctx.globalAlpha
-    ctx.lineWidth = Math.max(0.4, s * 0.04)
-    ctx.strokeStyle = ctx.fillStyle as string
-    ctx.globalAlpha = veinAlpha * 0.28
-    for (const [ex, ey] of [[-0.45, -0.68], [0, -0.83], [0.45, -0.68]] as const) {
-      ctx.beginPath()
-      ctx.moveTo(0, s * 0.85)
-      ctx.lineTo(s * ex, s * ey)
-      ctx.stroke()
-    }
-    ctx.globalAlpha = veinAlpha
-    drawStem(ctx, s, s)
-  }
+  fillShape(ctx, { ...p, color: '#E9BC49' })
+  drawVeins(ctx, s, [[-0.86, -0.46], [-0.6, -0.67], [-0.3, -0.7], [0, -0.48], [0.3, -0.7], [0.6, -0.67], [0.86, -0.46]])
 }
 
-// 작은 타원형 잎 — 매끈한 타원 실루엣의 세 번째 variation
-function drawRoundLeaf(ctx: CanvasRenderingContext2D, p: ShapeParams) {
-  const aspect = p.shapeVariant % 2 === 0 ? 0.5 : 0.72
-  ctx.beginPath()
-  ctx.ellipse(0, 0, p.size, p.size * aspect, 0, 0, Math.PI * 2)
-  ctx.fill()
-  if (p.size > 9) {
-    ctx.globalAlpha *= 0.4
-    ctx.beginPath()
-    ctx.moveTo(-p.size * 0.75, 0)
-    ctx.lineTo(p.size * 0.75, 0)
-    ctx.lineWidth = Math.max(0.5, p.size * 0.07)
-    ctx.strokeStyle = ctx.fillStyle as string
-    ctx.stroke()
-    drawStem(ctx, p.size, p.size * aspect)
-  }
-}
-
-// 톱니 잎(자작나무/너도밤나무형) — 가장자리가 잘게 들쭉날쭉한 타원형, 네 번째 variation
-function drawSerratedLeaf(ctx: CanvasRenderingContext2D, p: ShapeParams) {
+function drawOvalLeaf(ctx: CanvasRenderingContext2D, p: ShapeParams) {
   const s = p.size
-  const rx = s, ry = s * 0.56
-  const teeth = 11
   ctx.beginPath()
-  for (let i = 0; i <= teeth * 2; i++) {
-    const t = i / (teeth * 2)
-    const angle = t * Math.PI * 2 - Math.PI / 2
-    const jag = i % 2 === 0 ? 1 : 0.87
-    const x = Math.cos(angle) * rx * jag
-    const y = Math.sin(angle) * ry * jag
-    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y)
-  }
+  ctx.moveTo(0.14 * s, -s)
+  ctx.bezierCurveTo(0.94 * s, -0.3 * s, 0.6 * s, 0.48 * s, 0, 0.8 * s)
+  ctx.bezierCurveTo(-0.72 * s, 0.38 * s, -0.67 * s, -0.37 * s, 0.14 * s, -s)
   ctx.closePath()
-  ctx.fill()
-  if (s > 9) {
-    ctx.globalAlpha *= 0.3
-    ctx.beginPath()
-    ctx.moveTo(0, -ry * 0.85)
-    ctx.lineTo(0, ry * 0.85)
-    ctx.lineWidth = Math.max(0.4, s * 0.045)
-    ctx.strokeStyle = ctx.fillStyle as string
-    ctx.stroke()
-    drawStem(ctx, s, ry)
-  }
+  fillShape(ctx, p)
+  drawVeins(ctx, s, [[0.12, -0.85], [-0.38, -0.26], [0.47, -0.3], [-0.35, 0.15], [0.38, 0.14]])
 }
 
-// 낙엽 디스패처 — 파티클마다 배정된 shapeVariant로 단풍/은행/작은 잎/톱니 잎을 골고루 섞는다.
-function drawLeaf(ctx: CanvasRenderingContext2D, p: ShapeParams) {
-  const variant = p.shapeVariant % 4
-  if (variant === 0) drawMapleLeaf(ctx, p)
-  else if (variant === 1) drawGinkgoLeaf(ctx, p)
-  else if (variant === 2) drawRoundLeaf(ctx, p)
-  else drawSerratedLeaf(ctx, p)
-}
-
-function drawFlake(ctx: CanvasRenderingContext2D, p: ShapeParams) {
-  ctx.beginPath()
-  ctx.arc(0, 0, p.size, 0, Math.PI * 2)
-  ctx.fill()
-}
-
-const SEASON_CONFIG: Record<Exclude<Season, 'none'>, SeasonConfig> = {
+const SEASONS: Record<Exclude<Season, 'none'>, SeasonConfig> = {
   spring: {
-    countPerLayer: [10, 9, 7], maxTotal: 70,
-    colors: ['#F8DCE6', '#F3C7D6', '#FBEAEF', '#EFC0D2', '#F6D3DE'],
-    fallSpeed: [16, 32], swayAmp: [12, 30], swayFreq: [.35, .8], rotSpeed: [.25, .7],
-    sizeRange: [6, 13], shapeVariants: 1, extent: 0.95, draw: drawPetal,
+    counts: [10, 9, 7], colors: ['#F4BCD1', '#EFA9C3', '#F8D5E2', '#EAB0C9'],
+    speed: [16, 32], size: [6, 13], sway: 26, rotation: 0.6, variants: 2, draw: drawPetal,
   },
   autumn: {
-    countPerLayer: [8, 8, 6], maxTotal: 55,
-    colors: ['#B5651D', '#C97C3D', '#D9A441', '#A0522D', '#8B3A1D', '#C2703A'],
-    fallSpeed: [24, 44], swayAmp: [16, 36], swayFreq: [.28, .65], rotSpeed: [.6, 1.7],
-    sizeRange: [8, 16], shapeVariants: 4, extent: 1.35, draw: drawLeaf,
+    counts: [8, 8, 6], colors: ['#D88442', '#CE6948', '#DDA94A', '#BB5843'],
+    speed: [24, 44], size: [8, 16], sway: 32, rotation: 0.85, variants: 3,
+    draw: (ctx, p) => {
+      if (p.variant === 0) drawMaple(ctx, p)
+      else if (p.variant === 1) drawGinkgo(ctx, p)
+      else drawOvalLeaf(ctx, p)
+    },
   },
   winter: {
-    countPerLayer: [16, 14, 8], maxTotal: 92,
-    colors: ['#FFFFFF'],
-    fallSpeed: [12, 28], swayAmp: [4, 12], swayFreq: [.18, .45], rotSpeed: [0, .12],
-    sizeRange: [2, 7], shapeVariants: 1, extent: 1, draw: drawFlake,
+    counts: [16, 14, 8], colors: ['#FFFFFF'],
+    speed: [12, 28], size: [2, 7], sway: 10, rotation: 0.12, variants: 1,
+    draw: (ctx, p) => {
+      ctx.fillStyle = p.color
+      ctx.beginPath()
+      ctx.arc(0, 0, p.size, 0, Math.PI * 2)
+      ctx.fill()
+    },
   },
 }
 
-// 파티클 생김새(도형+블러)를 작은 오프스크린 캔버스에 한 번만 렌더링해 스프라이트로 만든다.
-function makeSprite(cfg: SeasonConfig, layer: number, size: number, color: string, shapeVariant: number, dpr: number) {
-  const L = LAYERS[layer]
-  const effSize = size * L.scale
-  const blurPx = L.blur
-  const half = Math.ceil(effSize * cfg.extent + blurPx * 3 + 2)
-
+function createParticle(cfg: SeasonConfig, layer: number, width: number, height: number): Particle {
+  const depth = LAYERS[layer]
+  const size = rand(...cfg.size) * depth.scale
+  const half = Math.ceil(size * 1.4 + depth.blur * 3 + 2)
   const sprite = document.createElement('canvas')
-  sprite.width = half * 2 * dpr
-  sprite.height = half * 2 * dpr
-  const sctx = sprite.getContext('2d')!
-  sctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-  sctx.translate(half, half)
-  sctx.filter = blurPx > 0 ? `blur(${blurPx}px)` : 'none'
-  sctx.fillStyle = color
-  sctx.globalAlpha = 1
-  cfg.draw(sctx, { size: effSize, shapeVariant })
-
-  return { sprite, half }
-}
-
-type Particle = SpriteParticle
-
-function createParticle(cfg: SeasonConfig, layer: number, width: number, height: number, spawnAnywhere: boolean, dpr: number): Particle {
-  const size = rand(cfg.sizeRange[0], cfg.sizeRange[1])
-  const color = pick(cfg.colors)
-  const shapeVariant = Math.floor(Math.random() * cfg.shapeVariants)
-  const { sprite, half } = makeSprite(cfg, layer, size, color, shapeVariant, dpr)
+  // 작은 원본만 2배 해상도로 유지. 화면 캔버스 해상도와 무관하게 윤곽은 선명하다.
+  sprite.width = sprite.height = half * 4
+  const ctx = sprite.getContext('2d')!
+  ctx.setTransform(2, 0, 0, 2, half * 2, half * 2)
+  ctx.filter = depth.blur ? `blur(${depth.blur}px)` : 'none'
+  cfg.draw(ctx, { size, variant: Math.floor(rand(0, cfg.variants)), color: cfg.colors[Math.floor(rand(0, cfg.colors.length))] })
   return {
-    x: rand(-40, width + 40),
-    y: spawnAnywhere ? rand(-height, height) : -half - rand(0, 120),
-    speed: rand(cfg.fallSpeed[0], cfg.fallSpeed[1]),
-    rot: rand(0, Math.PI * 2),
-    rotSpeed: rand(cfg.rotSpeed[0], cfg.rotSpeed[1]) * (Math.random() < 0.5 ? -1 : 1),
-    swayAmp: rand(cfg.swayAmp[0], cfg.swayAmp[1]),
-    swayFreq: rand(cfg.swayFreq[0], cfg.swayFreq[1]),
-    swayPhase: rand(0, Math.PI * 2),
-    layer,
-    baseOpacity: rand(0.55, 0.95),
-    sprite, halfW: half, halfH: half,
+    x: rand(-40, width + 40), y: rand(-height * 0.2, height), speed: rand(...cfg.speed),
+    rotation: rand(0, Math.PI * 2), spin: rand(0.2, 1) * cfg.rotation * (Math.random() < 0.5 ? -1 : 1),
+    phase: rand(0, Math.PI * 2), frequency: rand(0.35, 0.8), sway: rand(cfg.sway * 0.45, cfg.sway),
+    opacity: rand(0.55, 0.95) * depth.opacity, layer, sprite, half,
   }
 }
 
@@ -279,111 +176,120 @@ export default function SeasonCanvas({ season, intensity }: { season: Exclude<Se
     if (!canvas) return
     const ctx = canvas.getContext('2d', { alpha: true, desynchronized: true })
     if (!ctx) return
-
-    const cfg = SEASON_CONFIG[season]
-    const isMobile = window.innerWidth <= 768
-    const mul = INTENSITY_MULTIPLIER[intensity] * (isMobile ? 0.55 : 1)
-
+    const cfg = SEASONS[season]
+    const hero = document.querySelector<HTMLElement>('.lpv-hero')
     let particles: Particle[] = []
-    let width = 0, height = 0, dpr = 1
+    let width = 0, height = 0, dpr = 1, mobile = false
+    let heroHeight = window.innerHeight, scrollFactor = 1
+    let raf = 0, resizeTimer = 0, last = 0, lastDraw = 0, elapsed = 0
+    let wind = 0, targetWind = 0, nextWind = rand(2.5, 5)
 
-    function buildParticles() {
-      particles = []
-      for (let layer = 0; layer < 3; layer++) {
-        const count = Math.min(
-          Math.round(cfg.countPerLayer[layer] * mul),
-          Math.round(cfg.maxTotal * mul * (cfg.countPerLayer[layer] / (cfg.countPerLayer[0] + cfg.countPerLayer[1] + cfg.countPerLayer[2]))) || 1,
-        )
-        for (let i = 0; i < count; i++) particles.push(createParticle(cfg, layer, width, height, true, dpr))
-      }
+    function updateScrollFactor() {
+      // 스크롤 이벤트에서는 레이아웃을 읽지 않는다.
+      const progress = Math.min(1, Math.max(0, window.scrollY / (heroHeight * 1.1)))
+      scrollFactor = hero ? 1 - progress * 0.85 : 1
     }
 
     function resize() {
-      width = window.innerWidth
-      height = window.innerHeight
-      // 파티클은 작고 이미 블러/애니메이션으로 부드러워서 굳이 고해상도 스프라이트가 필요 없다 —
-      // dpr을 1.5로 제한해 스프라이트 생성 비용과 drawImage 픽셀 양을 줄인다.
-      dpr = Math.min(window.devicePixelRatio || 1, 1.5)
-      canvas!.width = width * dpr
-      canvas!.height = height * dpr
-      canvas!.style.width = width + 'px'
-      canvas!.style.height = height + 'px'
+      const nextWidth = window.innerWidth, nextHeight = window.innerHeight
+      const nextMobile = nextWidth <= 768
+      // 전체 화면 픽셀 수를 제한해 고해상도 화면의 fill-rate 부하를 줄인다.
+      const nextDpr = Math.min(window.devicePixelRatio || 1, nextMobile ? 1 : 1.5, Math.sqrt(2_500_000 / (nextWidth * nextHeight)))
+      heroHeight = hero?.offsetHeight || nextHeight
+      updateScrollFactor()
+      if (nextWidth === width && nextHeight === height && nextDpr === dpr) return
+      const oldWidth = width, oldHeight = height
+      const rebuild = particles.length === 0 || mobile !== nextMobile
+      width = nextWidth; height = nextHeight; dpr = nextDpr; mobile = nextMobile
+      canvas!.width = Math.round(width * dpr)
+      canvas!.height = Math.round(height * dpr)
       ctx!.setTransform(dpr, 0, 0, dpr, 0, 0)
-      buildParticles()
-    }
-    resize()
-    window.addEventListener('resize', resize)
-
-    // 바람 — 시간에 따라 목표값이 천천히 바뀌고, 실제 값은 그 목표를 부드럽게 뒤쫓는다
-    const wind = { value: 0, target: 0 }
-
-    // 히어로 높이를 넘어 스크롤할수록 옅어지되, 완전히 사라지진 않게(최소치 유지)
-    const heroEl = document.querySelector('.lpv-hero') as HTMLElement | null
-    let scrollFactor = 1
-    function updateScrollFactor() {
-      const heroHeight = heroEl?.offsetHeight ?? window.innerHeight
-      const p = Math.min(1, Math.max(0, window.scrollY / (heroHeight * 1.1)))
-      scrollFactor = 1 - p * 0.85 // 최저 0.15까지만 옅어짐
-    }
-    updateScrollFactor()
-    window.addEventListener('scroll', updateScrollFactor, { passive: true })
-
-    let raf = 0
-    let last = performance.now()
-    let windTimer = 0
-
-    function frame(now: number) {
-      const dt = Math.min(0.05, (now - last) / 1000) // 탭 전환 등으로 인한 급격한 점프 방지
-      last = now
-      windTimer += dt
-      if (windTimer > rand(2.5, 5)) {
-        windTimer = 0
-        wind.target = rand(-1, 1)
-      }
-      wind.value += (wind.target - wind.value) * dt * 0.6
-
-      ctx!.clearRect(0, 0, width, height)
-
-      // 레이어(뒤→앞) 순서로 그려서 앞 레이어가 뒤 레이어를 자연스럽게 덮도록 한다.
-      // 블러는 이미 스프라이트에 구워져 있으므로 여기서는 filter를 전혀 건드리지 않는다.
-      for (let layer = 0; layer < 3; layer++) {
-        const L = LAYERS[layer]
-        for (const p of particles) {
-          if (p.layer !== layer) continue
-          p.y += p.speed * L.speedMul * dt
-          p.x += Math.sin(now / 1000 * p.swayFreq + p.swayPhase) * p.swayAmp * dt + wind.value * 22 * dt
-          p.rot += p.rotSpeed * dt
-          if (p.y - p.halfH > height + 40) {
-            Object.assign(p, createParticle(cfg, layer, width, height, false, dpr))
+      if (rebuild) {
+        particles = []
+        const multiplier = INTENSITY_MULTIPLIER[intensity] * (mobile ? 0.55 : 1)
+        cfg.counts.forEach((count, layer) => {
+          for (let i = 0; i < Math.round(count * multiplier); i++) {
+            particles.push(createParticle(cfg, layer, width, height))
           }
-          if (p.x < -60) p.x = width + 40
-          if (p.x > width + 60) p.x = -40
-
-          ctx!.save()
-          ctx!.translate(p.x, p.y)
-          ctx!.rotate(p.rot)
-          ctx!.globalAlpha = p.baseOpacity * L.opacityMul * scrollFactor
-          ctx!.drawImage(p.sprite, -p.halfW, -p.halfH, p.halfW * 2, p.halfH * 2)
-          ctx!.restore()
+        })
+      } else {
+        for (const p of particles) {
+          p.x *= width / oldWidth
+          p.y *= height / oldHeight
         }
       }
-
-      raf = requestAnimationFrame(frame)
     }
-    raf = requestAnimationFrame(frame)
 
+    function scheduleResize() {
+      window.clearTimeout(resizeTimer)
+      resizeTimer = window.setTimeout(resize, 150)
+    }
+
+    function frame(now: number) {
+      raf = requestAnimationFrame(frame)
+      // 120/144Hz 화면에서도 장식 효과는 최대 60fps. 모바일은 최대 30fps.
+      const interval = 1000 / (mobile ? 30 : 60)
+      const delta = now - last
+      if (delta < interval - 0.5) return
+      last = now - (delta >= interval ? delta % interval : 0)
+      const dt = Math.min(0.05, (now - lastDraw) / 1000)
+      lastDraw = now
+      elapsed += dt
+      if (elapsed >= nextWind) {
+        targetWind = rand(-1, 1)
+        nextWind = elapsed + rand(2.5, 5)
+      }
+      wind += (targetWind - wind) * dt * 0.6
+      ctx!.setTransform(dpr, 0, 0, dpr, 0, 0)
+      ctx!.clearRect(0, 0, width, height)
+      // 이미 뒤→앞 순서로 저장되어 있으므로 한 번만 순회한다.
+      for (const p of particles) {
+        p.y += p.speed * LAYERS[p.layer].speed * dt
+        p.x += (Math.sin(elapsed * p.frequency + p.phase) * p.sway + wind * 22) * dt
+        p.rotation += p.spin * dt
+        if (p.y - p.half > height + 40) {
+          // 재진입 시 캔버스·그라디언트·입자 객체를 새로 만들지 않는다.
+          p.y = -p.half - rand(0, 120)
+          p.x = rand(-40, width + 40)
+        }
+        if (p.x < -60) p.x = width + 40
+        if (p.x > width + 60) p.x = -40
+        if (p.y + p.half < 0 || p.y - p.half > height) continue
+        const flutter = season === 'winter' ? 1 : 0.72 + Math.sin(elapsed * 1.2 + p.phase) * 0.28
+        const cos = Math.cos(p.rotation), sin = Math.sin(p.rotation)
+        ctx!.setTransform(dpr * cos * flutter, dpr * sin * flutter, -dpr * sin, dpr * cos, dpr * p.x, dpr * p.y)
+        ctx!.globalAlpha = p.opacity * scrollFactor
+        ctx!.drawImage(p.sprite, -p.half, -p.half, p.half * 2, p.half * 2)
+      }
+    }
+
+    function handleVisibility() {
+      cancelAnimationFrame(raf)
+      if (!document.hidden) {
+        last = lastDraw = performance.now()
+        raf = requestAnimationFrame(frame)
+      }
+    }
+
+    resize()
+    handleVisibility()
+    const observer = hero ? new ResizeObserver(() => {
+      heroHeight = hero.offsetHeight || window.innerHeight
+      updateScrollFactor()
+    }) : null
+    if (hero) observer?.observe(hero)
+    window.addEventListener('resize', scheduleResize)
+    window.addEventListener('scroll', updateScrollFactor, { passive: true })
+    document.addEventListener('visibilitychange', handleVisibility)
     return () => {
       cancelAnimationFrame(raf)
-      window.removeEventListener('resize', resize)
+      window.clearTimeout(resizeTimer)
+      observer?.disconnect()
+      window.removeEventListener('resize', scheduleResize)
       window.removeEventListener('scroll', updateScrollFactor)
+      document.removeEventListener('visibilitychange', handleVisibility)
     }
   }, [season, intensity])
 
-  return (
-    <canvas
-      ref={canvasRef}
-      aria-hidden
-      style={{ position: 'fixed', inset: 0, zIndex: 1, pointerEvents: 'none' }}
-    />
-  )
+  return <canvas ref={canvasRef} aria-hidden style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', zIndex: 1, pointerEvents: 'none' }} />
 }

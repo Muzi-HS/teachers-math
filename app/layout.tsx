@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { AuthProvider } from '@/context/AuthContext'
-import InstallBanner from '@/components/InstallBanner'
+import { AppInstallProvider } from '@/context/AppInstallContext'
 import SplashScreen from '@/components/SplashScreen'
 import './globals.css'
 
@@ -37,11 +37,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
       </head>
       <body style={{ margin: 0, padding: 0, overflowX: 'hidden', maxWidth: '100vw' }}>
-        <AuthProvider>
+        <AppInstallProvider><AuthProvider>
           <SplashScreen />
           {children}
-        </AuthProvider>
-        <InstallBanner />
+        </AuthProvider></AppInstallProvider>
       </body>
     </html>
   )

@@ -13,7 +13,6 @@ import NaverBlogSection from '@/components/landing-preview/NaverBlogSection'
 import SpecialClassSection from '@/components/landing-preview/SpecialClassSection'
 import ConsultationSection from '@/components/landing-preview/ConsultationSection'
 import LocationSection from '@/components/landing-preview/LocationSection'
-import InstallSection from '@/components/landing-preview/InstallSection'
 import LoginPanel from '@/components/landing-preview/LoginPanel'
 import ScrollToTopButton from '@/components/landing-preview/ScrollToTopButton'
 import SeasonEffect from '@/components/season/SeasonEffect'
@@ -79,7 +78,6 @@ export default function HomePage() {
         <SpecialClassSection />
         <ConsultationSection />
         <LocationSection />
-        <InstallSection />
       </div>
 
       <SeasonEffect enabled={siteSettings.seasonEffectEnabled} season={effectiveSeason} intensity={siteSettings.seasonIntensity} />
