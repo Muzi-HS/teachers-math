@@ -1,57 +1,12 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useAppInstall } from '@/context/AppInstallContext'
 import Image from 'next/image'
 import Reveal from './Reveal'
 
 const deep = '#154A32', deep2 = '#2A6349', gold = '#D87E13'
 
-type BIPEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> }
-
-function isStandalone() {
-  if (typeof window === 'undefined') return true
-  return window.matchMedia('(display-mode: standalone)').matches
-    || (window.navigator as unknown as { standalone?: boolean }).standalone === true
-}
-
 export default function InstallSection() {
-  // isStandalone()은 typeof window === 'undefined'일 때(서버) true를 반환하므로,
-  // 이걸 lazy initializer로 읽으면 서버는 "설치됨"(섹션 없음)으로, 실제 브라우저에서
-  // 다시 계산되는 클라이언트는 "설치 안 됨"(섹션 있음)으로 서로 다르게 렌더링되어
-  // 하이드레이션 불일치가 난다. 서버와 똑같이 false로 시작하고, 실제 판별은
-  // 마운트 후 effect에서만 한다(InstallBanner.tsx와 동일한 패턴).
-  const [installed, setInstalled] = useState(false)
-  const [deferred, setDeferred] = useState<BIPEvent | null>(null)
-  const [installing, setInstalling] = useState(false)
-  const [notReadyHint, setNotReadyHint] = useState(false)
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- 브라우저 전용 API(matchMedia)라 서버에서는 알 수 없고, 마운트 직후 한 번만 동기화하면 되는 값이다.
-    if (isStandalone()) { setInstalled(true); return }
-    function onBIP(e: Event) { e.preventDefault(); setDeferred(e as BIPEvent) }
-    function onInstalled() { setInstalled(true); setDeferred(null) }
-    window.addEventListener('beforeinstallprompt', onBIP)
-    window.addEventListener('appinstalled', onInstalled)
-    return () => {
-      window.removeEventListener('beforeinstallprompt', onBIP)
-      window.removeEventListener('appinstalled', onInstalled)
-    }
-  }, [])
-
-  async function install() {
-    if (!deferred) {
-      // beforeinstallprompt 이벤트가 아직 브라우저에서 발생하지 않은 상태 — 이 API는 브라우저가
-      // 자체적으로 준비했을 때만 호출 가능해 코드로 강제할 수 없다. 잠시 후 다시 시도하도록 안내한다.
-      setNotReadyHint(true)
-      setTimeout(() => setNotReadyHint(false), 4000)
-      return
-    }
-    setInstalling(true)
-    await deferred.prompt()
-    const { outcome } = await deferred.userChoice
-    setInstalling(false)
-    if (outcome === 'accepted') setInstalled(true)
-    setDeferred(null)
-  }
+  const { installed, installing, message, install } = useAppInstall()
 
   if (installed) return null
 
@@ -107,10 +62,9 @@ export default function InstallSection() {
             <button className="lpv-install-btn" onClick={install} disabled={installing}>
               {installing ? '설치 중...' : '지금 설치하기'}
             </button>
-            {notReadyHint && (
+            {message && (
               <p role="status" style={{ fontSize: 12, color: deep2, lineHeight: 1.7, marginTop: 10 }}>
-                아직 설치 준비 중이에요. 잠시 후 다시 눌러보시거나, 브라우저 메뉴에서{' '}
-                <strong style={{ color: deep }}>&lsquo;홈 화면에 추가&rsquo;</strong> 또는 <strong style={{ color: deep }}>&lsquo;앱 설치&rsquo;</strong>를 선택해주세요.
+                {message}
               </p>
             )}
           </div>
