@@ -3,14 +3,11 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Image from 'next/image'
 import { useAuth } from '@/context/AuthContext'
-import { supabase } from '@/lib/supabase'
 import { requestFCMToken, isFCMSupported } from '@/lib/firebase'
 import ForegroundNotification from '@/components/ForegroundNotification'
 import { InternalThemeProvider } from '@/context/InternalThemeContext'
 import { MobileModeProvider } from '@/context/MobileModeContext'
 import ThemeToggle from '@/components/ui/ThemeToggle'
-import SeasonEffect from '@/components/season/SeasonEffect'
-import { useSiteSettings } from '@/lib/use-site-settings'
 
 const navy='var(--ui-primary)', navyDk='var(--ui-primary)', bd='var(--ui-border)', bg='var(--ui-bg)', tx2='var(--ui-text-2)', tx3='var(--ui-text-3)'
 
@@ -49,7 +46,6 @@ function ParentLayoutContent({ children }: { children: React.ReactNode }) {
   const { parent, role, loading, logout } = useAuth()
   const router   = useRouter()
   const pathname = usePathname()
-  const { settings: siteSettings, effectiveSeason } = useSiteSettings()
 
   const [selChild, setSelChild] = useState<number | null>(null)
   const [ready,    setReady]    = useState(false)
@@ -332,7 +328,6 @@ function ParentLayoutContent({ children }: { children: React.ReactNode }) {
           )
         })}
       </nav>
-      <SeasonEffect enabled={siteSettings.seasonEffectEnabled && siteSettings.seasonShowInWorkspace} season={effectiveSeason} intensity={siteSettings.seasonIntensity} />
       <ForegroundNotification />
     </div>
   )

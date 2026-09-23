@@ -1,16 +1,20 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart, Bar } from 'recharts'
 import { supabase } from '@/lib/supabase'
 import { kstDateStr, kstDateOf } from '@/lib/kst'
 import { useMobileMode } from '@/context/MobileModeContext'
 import { IconUsers, IconChat, IconClock } from '@/components/icons'
 
 const navy = 'var(--ui-primary)'
+// --ui-accent는 테마에 따라 --ui-primary와 같은 계열(둘 다 초록 또는 둘 다 파랑)이라
+// 막대·선 구분이 잘 안 보여서, 테마와 무관하게 항상 대비되는 보라 계열(--ui-info)을 쓴다.
+const accent = 'var(--ui-info)'
 const bd = 'var(--ui-border)'
 const tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)'
 
 type Visit = { visited_at: string; is_mobile: boolean | null }
+type Consult = { created_at: string }
 
 function StatCard({ label, value, unit, icon }: { label: string; value: string | number; unit?: string; icon?: React.ReactNode }) {
   return (
@@ -28,8 +32,7 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [visits, setVisits] = useState<Visit[]>([])
-  const [consultTotal, setConsultTotal] = useState(0)
-  const [consultThisMonth, setConsultThisMonth] = useState(0)
+  const [consults, setConsults] = useState<Consult[]>([])
   const [unreadInquiries, setUnreadInquiries] = useState(0)
   const [pendingTeachers, setPendingTeachers] = useState(0)
 
@@ -38,13 +41,11 @@ export default function AnalyticsPage() {
   async function load() {
     setLoading(true)
     setLoadError(false)
-    const today = kstDateStr()
-    const monthPrefix = today.slice(0, 7) // YYYY-MM
-    const since = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString() // 최근 60일
+    const since = new Date(Date.now() - 366 * 24 * 60 * 60 * 1000).toISOString() // 최근 1년
 
     const [visitsRes, consultRes, inqRes, teacherRes] = await Promise.all([
       supabase.from('site_visits').select('visited_at, is_mobile').gte('visited_at', since),
-      supabase.from('consultation_requests').select('created_at'),
+      supabase.from('consultation_requests').select('created_at').gte('created_at', since),
       supabase.from('inquiry_messages').select('id', { count: 'exact', head: true }).eq('sender_type', 'parent').eq('is_read', false),
       supabase.from('teachers').select('id', { count: 'exact', head: true }).eq('approved', false),
     ])
@@ -52,9 +53,7 @@ export default function AnalyticsPage() {
     if (visitsRes.error) { setLoadError(true); setLoading(false); return }
 
     setVisits((visitsRes.data ?? []) as Visit[])
-    const consultRows = consultRes.data ?? []
-    setConsultTotal(consultRows.length)
-    setConsultThisMonth(consultRows.filter((r: { created_at: string }) => kstDateOf(r.created_at).startsWith(monthPrefix)).length)
+    setConsults((consultRes.data ?? []) as Consult[])
     setUnreadInquiries(inqRes.count ?? 0)
     setPendingTeachers(teacherRes.count ?? 0)
     setLoading(false)
@@ -65,6 +64,8 @@ export default function AnalyticsPage() {
 
   const todayCount = visits.filter(v => kstDateOf(v.visited_at) === today).length
   const monthCount = visits.filter(v => kstDateOf(v.visited_at).startsWith(monthPrefix)).length
+  const consultThisMonth = consults.filter(c => kstDateOf(c.created_at).startsWith(monthPrefix)).length
+  const consultTotal = consults.length
   const mobileCount = visits.filter(v => v.is_mobile).length
   const mobilePct = visits.length ? Math.round((mobileCount / visits.length) * 100) : 0
 
@@ -78,13 +79,40 @@ export default function AnalyticsPage() {
     const d = kstDateOf(v.visited_at)
     if (d in dayBuckets) dayBuckets[d]++
   }
-  const chartData = Object.entries(dayBuckets).map(([date, count]) => ({ date: date.slice(5), count }))
+  const dailyChartData = Object.entries(dayBuckets).map(([date, count]) => ({ date: date.slice(5), count }))
+
+  // 최근 12개월 방문량 + 상담 신청량 (한 그래프)
+  const monthKeys: string[] = []
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date()
+    d.setMonth(d.getMonth() - i)
+    monthKeys.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`)
+  }
+  const monthlyVisits: Record<string, number> = {}
+  const monthlyConsults: Record<string, number> = {}
+  for (const k of monthKeys) { monthlyVisits[k] = 0; monthlyConsults[k] = 0 }
+  for (const v of visits) {
+    const m = kstDateOf(v.visited_at).slice(0, 7)
+    if (m in monthlyVisits) monthlyVisits[m]++
+  }
+  for (const c of consults) {
+    const m = kstDateOf(c.created_at).slice(0, 7)
+    if (m in monthlyConsults) monthlyConsults[m]++
+  }
+  const monthlyChartData = monthKeys.map(k => ({
+    month: `${k.slice(2, 4)}.${k.slice(5, 7)}`,
+    visits: monthlyVisits[k],
+    consults: monthlyConsults[k],
+  }))
 
   return (
     <div style={{ padding: mobileMode ? '16px 14px 88px' : '28px 32px', fontFamily: "'Noto Sans KR',sans-serif" }}>
       <div style={{ marginBottom: mobileMode ? 14 : 20 }}>
         <h1 style={{ fontSize: mobileMode ? 17 : 21, fontWeight: 700, color: tx }}>접속 분석</h1>
-        <p style={{ fontSize: 13, color: tx2, marginTop: 4 }}>홈페이지 방문량과 주요 지표를 확인합니다</p>
+        <p style={{ fontSize: 13, color: tx2, marginTop: 4, lineHeight: 1.6 }}>
+          <strong style={{ color: tx }}>메인 홈페이지(로그인 전 첫 화면, 히어로)</strong>에 외부 방문자가 얼마나 접속하는지 보여줍니다.
+          로그인 후의 대시보드·수업기록 등 내부 화면 이용은 집계하지 않습니다.
+        </p>
       </div>
 
       {loading ? (
@@ -100,7 +128,7 @@ export default function AnalyticsPage() {
             <StatCard label="이번 달 방문" value={monthCount} unit="회" icon={<IconUsers size={11} />} />
             <StatCard label="모바일 접속 비율" value={mobilePct} unit="%" icon={<IconUsers size={11} />} />
             <StatCard label="상담 신청 (이번 달)" value={consultThisMonth} unit="건" icon={<IconChat size={11} />} />
-            <StatCard label="상담 신청 (전체)" value={consultTotal} unit="건" icon={<IconChat size={11} />} />
+            <StatCard label="상담 신청 (최근 1년)" value={consultTotal} unit="건" icon={<IconChat size={11} />} />
             <StatCard label="미확인 문의" value={unreadInquiries} unit="건" icon={<IconChat size={11} />} />
           </div>
 
@@ -110,13 +138,33 @@ export default function AnalyticsPage() {
             </div>
           )}
 
+          <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: 18, marginBottom: 12, boxShadow: '0 1px 4px rgba(0,0,0,.06)' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: tx, marginBottom: 4 }}>최근 12개월 방문량 · 상담 신청량</div>
+            <p style={{ fontSize: 11.5, color: tx3, margin: '0 0 12px' }}>월별 홈페이지 방문 수(막대)와 상담 신청 수(선)를 함께 볼 수 있습니다</p>
+            {visits.length === 0 && consults.length === 0 ? (
+              <p style={{ fontSize: 13, color: tx3, textAlign: 'center', padding: '30px 0' }}>아직 기록된 데이터가 없습니다</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={260}>
+                <ComposedChart data={monthlyChartData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={bd} />
+                  <XAxis dataKey="month" tick={{ fontSize: 10, fill: tx3 }} axisLine={{ stroke: bd }} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: tx3 }} axisLine={{ stroke: bd }} />
+                  <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: `1px solid ${bd}` }} />
+                  <Legend wrapperStyle={{ fontSize: 12 }} formatter={(v: string) => v === 'visits' ? '방문' : '상담 신청'} />
+                  <Bar dataKey="visits" name="visits" fill={navy} radius={[4, 4, 0, 0]} barSize={16} />
+                  <Line type="monotone" dataKey="consults" name="consults" stroke={accent} strokeWidth={2.5} dot={{ r: 3, fill: accent }} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
           <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: 18, boxShadow: '0 1px 4px rgba(0,0,0,.06)' }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: tx, marginBottom: 12 }}>최근 14일 방문 추이</div>
             {visits.length === 0 ? (
               <p style={{ fontSize: 13, color: tx3, textAlign: 'center', padding: '30px 0' }}>아직 기록된 방문이 없습니다</p>
             ) : (
               <ResponsiveContainer width="100%" height={220}>
-                <LineChart data={chartData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                <LineChart data={dailyChartData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={bd} />
                   <XAxis dataKey="date" tick={{ fontSize: 10, fill: tx3 }} axisLine={{ stroke: bd }} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: tx3 }} axisLine={{ stroke: bd }} />

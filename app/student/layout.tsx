@@ -2,8 +2,6 @@
 import { InternalThemeProvider } from '@/context/InternalThemeContext'
 import { MobileModeProvider } from '@/context/MobileModeContext'
 import ThemeToggle from '@/components/ui/ThemeToggle'
-import SeasonEffect from '@/components/season/SeasonEffect'
-import { useSiteSettings } from '@/lib/use-site-settings'
 import { useEffect, useRef, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Image from 'next/image'
@@ -34,7 +32,6 @@ function StudentLayoutContent({ children }: { children: React.ReactNode }) {
   const { student, role, loading, logout } = useAuth()
   const router   = useRouter()
   const pathname = usePathname()
-  const { settings: siteSettings, effectiveSeason } = useSiteSettings()
 
   const [ready, setReady] = useState(false)
   const [notifPerm, setNotifPerm] = useState<NotificationPermission | null>(null)
@@ -254,7 +251,6 @@ function StudentLayoutContent({ children }: { children: React.ReactNode }) {
           )
         })}
       </nav>
-      <SeasonEffect enabled={siteSettings.seasonEffectEnabled && siteSettings.seasonShowInWorkspace} season={effectiveSeason} intensity={siteSettings.seasonIntensity} />
       <ForegroundNotification />
     </div>
   )

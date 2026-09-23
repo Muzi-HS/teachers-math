@@ -34,7 +34,8 @@ export default function HomePage() {
     else if (role === 'student') router.replace('/student/records')
   }, [role, authLoading, router])
 
-  // 방문 로그 — 관리자 분석 페이지의 일일/월별 접속량 집계용. 브라우저 세션(탭)마다 한 번만 기록한다.
+  // 메인 홈페이지(히어로) 방문 로그 — 관리자 접속 분석 페이지에서 "외부 방문자가 이 사이트를
+  // 얼마나 보는지" 집계용. 로그인 후 내부 화면은 기록하지 않고, 브라우저 세션(탭)마다 한 번만 기록한다.
   useEffect(() => {
     try {
       if (sessionStorage.getItem('visit_logged')) return

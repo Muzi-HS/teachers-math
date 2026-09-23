@@ -12,8 +12,6 @@ import { MobileModeProvider, useMobileMode } from '@/context/MobileModeContext'
 import { IconSmartphone } from '@/components/icons'
 import ThemeToggle from '@/components/ui/ThemeToggle'
 import { InternalThemeProvider } from '@/context/InternalThemeContext'
-import SeasonEffect from '@/components/season/SeasonEffect'
-import { useSiteSettings } from '@/lib/use-site-settings'
 
 // 관리자용 FCM 토큰 등록 — 학부모(register-fcm-token 엣지함수)와 달리 관리자는 Supabase Auth
 // 세션이 있어 RLS(본인 user_id만)로 바로 보호되므로 클라이언트에서 직접 upsert한다.
@@ -102,7 +100,6 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const { mobileMode } = useMobileMode()
   const router   = useRouter()
   const pathname = usePathname()
-  const { settings: siteSettings, effectiveSeason } = useSiteSettings()
 
   // useRef로 초기화 여부 추적 — 리렌더에 영향 없음
   const initDone = useRef(false)
@@ -201,7 +198,6 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
         </main>
       </div>
       {mobileMode && <Sidebar />}
-      <SeasonEffect enabled={siteSettings.seasonEffectEnabled && siteSettings.seasonShowInWorkspace} season={effectiveSeason} intensity={siteSettings.seasonIntensity} />
       <ForegroundNotification />
     </div>
   )

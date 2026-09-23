@@ -114,6 +114,10 @@ export default function SiteSettingsPage() {
               <Radio checked={settings.seasonMode === 'manual'} onChange={() => update('seasonMode', 'manual' as SeasonMode)} label="직접 선택" />
               <Radio checked={settings.seasonMode === 'auto'} onChange={() => update('seasonMode', 'auto' as SeasonMode)} label="자동 (날짜 기준)" />
             </div>
+            <p style={{ fontSize: 11.5, color: tx3, margin: '8px 0 0', lineHeight: 1.6 }}>
+              <strong style={{ color: tx2 }}>직접 선택</strong>: 아래에서 고른 계절을 항상 그대로 사용합니다.<br />
+              <strong style={{ color: tx2 }}>자동</strong>: 오늘 날짜로 계절을 판단해 매번 자동으로 바꿔줍니다 (3~5월 봄, 9~11월 가을, 12~2월 겨울, 6~8월은 효과 없음).
+            </p>
             {settings.seasonMode === 'auto' && (
               <p style={{ fontSize: 11.5, color: tx3, margin: '8px 0 0' }}>
                 오늘 날짜 기준 자동 적용 계절: <strong style={{ color: navy }}>{SEASON_LABEL[autoSeason]}</strong>
@@ -129,15 +133,6 @@ export default function SiteSettingsPage() {
               {(['spring', 'autumn', 'winter'] as const).map(s => (
                 <Radio key={s} checked={settings.season === s} onChange={() => update('season', s)} label={SEASON_LABEL[s]} disabled={settings.seasonMode === 'auto'} />
               ))}
-            </div>
-          </div>
-
-          {/* 적용 범위 */}
-          <div style={{ marginBottom: 18 }}>
-            <p style={{ fontSize: 12, fontWeight: 700, color: tx2, margin: '0 0 8px' }}>적용 범위</p>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <Radio checked={!settings.seasonShowInWorkspace} onChange={() => update('seasonShowInWorkspace', false)} label="메인 화면만" />
-              <Radio checked={settings.seasonShowInWorkspace} onChange={() => update('seasonShowInWorkspace', true)} label="작업 화면(대시보드 등)에도 표시" />
             </div>
           </div>
 
