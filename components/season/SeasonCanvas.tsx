@@ -56,34 +56,57 @@ function drawPetal(ctx: CanvasRenderingContext2D, p: Particle) {
   ctx.stroke()
 }
 
+// 잎자루(줄기) — 낙엽 종류 공통으로 아래쪽에 짧은 줄기를 그려 자연스러움을 더한다.
+function drawStem(ctx: CanvasRenderingContext2D, s: number, baseY: number) {
+  ctx.globalAlpha *= 0.35
+  ctx.beginPath()
+  ctx.moveTo(0, baseY)
+  ctx.lineTo(0, baseY + s * 0.22)
+  ctx.lineWidth = Math.max(0.5, s * 0.07)
+  ctx.lineCap = 'round'
+  ctx.strokeStyle = ctx.fillStyle as string
+  ctx.stroke()
+}
+
 // 단풍잎 — 5갈래로 뾰족하게 뻗은 손바닥형 실루엣(각지고 뾰족한 잎끝 사이사이 노치).
+// 잎맥이 중심에서 각 갈래 끝까지 5방향으로 뻗어나가 단풍잎 특유의 결이 보이게 한다.
 function drawMapleLeaf(ctx: CanvasRenderingContext2D, p: Particle) {
   const s = p.size
   const segments = 16
   const startAngle = -Math.PI * 0.86, endAngle = Math.PI * 0.86 // 아래쪽 줄기 자리는 비워둠
+  const lobeAngleOf = (t: number) => startAngle + (endAngle - startAngle) * t - Math.PI / 2
   ctx.beginPath()
   ctx.moveTo(0, s * 1.05)
   for (let i = 0; i <= segments; i++) {
     const t = i / segments
-    const angle = startAngle + (endAngle - startAngle) * t - Math.PI / 2
+    const angle = lobeAngleOf(t)
     const wave = Math.sin(t * Math.PI * 5) // 5개의 뾰족한 갈래
     const r = s * (0.58 + Math.max(0, wave) * 0.52)
     ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r)
   }
   ctx.closePath()
   ctx.fill()
-  if (s > 10) {
-    ctx.globalAlpha *= 0.3
-    ctx.beginPath()
-    ctx.moveTo(0, s * 0.9)
-    ctx.lineTo(0, -s * 0.5)
-    ctx.lineWidth = Math.max(0.5, s * 0.05)
+  if (s > 9) {
+    const veinAlpha = ctx.globalAlpha
+    ctx.lineWidth = Math.max(0.4, s * 0.045)
     ctx.strokeStyle = ctx.fillStyle as string
-    ctx.stroke()
+    // 5개 갈래 끝(파형의 피크, t≈0.1/0.3/0.5/0.7/0.9)까지 뻗는 잎맥
+    for (const t of [0.1, 0.3, 0.5, 0.7, 0.9]) {
+      const angle = lobeAngleOf(t)
+      const r = s * 1.10
+      ctx.globalAlpha = veinAlpha * (t === 0.5 ? 0.32 : 0.22)
+      ctx.beginPath()
+      ctx.moveTo(0, 0)
+      ctx.lineTo(Math.cos(angle) * r * 0.95, Math.sin(angle) * r * 0.95)
+      ctx.stroke()
+    }
+    ctx.globalAlpha = veinAlpha
+    drawStem(ctx, s, s * 1.05)
   }
 }
 
 // 은행잎 — 아래는 줄기로 좁아지고 위로 갈수록 부채꼴로 넓어지다 중앙이 살짝 파인 실루엣.
+// 은행잎 특유의 밑동에서 위로 부챗살처럼 퍼지는 평행 잎맥을 살짝 넣는다.
 function drawGinkgoLeaf(ctx: CanvasRenderingContext2D, p: Particle) {
   const s = p.size
   ctx.beginPath()
@@ -94,9 +117,23 @@ function drawGinkgoLeaf(ctx: CanvasRenderingContext2D, p: Particle) {
   ctx.bezierCurveTo(-s * 0.98, -s * 0.05, -s * 0.15, s * 0.25, 0, s)
   ctx.closePath()
   ctx.fill()
+  if (s > 9) {
+    const veinAlpha = ctx.globalAlpha
+    ctx.lineWidth = Math.max(0.4, s * 0.04)
+    ctx.strokeStyle = ctx.fillStyle as string
+    ctx.globalAlpha = veinAlpha * 0.28
+    for (const [ex, ey] of [[-0.45, -0.68], [0, -0.83], [0.45, -0.68]] as const) {
+      ctx.beginPath()
+      ctx.moveTo(0, s * 0.85)
+      ctx.lineTo(s * ex, s * ey)
+      ctx.stroke()
+    }
+    ctx.globalAlpha = veinAlpha
+    drawStem(ctx, s, s)
+  }
 }
 
-// 작은 타원형 잎 — 위 두 종류보다 단순한 세 번째 variation
+// 작은 타원형 잎 — 매끈한 타원 실루엣의 세 번째 variation
 function drawRoundLeaf(ctx: CanvasRenderingContext2D, p: Particle) {
   const aspect = p.shapeVariant % 2 === 0 ? 0.5 : 0.72
   ctx.beginPath()
@@ -110,15 +147,45 @@ function drawRoundLeaf(ctx: CanvasRenderingContext2D, p: Particle) {
     ctx.lineWidth = Math.max(0.5, p.size * 0.07)
     ctx.strokeStyle = ctx.fillStyle as string
     ctx.stroke()
+    drawStem(ctx, p.size, p.size * aspect)
   }
 }
 
-// 낙엽 디스패처 — 파티클마다 배정된 shapeVariant로 단풍/은행/작은 잎을 골고루 섞는다.
+// 톱니 잎(자작나무/너도밤나무형) — 가장자리가 잘게 들쭉날쭉한 타원형, 네 번째 variation
+function drawSerratedLeaf(ctx: CanvasRenderingContext2D, p: Particle) {
+  const s = p.size
+  const rx = s, ry = s * 0.56
+  const teeth = 11
+  ctx.beginPath()
+  for (let i = 0; i <= teeth * 2; i++) {
+    const t = i / (teeth * 2)
+    const angle = t * Math.PI * 2 - Math.PI / 2
+    const jag = i % 2 === 0 ? 1 : 0.87
+    const x = Math.cos(angle) * rx * jag
+    const y = Math.sin(angle) * ry * jag
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y)
+  }
+  ctx.closePath()
+  ctx.fill()
+  if (s > 9) {
+    ctx.globalAlpha *= 0.3
+    ctx.beginPath()
+    ctx.moveTo(0, -ry * 0.85)
+    ctx.lineTo(0, ry * 0.85)
+    ctx.lineWidth = Math.max(0.4, s * 0.045)
+    ctx.strokeStyle = ctx.fillStyle as string
+    ctx.stroke()
+    drawStem(ctx, s, ry)
+  }
+}
+
+// 낙엽 디스패처 — 파티클마다 배정된 shapeVariant로 단풍/은행/작은 잎/톱니 잎을 골고루 섞는다.
 function drawLeaf(ctx: CanvasRenderingContext2D, p: Particle) {
-  const variant = p.shapeVariant % 3
+  const variant = p.shapeVariant % 4
   if (variant === 0) drawMapleLeaf(ctx, p)
   else if (variant === 1) drawGinkgoLeaf(ctx, p)
-  else drawRoundLeaf(ctx, p)
+  else if (variant === 2) drawRoundLeaf(ctx, p)
+  else drawSerratedLeaf(ctx, p)
 }
 
 function drawFlake(ctx: CanvasRenderingContext2D, p: Particle) {
@@ -138,7 +205,7 @@ const SEASON_CONFIG: Record<Exclude<Season, 'none'>, SeasonConfig> = {
     countPerLayer: [8, 8, 6], maxTotal: 55,
     colors: ['#B5651D', '#C97C3D', '#D9A441', '#A0522D', '#8B3A1D', '#C2703A'],
     fallSpeed: [24, 44], swayAmp: [16, 36], swayFreq: [.28, .65], rotSpeed: [.6, 1.7],
-    sizeRange: [8, 16], shapeVariants: 3, draw: drawLeaf,
+    sizeRange: [8, 16], shapeVariants: 4, draw: drawLeaf,
   },
   winter: {
     countPerLayer: [16, 14, 8], maxTotal: 92,
