@@ -73,7 +73,7 @@ export default function InstallSection() {
 
       <div style={{ maxWidth: 520, margin: '0 auto', textAlign: 'center' }}>
         <Reveal>
-          <Image src="/app-icon-v2-512.png" alt="" width={48} height={48} style={{ borderRadius: 12, marginBottom: 18 }} />
+          <Image src="/app-icon-v2-512.png" alt="" width={48} height={48} style={{ display: 'block', margin: '0 auto 18px', borderRadius: 12 }} />
         </Reveal>
         <Reveal delay={80}>
           <span style={{ display: 'inline-block', fontSize: 12, fontWeight: 700, color: deep2, letterSpacing: 3, marginBottom: 16 }}>APP</span>
