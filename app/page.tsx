@@ -11,10 +11,12 @@ import StudentManagementSection from '@/components/landing-preview/StudentManage
 import LessonRecordPreviewSection from '@/components/landing-preview/LessonRecordPreviewSection'
 import NaverBlogSection from '@/components/landing-preview/NaverBlogSection'
 import SpecialClassSection from '@/components/landing-preview/SpecialClassSection'
+import ParentSeminarSection from '@/components/landing-preview/ParentSeminarSection'
 import ConsultationSection from '@/components/landing-preview/ConsultationSection'
 import LocationSection from '@/components/landing-preview/LocationSection'
 import InstallSection from '@/components/landing-preview/InstallSection'
 import LoginPanel from '@/components/landing-preview/LoginPanel'
+import PromoPopup from '@/components/landing-preview/PromoPopup'
 import ScrollToTopButton from '@/components/landing-preview/ScrollToTopButton'
 import SeasonEffect from '@/components/season/SeasonEffect'
 import { useSiteSettings } from '@/lib/use-site-settings'
@@ -77,6 +79,7 @@ export default function HomePage() {
         <LessonRecordPreviewSection />
         <NaverBlogSection />
         <SpecialClassSection />
+        <ParentSeminarSection />
         <ConsultationSection />
         <LocationSection />
         <InstallSection />
@@ -84,6 +87,7 @@ export default function HomePage() {
 
       <SeasonEffect enabled={siteSettings.seasonEffectEnabled} season={effectiveSeason} intensity={siteSettings.seasonIntensity} />
       <LoginPanel open={loginOpen} onClose={() => setLoginOpen(false)} />
+      <PromoPopup />
       <ScrollToTopButton />
     </div>
   )

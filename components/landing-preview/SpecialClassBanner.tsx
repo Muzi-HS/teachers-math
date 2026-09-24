@@ -9,7 +9,7 @@ export default function SpecialClassBanner() {
 
   useEffect(() => {
     let cancelled = false
-    supabase.from('special_classes').select('title').eq('is_active', true)
+    supabase.from('special_classes').select('title').eq('is_active', true).eq('banner_enabled', true)
       .order('sort_order').limit(1).maybeSingle().then(({ data }) => {
         if (!cancelled) setTitle(data?.title ?? null)
       })
@@ -21,7 +21,7 @@ export default function SpecialClassBanner() {
   return (
     <a href="#lpv-special" className="lpv-scb">
       <style>{`
-        .lpv-scb{position:absolute;top:0;left:0;right:0;z-index:2;display:flex;align-items:center;justify-content:center;
+        .lpv-scb{position:relative;z-index:2;display:flex;align-items:center;justify-content:center;
           gap:10px;background:${deep};color:#fff;padding:13px 20px;text-decoration:none;font-size:13.5px;white-space:nowrap}
         .lpv-scb:hover .lpv-scb-arrow{transform:translateX(3px)}
         .lpv-scb-lead{display:inline-flex;align-items:center;gap:6px;font-weight:700;color:${gold};flex-shrink:0}

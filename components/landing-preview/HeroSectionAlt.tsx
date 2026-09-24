@@ -2,6 +2,7 @@
 import { useEffect, useRef } from 'react'
 import Image from 'next/image'
 import SpecialClassBanner from './SpecialClassBanner'
+import SeminarBanner from './SeminarBanner'
 
 const mint = '#EAF7F0', deep = '#154A32', deep2 = '#2A6349'
 
@@ -90,8 +91,12 @@ export default function HeroSectionAlt() {
       <div ref={glowRef} className="lpv-glow" aria-hidden />
 
       {/* absolute로 Hero 상단 빈 여백(padding-top) 위에 겹쳐 보이도록 해, 배너가 있어도
-          없을 때와 동일하게 제목 등 Hero 콘텐츠 위치가 아래로 밀리지 않게 한다 */}
-      <SpecialClassBanner />
+          없을 때와 동일하게 제목 등 Hero 콘텐츠 위치가 아래로 밀리지 않게 한다. 특강/설명회
+          배너가 둘 다 활성화되어 있으면 세로로 쌓아서 보여준다. */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 2 }}>
+        <SpecialClassBanner />
+        <SeminarBanner />
+      </div>
 
       <div ref={contentRef} className="lpv-hero-inner">
         <h1 style={{

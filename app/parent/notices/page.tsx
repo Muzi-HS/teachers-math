@@ -81,6 +81,13 @@ export default function ParentNotices() {
 
   useEffect(() => { if (detail) fetchComments(detail.id) }, [detail?.id])
 
+  // 공지 상세를 열람하면 이 학부모의 자녀들 기준으로 읽음 기록을 남긴다(조회수/읽음 표시용)
+  useEffect(() => {
+    if (!detail || !parent?.children?.length) return
+    const rows = parent.children.map(c => ({ notice_id: detail.id, student_id: c.id }))
+    supabase.from('notice_reads').upsert(rows, { onConflict: 'notice_id,student_id', ignoreDuplicates: true }).then(() => {})
+  }, [detail?.id, parent?.children])
+
   async function fetchComments(noticeId: number) {
     setCommentsLoading(true)
     const { data } = await supabase.from('notice_comments').select('*').eq('notice_id', noticeId).order('created_at', { ascending: true })

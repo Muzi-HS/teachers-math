@@ -38,20 +38,36 @@ const NAV = [
   { key: 'divider2', href: '', label: '', icon: null },
   { key: 'coupons', href: '/coupons', label: '쿠폰처리',
     icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M9 5H4a1 1 0 00-1 1v3a2 2 0 010 4v3a1 1 0 001 1h5m0-12h11a1 1 0 011 1v3a2 2 0 000 4v3a1 1 0 01-1 1H9m0-12v12"/></svg> },
-  { key: 'special-classes', href: '/special-classes', label: '특강관리',
-    icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M12 2l3 6 6.5 1-4.7 4.4L18 20l-6-3.2L6 20l1.2-6.6L2.5 9l6.5-1z"/></svg> },
   { key: 'consultations', href: '/consultations', label: '상담신청',
     icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> },
-  { key: 'app-qr', href: '/app-qr', label: '앱 설치 · QR',
+  { key: 'app-qr', href: '/app-qr', label: '앱설치',
     icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM14 20h3M20 14v3M20 20v.01M17 17h.01"/></svg> },
   { key: 'site-settings', href: '/site-settings', label: '사이트 설정',
     icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg> },
 ]
 
 const NAV_ORDER_KEY = 'admin_mobile_nav_order'
+const RAIL_W = 58
+const EXPANDED_W = 176
+
+// 접혔을 때(아이콘 레일)는 좁은 폭에 맞춰 원래 라벨보다 짧은 이름으로 보여준다
+const SHORT_LABEL: Record<string, string> = {
+  'site-settings': '설정',
+  analytics: '분석',
+  notices: '공지',
+  schedule: '일정',
+  inquiries: '문의',
+  teachers: '선생님',
+  records: '기록',
+  coupons: '쿠폰',
+}
 
 export default function Sidebar() {
-  const [expanded, setExpanded] = useState(true)
+  // 버튼으로 여닫는 대신, 마우스가 사이드바 위에 있는 동안만 넓게 펼쳐지는
+  // supabase 스타일 호버 레일. 평소에는 아이콘만 보이는 좁은 레일로 있다가
+  // 마우스가 올라오면 펼쳐지고, 벗어나면 다시 좁아진다.
+  const [hovering, setHovering] = useState(false)
+  const expanded = hovering
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editMode, setEditMode] = useState(false)
   const [navOrder, setNavOrderState] = useState<string[]>([])
@@ -107,8 +123,6 @@ export default function Sidebar() {
 
   // 모바일 모드에서는 메뉴 이동 시 자동으로 드로어/편집모드를 닫는다
   useEffect(() => { setDrawerOpen(false); setEditMode(false) }, [pathname])
-
-  const W = expanded ? 156 : 58
 
   const visibleNav = role
     ? NAV.filter(item =>
@@ -177,17 +191,9 @@ export default function Sidebar() {
       background: var(--ui-accent);
       border-radius: 3px;
     }
-    .toggle-btn {
-      flex-shrink: 0; width: 30px; height: 30px;
-      background: var(--ui-surface); border: 1px solid var(--ui-border);
-      border-radius: 8px;
-      cursor: pointer; display: flex; align-items: center; justify-content: center;
-      color: var(--ui-text-2);
-    }
-    .toggle-btn:hover { color: var(--ui-primary); background: var(--ui-hover); border-color: var(--ui-accent); }
     .desktop-menu .sb-tab { border-radius: 8px; }
     .desktop-menu { scrollbar-width: thin; scrollbar-color: var(--ui-border) transparent; }
-    @media(prefers-reduced-motion:reduce){.sb-tab,.toggle-btn{transition:none;}}
+    @media(prefers-reduced-motion:reduce){.sb-tab{transition:none;}}
     .mnav-bar {
       position: fixed; left: 0; right: 0; bottom: 0; z-index: 200;
       background: var(--ui-surface); border-top: 1px solid var(--ui-border);
@@ -267,7 +273,7 @@ export default function Sidebar() {
                 <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--ui-danger)' }}>{unreadCount}</span>
               )}
             </span>
-          : <span style={{ fontSize: 8, fontWeight: 600 }}>{item.label}</span>
+          : <span style={{ fontSize: 8, fontWeight: 600 }}>{SHORT_LABEL[item.key] ?? item.label}</span>
         }
       </button>
     )
@@ -354,35 +360,34 @@ export default function Sidebar() {
   return (
     <>
       <style>{css}</style>
-      <aside style={{
-        width: W,
-        background: 'var(--ui-surface)',
-        borderRight: '1px solid var(--ui-border)',
-        display: 'flex', flexDirection: 'column',
-        padding: '10px 6px',
-        flexShrink: 0,
-        position: 'relative',
-        transition: 'width .22s cubic-bezier(.4,0,.2,1)',
-        overflow: 'visible',
-        height: '100%',
-      }}>
-
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: expanded ? 'space-between' : 'center', padding: '0 6px 10px', gap: 8 }}>
-          {expanded && <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--ui-text-3)' }}>관리 메뉴</span>}
-          <button className="toggle-btn" onClick={() => setExpanded(e => !e)} aria-label={expanded ? '메뉴 접기' : '메뉴 펼치기'} aria-expanded={expanded} aria-controls="desktop-admin-menu" title={expanded ? '메뉴 접기' : '메뉴 펼치기'}>
-            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ transform: expanded ? 'none' : 'rotate(180deg)' }}><path d="M15 18l-6-6 6-6" /></svg>
-          </button>
-        </div>
-        {/* 메뉴 목록 */}
-        <nav id="desktop-admin-menu" className="desktop-menu" aria-label="관리 메뉴" style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {visibleNav.map((item, idx) => (
-            item.key.startsWith('divider')
-              ? (expanded ? <div key={idx} style={{ height: 1, flexShrink: 0, background: 'var(--ui-border)', margin: '8px 12px' }} /> : null)
-              : <NavButton key={item.key} item={item} />
-          ))}
-        </nav>
-
-      </aside>
+      {/* 좁은 폭만큼 자리를 항상 차지하는 스페이서 — 호버로 넓어져도 본문(main)이 밀리지 않게 한다 */}
+      <div style={{ width: RAIL_W, flexShrink: 0, position: 'relative', height: '100%' }}>
+        <aside
+          onMouseEnter={() => setHovering(true)}
+          onMouseLeave={() => setHovering(false)}
+          style={{
+            position: 'absolute', top: 0, left: 0, bottom: 0,
+            width: expanded ? EXPANDED_W : RAIL_W,
+            background: 'var(--ui-surface)',
+            borderRight: '1px solid var(--ui-border)',
+            boxShadow: expanded ? '4px 0 16px rgba(0,0,0,.08)' : 'none',
+            display: 'flex', flexDirection: 'column',
+            padding: '10px 6px',
+            transition: 'width .18s cubic-bezier(.4,0,.2,1)',
+            overflow: 'visible',
+            zIndex: 60,
+          }}
+        >
+          {/* 메뉴 목록 */}
+          <nav id="desktop-admin-menu" className="desktop-menu" aria-label="관리 메뉴" style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {visibleNav.map((item, idx) => (
+              item.key.startsWith('divider')
+                ? (expanded ? <div key={idx} style={{ height: 1, flexShrink: 0, background: 'var(--ui-border)', margin: '8px 12px' }} /> : null)
+                : <NavButton key={item.key} item={item} />
+            ))}
+          </nav>
+        </aside>
+      </div>
     </>
   )
 }

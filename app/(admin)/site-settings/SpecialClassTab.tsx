@@ -1,10 +1,12 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { can } from '@/lib/permissions'
 import { kstDateOf } from '@/lib/kst'
 import { useMobileMode } from '@/context/MobileModeContext'
+import type { PopupType } from '@/lib/site-settings'
+import { uploadPromoImage } from './promoImage'
 
 type SpecialClass = {
   id: number
@@ -16,16 +18,27 @@ type SpecialClass = {
   capacity: string | null
   is_active: boolean
   sort_order: number
+  banner_enabled: boolean
+  popup_enabled: boolean
+  popup_type: PopupType
+  popup_image_url: string | null
+  popup_title: string | null
+  popup_body: string | null
   created_at: string
 }
 
-const EMPTY = { title: '', subtitle: '', description: '', period: '', target: '', capacity: '', is_active: true, sort_order: 0 }
+const EMPTY = {
+  title: '', subtitle: '', description: '', period: '', target: '', capacity: '', is_active: true, sort_order: 0,
+  banner_enabled: true, popup_enabled: false, popup_type: 'text' as PopupType,
+  popup_image_url: null as string | null, popup_title: '', popup_body: '',
+}
 
 const navy = 'var(--ui-primary)', navyDk = 'var(--ui-primary-text)', gold = 'var(--ui-primary)'
 const bg = 'var(--ui-bg)', bd = 'var(--ui-border)', tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)'
-const re = 'var(--ui-danger)', rbg = 'var(--ui-danger-bg)', gr = 'var(--ui-success)', gbg = 'var(--ui-success-bg)'
+const re = 'var(--ui-danger)', rbg = 'var(--ui-danger-bg)', gr = 'var(--ui-success)', gbg = 'var(--ui-success-bg)', navyMuted = 'var(--ui-surface-2)'
+const POPUP_TYPE_LABEL: Record<PopupType, string> = { image: '이미지', text: '글', both: '이미지 + 글' }
 
-export default function SpecialClassesPage() {
+export default function SpecialClassTab() {
   const { role } = useAuth()
   const { mobileMode } = useMobileMode()
   const [items, setItems] = useState<SpecialClass[]>([])
@@ -34,7 +47,9 @@ export default function SpecialClassesPage() {
   const [editId, setEditId] = useState<number | null>(null)
   const [form, setForm] = useState({ ...EMPTY })
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [notif, setNotif] = useState<{ msg: string; ok: boolean } | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
 
   const canWrite = role ? can.writeSpecialClass(role) : false
 
@@ -44,7 +59,6 @@ export default function SpecialClassesPage() {
     setLoading(false)
   }
 
-  // 마운트 시 한 번 목록을 불러온다 (관리자 화면 조회 전용, 새로고침 버튼 없음)
   // eslint-disable-next-line react-hooks/set-state-in-effect -- 마운트 직후 서버 데이터를 한 번 동기화하는 목적의 fetch로, 다른 대안이 없다.
   useEffect(() => { fetchItems() }, [])
 
@@ -57,8 +71,21 @@ export default function SpecialClassesPage() {
       title: it.title, subtitle: it.subtitle ?? '', description: it.description ?? '',
       period: it.period ?? '', target: it.target ?? '', capacity: it.capacity ?? '',
       is_active: it.is_active, sort_order: it.sort_order,
+      banner_enabled: it.banner_enabled, popup_enabled: it.popup_enabled, popup_type: it.popup_type,
+      popup_image_url: it.popup_image_url, popup_title: it.popup_title ?? '', popup_body: it.popup_body ?? '',
     })
     setModal(true)
+  }
+
+  async function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    const { url, error } = await uploadPromoImage(file)
+    setUploading(false)
+    if (error) { toast('이미지 업로드 실패: ' + error, false); return }
+    setForm(f => ({ ...f, popup_image_url: url }))
+    if (fileRef.current) fileRef.current.value = ''
   }
 
   async function save() {
@@ -68,6 +95,8 @@ export default function SpecialClassesPage() {
       title: form.title, subtitle: form.subtitle || null, description: form.description || null,
       period: form.period || null, target: form.target || null, capacity: form.capacity || null,
       is_active: form.is_active, sort_order: form.sort_order,
+      banner_enabled: form.banner_enabled, popup_enabled: form.popup_enabled, popup_type: form.popup_type,
+      popup_image_url: form.popup_image_url, popup_title: form.popup_title || null, popup_body: form.popup_body || null,
     }
     const { error } = editId
       ? await supabase.from('special_classes').update(payload).eq('id', editId)
@@ -91,9 +120,11 @@ export default function SpecialClassesPage() {
 
   const fi: React.CSSProperties = { width: '100%', padding: '9px 11px', border: `1.5px solid ${bd}`, borderRadius: 8, fontSize: 13, fontFamily: 'inherit', color: tx, outline: 'none', background: '#fff', boxSizing: 'border-box' }
   const label: React.CSSProperties = { display: 'block', fontSize: 12, fontWeight: 500, color: tx2, marginBottom: 5 }
+  const showImage = form.popup_type === 'image' || form.popup_type === 'both'
+  const showText = form.popup_type === 'text' || form.popup_type === 'both'
 
   return (
-    <div style={{ padding: mobileMode ? '16px 14px 88px' : '28px 32px', fontFamily: "'Noto Sans KR', sans-serif" }}>
+    <div>
       {notif && (
         <div style={{ position: 'fixed', top: 18, right: 18, zIndex: 9999, background: '#fff', borderRadius: 8, padding: '11px 16px', borderLeft: `4px solid ${notif.ok ? gr : re}`, boxShadow: '0 4px 18px rgba(0,0,0,.1)', fontSize: 13, color: tx, maxWidth: 280 }}>
           <div style={{ fontWeight: 600, marginBottom: 2 }}>{notif.ok ? '완료' : '알림'}</div>
@@ -101,11 +132,8 @@ export default function SpecialClassesPage() {
         </div>
       )}
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: mobileMode ? 14 : 20 }}>
-        <div>
-          <h1 style={{ fontSize: mobileMode ? 17 : 21, fontWeight: 700, color: tx }}>특강 관리</h1>
-          {!mobileMode && <p style={{ fontSize: 13, color: tx2, marginTop: 4 }}>홈페이지 시안에 노출되는 특강 홍보 게시물을 관리합니다</p>}
-        </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <p style={{ fontSize: 14, fontWeight: 700, color: tx }}>특강 게시물</p>
         {canWrite && (
           <button onClick={openAdd} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', border: 'none', background: gold, color: navyDk, fontFamily: 'inherit' }}>
             <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth={2} d="M12 5v14M5 12h14" /></svg>
@@ -156,8 +184,8 @@ export default function SpecialClassesPage() {
       )}
 
       {modal && (
-        <div onClick={() => setModal(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.42)', zIndex: 1000, display: 'flex', alignItems: mobileMode ? 'flex-end' : 'center', justifyContent: 'center', padding: mobileMode ? 0 : 16 }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: mobileMode ? '16px 16px 0 0' : 12, width: mobileMode ? '100%' : 480, maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.42)', zIndex: 1000, display: 'flex', alignItems: mobileMode ? 'flex-end' : 'center', justifyContent: 'center', padding: mobileMode ? 0 : 16 }}>
+          <div style={{ background: '#fff', borderRadius: mobileMode ? '16px 16px 0 0' : 12, width: mobileMode ? '100%' : 480, maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
             <div style={{ padding: '18px 22px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 15, fontWeight: 600, color: tx }}>{editId ? '특강 수정' : '특강 등록'}</span>
               <button onClick={() => setModal(false)} style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: bg, cursor: 'pointer', fontSize: 17, color: tx2 }}>×</button>
@@ -189,10 +217,66 @@ export default function SpecialClassesPage() {
                 <label style={label}>상세 설명</label>
                 <textarea rows={4} style={{ ...fi, resize: 'vertical', fontFamily: 'inherit' }} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="특강 커리큘럼, 강사, 신청 방법 등" />
               </div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 14 }}>
                 <input type="checkbox" checked={form.is_active} onChange={e => setForm(f => ({ ...f, is_active: e.target.checked }))} style={{ width: 15, height: 15, accentColor: navy, cursor: 'pointer' }} />
                 <span style={{ fontSize: 13, color: tx2 }}>홈페이지에 바로 노출</span>
               </label>
+
+              <div style={{ paddingTop: 14, borderTop: `1px solid ${bd}` }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 14 }}>
+                  <input type="checkbox" checked={form.banner_enabled} onChange={e => setForm(f => ({ ...f, banner_enabled: e.target.checked }))} style={{ width: 15, height: 15, accentColor: navy, cursor: 'pointer' }} />
+                  <span style={{ fontSize: 13, color: tx2 }}>배너로 노출</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 14 }}>
+                  <input type="checkbox" checked={form.popup_enabled} onChange={e => setForm(f => ({ ...f, popup_enabled: e.target.checked }))} style={{ width: 15, height: 15, accentColor: navy, cursor: 'pointer' }} />
+                  <span style={{ fontSize: 13, color: tx2 }}>팝업으로 노출</span>
+                </label>
+
+                {form.popup_enabled && (
+                  <div style={{ marginLeft: 4 }}>
+                    <div style={{ marginBottom: 14 }}>
+                      <p style={{ fontSize: 12, fontWeight: 700, color: tx2, margin: '0 0 8px' }}>팝업 유형</p>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        {(['image', 'text', 'both'] as const).map(t => (
+                          <label key={t} style={{
+                            display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 8,
+                            border: `1.5px solid ${form.popup_type === t ? navy : bd}`, background: form.popup_type === t ? navyMuted : '#fff',
+                            cursor: 'pointer', fontSize: 12.5, color: form.popup_type === t ? navy : tx2, fontWeight: form.popup_type === t ? 700 : 500,
+                          }}>
+                            <input type="radio" checked={form.popup_type === t} onChange={() => setForm(f => ({ ...f, popup_type: t }))} />
+                            {POPUP_TYPE_LABEL[t]}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    {showImage && (
+                      <div style={{ marginBottom: 14 }}>
+                        <label style={label}>팝업 이미지</label>
+                        {form.popup_image_url && (
+                          // eslint-disable-next-line @next/next/no-img-element -- Supabase Storage 공개 URL 미리보기
+                          <img src={form.popup_image_url} alt="팝업 이미지 미리보기" style={{ width: '100%', maxWidth: 220, borderRadius: 8, marginBottom: 8, display: 'block', border: `1px solid ${bd}` }} />
+                        )}
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                          <input ref={fileRef} type="file" accept="image/*" onChange={onPickFile} disabled={uploading} style={{ fontSize: 12 }} />
+                          {uploading && <span style={{ fontSize: 12, color: tx3 }}>업로드 중...</span>}
+                        </div>
+                      </div>
+                    )}
+                    {showText && (
+                      <>
+                        <div style={{ marginBottom: 14 }}>
+                          <label style={label}>팝업 제목</label>
+                          <input style={fi} value={form.popup_title} onChange={e => setForm(f => ({ ...f, popup_title: e.target.value }))} />
+                        </div>
+                        <div style={{ marginBottom: 4 }}>
+                          <label style={label}>팝업 본문</label>
+                          <textarea rows={3} style={{ ...fi, resize: 'vertical', fontFamily: 'inherit' }} value={form.popup_body} onChange={e => setForm(f => ({ ...f, popup_body: e.target.value }))} />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
             <div style={{ padding: '0 22px 18px', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button onClick={() => setModal(false)} style={{ padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer', border: `1px solid ${bd}`, background: 'transparent', color: tx2, fontFamily: 'inherit' }}>취소</button>

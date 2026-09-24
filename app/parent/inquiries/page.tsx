@@ -100,7 +100,7 @@ export default function ParentInquiriesPage() {
       body: JSON.stringify({
         title: '티처스 수학학원',
         body: `${childNames ? childNames + ' 학부모' : '학부모'}님에게서 메시지가 도착했습니다`,
-        link: '/inquiries',
+        link: `/inquiries?parentId=${parent.parentId}`,
       }),
     }).catch(() => {})
   }

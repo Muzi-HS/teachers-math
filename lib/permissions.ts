@@ -74,8 +74,6 @@ export const menuAccess: Record<string, (role: Role) => boolean> = {
   student:    (r) => r === 'student',
   // 쿠폰 사용 처리 — admin만
   coupons:    (r) => r === 'admin',
-  // 특강 홍보 게시물 관리 — admin만
-  'special-classes': (r) => r === 'admin',
   // 상담 신청 내역 — admin만
   consultations: (r) => r === 'admin',
   // 사이트 설정(계절 효과 등) — admin만

@@ -221,7 +221,11 @@ export default function LoginPanel({ open, onClose }: { open: boolean; onClose: 
       <aside className="lpv-login-panel" data-open={open} role="dialog" aria-modal="true" aria-label="로그인"
         aria-hidden={!open}>
         <div style={{ padding: '20px 26px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <button className="lpv-close-btn" onClick={onClose} aria-label="뒤로가기">←</button>
+          <button
+            className="lpv-close-btn"
+            onClick={step === 'select' ? onClose : (showSignup ? () => setShowSignup(false) : (step === 'form' ? backToSelect : () => { setStep('form'); setPin(''); setError('') }))}
+            aria-label="뒤로가기"
+          >←</button>
           <Image src="/logo2.png" alt="티처스 수학학원" width={149} height={26} style={{ height: 22, width: 'auto', objectFit: 'contain' }} />
         </div>
 
@@ -243,11 +247,6 @@ export default function LoginPanel({ open, onClose }: { open: boolean; onClose: 
 
           {step !== 'select' && (
             <div key={`${accountType}-${step}-${showSignup}`} className="lpv-login-step">
-              <button onClick={showSignup ? () => setShowSignup(false) : (step === 'form' ? backToSelect : () => { setStep('form'); setPin(''); setError('') })}
-                style={{ background: 'none', border: 'none', color: deep2, fontSize: 12.5, cursor: 'pointer', marginBottom: 18, fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4, padding: 0 }}>
-                ← 이전으로
-              </button>
-
               {!showSignup && step === 'form' && accountType !== 'teacher' && (
                 <>
                   <h2 style={{ fontSize: 19, fontWeight: 800, color: deep, marginBottom: 22 }}>

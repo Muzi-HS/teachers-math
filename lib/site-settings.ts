@@ -1,6 +1,8 @@
 import { supabase } from '@/lib/supabase'
 import type { Season, SeasonMode, SeasonIntensity } from '@/lib/season'
 
+export type PopupType = 'image' | 'text' | 'both'
+
 export type SiteSettings = {
   seasonEffectEnabled: boolean
   seasonMode: SeasonMode

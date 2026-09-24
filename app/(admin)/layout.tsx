@@ -190,8 +190,9 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      {/* 사이드바 + 본문 */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      {/* 사이드바 + 본문 — 사이드바가 호버 시 옆으로 살짝 넓어지는(overlay) 구조라
+          가로 방향은 잘리지 않게 두고, 세로는 기존처럼 main 내부 스크롤만 쓰도록 막아둔다 */}
+      <div style={{ display: 'flex', flex: 1, overflowX: 'visible', overflowY: 'hidden' }}>
         {!mobileMode && <Sidebar />}
         <main style={{ flex: 1, background: 'var(--ui-bg)', overflowY: 'auto', minHeight: 0, minWidth: 0, paddingBottom: mobileMode ? 'env(safe-area-inset-bottom)' : 0 }}>
           {children}

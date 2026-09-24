@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { kstDateStr, kstNow, kstTimeOf } from '@/lib/kst'
+import { kstDateStr, kstNow } from '@/lib/kst'
 import ClassBulkRecordModal from '@/components/ClassBulkRecordModal'
 import { IconBook, IconSend } from '@/components/icons'
 import { isUnreadParentComment, RecordComment, groupCommentsByRecord } from '@/lib/records'
@@ -43,12 +43,12 @@ function rateBg(v: number) { return v >= 80 ? 'var(--ui-success-bg)' : v >= 60 ?
 function attColor(v: number) { return v >= 8 ? 'var(--ui-success)' : v >= 5 ? 'var(--ui-warning)' : 'var(--ui-danger)' }
 function attBg(v: number) { return v >= 8 ? 'var(--ui-success-bg)' : v >= 5 ? 'var(--ui-warning-bg)' : 'var(--ui-danger-bg)' }
 function attLabel(v: number) { return v >= 8 ? '우수' : v >= 5 ? '보통' : '노력필요' }
-// 개별 기록의 공개/읽음 상태. 반별 미발송 여부는 일괄 발송 이력으로 판단한다.
+// 개별 기록의 공개/읽음 상태 — 색 점 하나로만 표시한다(제목 텍스트는 title 툴팁으로).
+// 발송은 학부모 공개 여부로 판단하며, 푸시 수신 여부와는 무관하다.
 function recordStatus(r: { released_to_parent: boolean; viewed_at: string | null }) {
-  // 발송은 학부모 공개 여부로 판단하며, 푸시 수신 여부와는 무관하다.
-  if (r.viewed_at) return { label: `읽음 · ${kstTimeOf(r.viewed_at)}`, bg: gbg, color: gr }
-  if (!r.released_to_parent) return { label: '미공개 · 안읽음', bg, color: tx3, border: bd }
-  return { label: '발송됨 · 안읽음', bg: navyM, color: navy }
+  if (r.viewed_at) return { color: gr, title: '읽음' }
+  if (!r.released_to_parent) return { color: re, title: '미공개' }
+  return { color: re, title: '발송됨 · 안읽음' }
 }
 function todayStr() { return kstDateStr() }
 function fmtDate(dt: string) {
@@ -686,19 +686,21 @@ export default function RecordsPage() {
           ) : (
             <div>
             {unsentOnly && bulkStatusReady && visibleGroups.length === 0 && <p style={{ textAlign: 'center', padding: '24px 0', color: tx3, fontSize: 13 }}>선택한 날짜의 모든 반에서 일괄 발송을 실행했습니다.</p>}
-            {visibleGroups.map(({ cls: clsG, recs: clsRecs }) => (
+            {visibleGroups.map(({ cls: clsG, recs: clsRecs }) => {
+              const clsAlreadySent = bulkSendState?.clicked.has(recClsId(clsRecs[0]) ?? 0) ?? false
+              return (
               <div key={clsG?.id ?? 'none'} style={{ marginBottom: 20 }}>
                 {/* 반별 헤더 + 일괄 푸시 버튼 */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: mobileMode ? 'wrap' : 'nowrap', gap: mobileMode ? 8 : 0, marginBottom: 12, padding: '8px 14px', background: bg, borderRadius: 8, border: `1px solid ${bd}` }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 13, fontWeight: 700, color: navy }}>{clsG?.name ?? '반 미지정'}</span>
                     <span className="badge" style={{ background: navyM, color: navy }}>{clsRecs.length}명</span>
-                    {bulkStatusReady && !bulkSendState.clicked.has(recClsId(clsRecs[0]) ?? 0) && (
+                    {bulkStatusReady && !clsAlreadySent && (
                       <span className="badge" style={{ background: 'var(--ui-warning-bg)', color: gold }}>
                         일괄 발송 전
                       </span>
                     )}
-                    {bulkStatusReady && bulkSendState.clicked.has(recClsId(clsRecs[0]) ?? 0) && (
+                    {bulkStatusReady && clsAlreadySent && (
                       <span className="badge" style={{ background: gbg, color: gr }}>일괄 발송 완료</span>
                     )}
                   </div>
@@ -706,9 +708,9 @@ export default function RecordsPage() {
                     {clsG && <button className="bout" onClick={() => setBulkModalClsId(clsG.id)}>일괄 수정</button>}
                     <button className="bgrn"
                       onClick={() => sendPushByClass(recClsId(clsRecs[0]))}
-                      disabled={pushing || pushingOneId !== null || !bulkStatusReady}
-                      style={{ opacity: pushing || pushingOneId !== null || !bulkStatusReady ? 0.5 : 1 }}>
-                      {pushing ? '발송 중...' : '일괄 발송'}
+                      disabled={pushing || pushingOneId !== null || !bulkStatusReady || clsAlreadySent}
+                      style={{ opacity: pushing || pushingOneId !== null || !bulkStatusReady || clsAlreadySent ? 0.5 : 1 }}>
+                      {pushing ? '발송 중...' : clsAlreadySent ? '발송 완료' : '일괄 발송'}
                     </button>
                   </div>
                 </div>
@@ -736,7 +738,7 @@ export default function RecordsPage() {
                             {r.has_test && <span className="badge" style={{ background: navyM, color: navy }}>시험</span>}
                             {(() => {
                               const ps = recordStatus(r)
-                              return <span className="badge" style={{ background: ps.bg, color: ps.color, border: ps.border ? `1px solid ${ps.border}` : undefined }}>{ps.label}</span>
+                              return <span title={ps.title} aria-label={ps.title} style={{ width: 8, height: 8, borderRadius: '50%', background: ps.color, display: 'inline-block', flexShrink: 0 }} />
                             })()}
                           </div>
                         </div>
@@ -897,7 +899,8 @@ export default function RecordsPage() {
                 })}
                 </div>
               </div>
-            ))}
+              )
+            })}
             </div>
           )}
         </div>

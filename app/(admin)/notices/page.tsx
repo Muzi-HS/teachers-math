@@ -62,6 +62,7 @@ export default function NoticesPage() {
   const [classes, setClasses] = useState<ClassLite[]>([])
   const [classMembers, setClassMembers] = useState<ClassMember[]>([])
   const [targetsByNotice, setTargetsByNotice] = useState<Record<number, number[]>>({})
+  const [readsByNotice, setReadsByNotice] = useState<Record<number, Set<number>>>({})
   const [parentsMap, setParentsMap] = useState<Record<number, { phone: string; names: string[] }>>({}) // parent_id -> 전화번호·자녀 이름
   const [loading, setLoading] = useState(true)
   const [modal,   setModal]   = useState(false)
@@ -86,9 +87,10 @@ export default function NoticesPage() {
   useEffect(() => { if (detail) fetchComments(detail.id) }, [detail?.id])
 
   async function fetchNotices() {
-    const [{ data }, { data: targets }] = await Promise.all([
+    const [{ data }, { data: targets }, { data: reads }] = await Promise.all([
       supabase.from('notices').select('*').order('pinned', { ascending: false }).order('created_at', { ascending: false }),
       supabase.from('notice_target_students').select('notice_id,student_id'),
+      supabase.from('notice_reads').select('notice_id,student_id'),
     ])
     setNotices(data ?? [])
     const tmap: Record<number, number[]> = {}
@@ -97,6 +99,12 @@ export default function NoticesPage() {
       tmap[row.notice_id].push(row.student_id)
     }
     setTargetsByNotice(tmap)
+    const rmap: Record<number, Set<number>> = {}
+    for (const row of (reads ?? []) as { notice_id: number; student_id: number }[]) {
+      if (!rmap[row.notice_id]) rmap[row.notice_id] = new Set()
+      rmap[row.notice_id].add(row.student_id)
+    }
+    setReadsByNotice(rmap)
     setLoading(false)
   }
 
@@ -408,10 +416,11 @@ export default function NoticesPage() {
 
           {/* 헤더 행 (모바일에서는 카드형으로 바뀌므로 생략) */}
           {!mobileMode && (
-            <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 100px 90px 112px', gap: 10, padding: '11px 18px', background: bg, borderBottom: `1px solid ${bd}`, fontSize: 11, fontWeight: 600, color: tx3 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 100px 70px 90px 112px', gap: 10, padding: '11px 18px', background: bg, borderBottom: `1px solid ${bd}`, fontSize: 11, fontWeight: 600, color: tx3 }}>
               <div style={{ textAlign: 'center' }}>번호</div>
               <div>제목</div>
               <div style={{ textAlign: 'center' }}>공개대상</div>
+              <div style={{ textAlign: 'center' }}>조회수</div>
               <div style={{ textAlign: 'center' }}>등록일</div>
               <div style={{ textAlign: 'center' }}>관리</div>
             </div>
@@ -419,6 +428,7 @@ export default function NoticesPage() {
 
           {pinnedList.map((n, i) => (
             <BoardRow key={n.id} notice={n} index="공지" pinned canWrite={canWrite} mobile={mobileMode} visLabel={targetLabel(n)}
+              viewCount={readsByNotice[n.id]?.size ?? 0}
               onClick={() => setDetail(n)} onEdit={() => openEdit(n)} onDelete={() => remove(n.id)}
               isLast={i === pinnedList.length - 1 && normalList.length === 0} />
           ))}
@@ -429,6 +439,7 @@ export default function NoticesPage() {
 
           {normalList.map((n, i) => (
             <BoardRow key={n.id} notice={n} index={normalList.length - i} pinned={false} canWrite={canWrite} mobile={mobileMode} visLabel={targetLabel(n)}
+              viewCount={readsByNotice[n.id]?.size ?? 0}
               onClick={() => setDetail(n)} onEdit={() => openEdit(n)} onDelete={() => remove(n.id)}
               isLast={i === normalList.length - 1} />
           ))}
@@ -463,9 +474,15 @@ export default function NoticesPage() {
                 </div>
                 {detail.parent_visible && (targetsByNotice[detail.id]?.length ?? 0) > 0 && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
-                    {targetsByNotice[detail.id].map(sid => (
-                      <span key={sid} className="chip" style={{ padding: '2px 8px' }}>{students.find(s => s.id === sid)?.name ?? '?'}</span>
-                    ))}
+                    {targetsByNotice[detail.id].map(sid => {
+                      const read = readsByNotice[detail.id]?.has(sid) ?? false
+                      return (
+                        <span key={sid} className="chip" title={read ? '읽음' : '안읽음'}
+                          style={{ padding: '2px 8px', background: read ? gbg : bg, color: read ? gr : tx3 }}>
+                          {students.find(s => s.id === sid)?.name ?? '?'}
+                        </span>
+                      )
+                    })}
                   </div>
                 )}
               </div>
@@ -703,8 +720,8 @@ export default function NoticesPage() {
 }
 
 // ── 게시판 행 (네이버카페 스타일) ──
-function BoardRow({ notice, index, pinned, canWrite, mobile, visLabel, onClick, onEdit, onDelete, isLast }: {
-  notice: Notice; index: number | string; pinned: boolean; canWrite: boolean; mobile?: boolean; visLabel: string
+function BoardRow({ notice, index, pinned, canWrite, mobile, visLabel, viewCount, onClick, onEdit, onDelete, isLast }: {
+  notice: Notice; index: number | string; pinned: boolean; canWrite: boolean; mobile?: boolean; visLabel: string; viewCount: number
   onClick: () => void; onEdit: () => void; onDelete: () => void; isLast: boolean
 }) {
   const navy = 'var(--ui-primary)', gold = 'var(--ui-primary)', bd = 'var(--ui-border)'
@@ -739,6 +756,7 @@ function BoardRow({ notice, index, pinned, canWrite, mobile, visLabel, onClick, 
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
           {visBadge}
+          <span style={{ fontSize: 11, color: tx3 }}>조회 {viewCount}</span>
           <span style={{ fontSize: 11, color: tx3 }}>{kstDateOf(notice.created_at)}</span>
           {canWrite && (
             <div style={{ display: 'flex', gap: 5, marginLeft: 'auto' }}>
@@ -762,7 +780,7 @@ function BoardRow({ notice, index, pinned, canWrite, mobile, visLabel, onClick, 
       className="notice-row"
       onClick={onClick}
       style={{
-        display: 'grid', gridTemplateColumns: '60px 1fr 100px 90px 112px', gap: 10,
+        display: 'grid', gridTemplateColumns: '60px 1fr 100px 70px 90px 112px', gap: 10,
         padding: '13px 18px', alignItems: 'center', cursor: 'pointer',
         background: pinned ? 'var(--ui-info-bg)' : '#fff',
         borderBottom: isLast ? 'none' : `1px solid ${bd}`,
@@ -788,6 +806,8 @@ function BoardRow({ notice, index, pinned, canWrite, mobile, visLabel, onClick, 
       </div>
 
       <div style={{ textAlign: 'center' }}>{visBadge}</div>
+
+      <div style={{ textAlign: 'center', fontSize: 12, color: tx3 }}>{viewCount}</div>
 
       <div style={{ textAlign: 'center', fontSize: 11, color: tx3 }}>{kstDateOf(notice.created_at)}</div>
 

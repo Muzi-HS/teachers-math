@@ -1,5 +1,6 @@
 'use client'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { kstDateOf, kstTimeOf } from '@/lib/kst'
@@ -26,8 +27,17 @@ function fmtPhone(p: string) {
 }
 
 export default function AdminInquiriesPage() {
+  return (
+    <Suspense fallback={null}>
+      <AdminInquiriesPageInner />
+    </Suspense>
+  )
+}
+
+function AdminInquiriesPageInner() {
   const { teacher } = useAuth()
   const { mobileMode } = useMobileMode()
+  const searchParams = useSearchParams()
   const [msgs, setMsgs] = useState<Msg[]>([])
   const [parentsMap, setParentsMap] = useState<Record<number, ParentRow>>({})
   const [childrenMap, setChildrenMap] = useState<Record<number, string[]>>({})
@@ -46,6 +56,17 @@ export default function AdminInquiriesPage() {
   function toast(msg: string, ok = true) { setNotif({ msg, ok }); setTimeout(() => setNotif(null), 3000) }
 
   useEffect(() => { fetchAll() }, [])
+
+  // 푸시 알림 탭 등으로 /inquiries?parentId=123 형태로 들어오면 해당 학부모 대화를 자동으로 연다
+  const appliedDeepLinkRef = useRef(false)
+  useEffect(() => {
+    if (loading || appliedDeepLinkRef.current) return
+    const pid = searchParams.get('parentId')
+    if (!pid) return
+    appliedDeepLinkRef.current = true
+    openThread(Number(pid))
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 최초 데이터 로드가 끝난 뒤 한 번만 URL의 parentId를 적용하기 위함
+  }, [loading, searchParams])
 
   async function fetchAll() {
     setLoading(true)
