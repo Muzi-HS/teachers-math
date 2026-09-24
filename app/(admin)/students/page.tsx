@@ -78,11 +78,9 @@ export default function StudentsPage() {
   const [schoolMiddle,     setSchoolMiddle]     = useState('')
   const [schoolHigh,       setSchoolHigh]       = useState('')
   const [noSchoolMap, setNoSchoolMap] = useState<Record<SchoolKey, boolean>>({ '초등': false, '중등': false, '고등': false })
-  const [parentPinMap, setParentPinMap] = useState<Record<string, string>>({})
   const [detailCoupons, setDetailCoupons] = useState<{ id: number; milestone: number; claimed_at: string; used: boolean; code: string }[]>([])
 
   useEffect(() => { fetchAll() }, [])
-  useEffect(() => { if (role === 'admin') fetchParentPins() }, [role])
   useEffect(() => {
     if (!detailStu) { setDetailCoupons([]); return }
     supabase.from('student_coupons').select('id,milestone,claimed_at,used,code')
@@ -95,14 +93,6 @@ export default function StudentsPage() {
       .update({ used, used_at: used ? new Date().toISOString() : null }).eq('id', couponId)
     if (error) return toast('쿠폰 처리 실패: ' + error.message, false)
     setDetailCoupons(cs => cs.map(c => c.id === couponId ? { ...c, used } : c))
-  }
-
-  async function fetchParentPins() {
-    const { data: pp, error } = await supabase.from('parents').select('phone, pin')
-    if (error) { toast('학부모 PIN 조회 실패: ' + error.message, false); return }
-    const pmap: Record<string, string> = {}
-    for (const row of (pp ?? [])) pmap[row.phone] = row.pin ?? '0000'
-    setParentPinMap(pmap)
   }
 
   async function fetchAll() {
@@ -224,13 +214,8 @@ export default function StudentsPage() {
 
   async function resetParentPin(parentPhone: string, studentName: string) {
     if (!confirm(`${studentName} 학부모의 PIN을 0000으로 초기화하시겠습니까?`)) return
-    const normalized = parentPhone.replace(/-/g, '')
-    const { error } = await supabase
-      .from('parents')
-      .update({ pin: '0000' })
-      .eq('phone', normalized)
+    const { error } = await supabase.rpc('admin_reset_parent_pin', { p_phone: parentPhone })
     if (error) return toast('PIN 초기화 실패: ' + error.message, false)
-    setParentPinMap(m => ({ ...m, [normalized]: '0000' }))
     toast(`${studentName} 학부모 PIN이 초기화됐습니다`)
   }
 
@@ -775,14 +760,12 @@ export default function StudentsPage() {
                 </div>
               )}
 
-              {/* 학부모 PIN (admin만) */}
+              {/* 학부모 PIN (admin만) — PIN은 암호화 저장되어 관리자도 현재 값을 볼 수 없고, 초기화(0000)만 가능하다 */}
               {canFull && detailStu.parent_phone && (
                 <div style={{ background:bg,borderRadius:10,padding:'14px 16px' }}>
                   <p style={{ fontSize:11,fontWeight:700,color:tx3,letterSpacing:1,margin:'0 0 10px' }}>학부모 PIN</p>
                   <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between' }}>
-                    <p style={{ fontSize:18,fontWeight:700,color:tx,margin:0,letterSpacing:2 }}>
-                      {parentPinMap[detailStu.parent_phone.replace(/-/g,'')] ?? '0000'}
-                    </p>
+                    <p style={{ fontSize:12,color:tx3,margin:0 }}>보안을 위해 암호화 저장되어 현재 PIN은 확인할 수 없습니다.</p>
                     {isAdmin && (
                       <button className="bdng" onClick={() => resetParentPin(detailStu.parent_phone, detailStu.name)}>
                         PIN 초기화

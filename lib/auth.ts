@@ -29,19 +29,15 @@ export async function teacherLogin(email: string, password: string) {
   }
 }
 
-// ── 학부모 전화번호 확인 (1단계) ──
+type ParentChild = { id: number; name: string; birth_year: number; school: string }
+
+// ── 학부모 전화번호 확인 (1단계) — 등록 여부만 확인하고, PIN 값은 다루지 않는다 ──
 export async function parentLookup(phone: string) {
   const normalized = phone.replace(/-/g, '').replace(/\s/g, '')
 
   const { data: parent, error } = await supabase
     .from('parents')
-    .select(`
-      id, phone, pin,
-      parent_students (
-        student_id,
-        students ( id, name, birth_year, school )
-      )
-    `)
+    .select('id, phone')
     .eq('phone', normalized)
     .single()
 
@@ -49,34 +45,28 @@ export async function parentLookup(phone: string) {
     throw new Error('등록되지 않은 전화번호입니다. 담당 선생님에게 문의하세요.')
   }
 
-  const children = (parent.parent_students as any[]).map((ps: any) => ps.students)
-  return {
-    parentId: parent.id,
-    phone: parent.phone,
-    pin: parent.pin ?? '0000',
-    children,
-  }
+  return { parentId: parent.id, phone: parent.phone }
 }
 
-// ── 학부모 PIN 검증 (2단계) ──
+// ── 학부모 PIN 검증 (2단계) — PIN 비교는 DB 함수(verify_parent_pin)가 서버에서 수행하고,
+//    클라이언트는 결과(성공 여부·자녀 목록)만 받는다. PIN 값 자체는 어디로도 노출되지 않는다. ──
 export async function parentLoginWithPin(phone: string, pin: string) {
-  const data = await parentLookup(phone)
-  if (data.pin !== pin) throw new Error('PIN이 올바르지 않습니다.')
+  const normalized = phone.replace(/-/g, '').replace(/\s/g, '')
+  const { data, error } = await supabase.rpc('verify_parent_pin', { p_phone: normalized, p_pin: pin }).single()
+  if (error) throw new Error(error.message || 'PIN이 올바르지 않습니다.')
+  const row = data as { parent_id: number; phone: string; is_default_pin: boolean; children: ParentChild[] }
   return {
-    parentId: data.parentId,
-    phone: data.phone,
-    children: data.children,
-    isDefaultPin: data.pin === '0000',
+    parentId: row.parent_id,
+    phone: row.phone,
+    children: row.children,
+    isDefaultPin: row.is_default_pin,
   }
 }
 
-// ── 학부모 PIN 변경 ──
-export async function updateParentPin(parentId: number, newPin: string) {
-  const { error } = await supabase
-    .from('parents')
-    .update({ pin: newPin })
-    .eq('id', parentId)
-  if (error) throw new Error('PIN 변경에 실패했습니다.')
+// ── 학부모 PIN 변경 — 기존 PIN이 맞아야만 통과한다(임의 계정 PIN 덮어쓰기 방지) ──
+export async function updateParentPin(parentId: number, oldPin: string, newPin: string) {
+  const { error } = await supabase.rpc('update_parent_pin', { p_parent_id: parentId, p_old_pin: oldPin, p_new_pin: newPin })
+  if (error) throw new Error(error.message || 'PIN 변경에 실패했습니다.')
 }
 
 // ── 학생 전화번호 확인 (1단계) — 학부모 로그인과 동일한 방식, students.phone 기준 ──
@@ -85,7 +75,7 @@ export async function studentLookup(phone: string) {
 
   const { data: student, error } = await supabase
     .from('students')
-    .select('id, name, phone, pin')
+    .select('id, name, phone')
     .eq('phone', normalized)
     .maybeSingle()
 
@@ -93,38 +83,32 @@ export async function studentLookup(phone: string) {
     throw new Error('등록되지 않은 전화번호입니다. 담당 선생님에게 문의하세요.')
   }
 
-  return {
-    studentId: student.id,
-    name: student.name,
-    phone: student.phone,
-    pin: student.pin ?? '0000',
-  }
+  return { studentId: student.id, name: student.name, phone: student.phone }
 }
 
 // ── 학생 PIN 검증 (2단계) ──
 export async function studentLoginWithPin(phone: string, pin: string) {
-  const data = await studentLookup(phone)
-  if (data.pin !== pin) throw new Error('PIN이 올바르지 않습니다.')
+  const normalized = phone.replace(/-/g, '').replace(/\s/g, '')
+  const { data, error } = await supabase.rpc('verify_student_pin', { p_phone: normalized, p_pin: pin }).single()
+  if (error) throw new Error(error.message || 'PIN이 올바르지 않습니다.')
+  const row = data as { student_id: number; name: string; phone: string; is_default_pin: boolean }
   // 기존 학생 로그인은 유지하고, 시험 제출용 서버 검증 세션도 발급한다.
-  if (data.pin !== '0000') await fetch('/api/student-tests', {
+  if (!row.is_default_pin) await fetch('/api/student-tests', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'verify', studentId: data.studentId, pin }),
+    body: JSON.stringify({ action: 'verify', studentId: row.student_id, pin }),
   }).catch(() => {})
   return {
-    studentId: data.studentId,
-    name: data.name,
-    phone: data.phone,
-    isDefaultPin: data.pin === '0000',
+    studentId: row.student_id,
+    name: row.name,
+    phone: row.phone,
+    isDefaultPin: row.is_default_pin,
   }
 }
 
-// ── 학생 PIN 변경 ──
-export async function updateStudentPin(studentId: number, newPin: string) {
-  const { error } = await supabase
-    .from('students')
-    .update({ pin: newPin })
-    .eq('id', studentId)
-  if (error) throw new Error('PIN 변경에 실패했습니다.')
+// ── 학생 PIN 변경 — 기존 PIN이 맞아야만 통과한다(임의 계정 PIN 덮어쓰기 방지) ──
+export async function updateStudentPin(studentId: number, oldPin: string, newPin: string) {
+  const { error } = await supabase.rpc('update_student_pin', { p_student_id: studentId, p_old_pin: oldPin, p_new_pin: newPin })
+  if (error) throw new Error(error.message || 'PIN 변경에 실패했습니다.')
 }
 
 // ── 학부모 로그인 (전화번호만) - 기존 호환용 ──

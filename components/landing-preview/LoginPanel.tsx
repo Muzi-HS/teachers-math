@@ -1,8 +1,8 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
-import { supabase, TEACHER_AUTO_LOGIN_KEY } from '@/lib/supabase'
-import { teacherLogin, parentLookup, parentLoginWithPin, studentLookup, studentLoginWithPin } from '@/lib/auth'
+import { TEACHER_AUTO_LOGIN_KEY } from '@/lib/supabase'
+import { teacherLogin, parentLookup, parentLoginWithPin, updateParentPin, studentLookup, studentLoginWithPin, updateStudentPin } from '@/lib/auth'
 import { useAuth } from '@/context/AuthContext'
 
 type AccountType = 'parent' | 'student' | 'teacher'
@@ -127,11 +127,11 @@ export default function LoginPanel({ open, onClose }: { open: boolean; onClose: 
     if (newPin !== confirmPin) { setError('PIN이 일치하지 않습니다. 다시 입력해주세요.'); setNewPin(''); setNewPin2(''); return }
     setLoading(true)
     try {
-      const table = accountType === 'student' ? 'students' : 'parents'
-      const idKey = accountType === 'student' ? 'studentId' : 'parentId'
-      const id = parentData ? (parentData as Record<string, unknown>)[idKey] : undefined
-      const { error: updateErr } = await supabase.from(table).update({ pin: newPin }).eq('id', id)
-      if (updateErr) throw new Error('PIN 저장 실패: ' + updateErr.message)
+      if (accountType === 'student') {
+        await updateStudentPin(parentData?.studentId as number, '0000', newPin)
+      } else {
+        await updateParentPin(parentData?.parentId as number, '0000', newPin)
+      }
       if (accountType === 'student') {
         const session = { studentId: parentData?.studentId, phone: parentData?.phone, name: parentData?.name }
         if (autoLogin) localStorage.setItem(STUDENT_AUTO_KEY, JSON.stringify({ session }))
