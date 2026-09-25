@@ -175,6 +175,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function logout() {
     await fetch('/api/student-tests', { method: 'DELETE' }).catch(() => {})
+    // 로그아웃 시 서버에 발급된 세션 토큰 자체를 무효화한다 — 안 지우면 브라우저 저장소만
+    // 비워질 뿐, 토큰이 유출된 적 있다면 만료(최대 30일) 전까지 그 토큰으로는 계속 접근 가능했다.
+    const token = parent?.sessionToken ?? student?.sessionToken
+    if (token) supabase.rpc('client_logout', { p_token: token }).then(() => {}, () => {})
     setLoading(true)
     setTeacher(null)
     setParent(null)

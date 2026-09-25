@@ -123,6 +123,9 @@ export default function TagCheckinPage() {
   async function confirmCheckin(c: Candidate) {
     setBusy(true)
     try {
+      // 이 세션 토큰은 뒷 4자리 확인 시 그 학부모 앞으로 발급된 것 — 정말 이 학부모의
+      // 자녀가 맞는지는 kiosk-checkin Edge Function이 서버에서 다시 확인한다.
+      const session = parentSessions[c.parentId]
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/kiosk-checkin`,
         {
@@ -131,7 +134,7 @@ export default function TagCheckinPage() {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
           },
-          body: JSON.stringify({ student_id: c.studentId }),
+          body: JSON.stringify({ student_id: c.studentId, session_token: session?.sessionToken }),
         }
       )
       const result = await res.json().catch(() => null)
@@ -140,7 +143,6 @@ export default function TagCheckinPage() {
         return
       }
       // 다음 태그부터는 입력 없이 되도록 이 폰에 저장 시도 (저장이 유지되는 폰이면 다음엔 바로 처리됨)
-      const session = parentSessions[c.parentId]
       if (session) {
         try { localStorage.setItem(AUTO_KEY, JSON.stringify({ session })) } catch {}
       }

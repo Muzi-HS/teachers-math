@@ -48,9 +48,14 @@ export async function parentLookup(phone: string) {
 //    클라이언트는 결과(성공 여부·자녀 목록)만 받는다. PIN 값 자체는 어디로도 노출되지 않는다. ──
 export async function parentLoginWithPin(phone: string, pin: string) {
   const normalized = phone.replace(/-/g, '').replace(/\s/g, '')
-  const { data, error } = await supabase.rpc('verify_parent_pin', { p_phone: normalized, p_pin: pin }).single()
+  // .single()을 쓰지 않는다 — 틀린 PIN(잠기지 않은 상태)은 예외가 아니라 빈 결과(0행)로
+  // 돌아온다(같은 트랜잭션에서 예외를 던지면 방금 남긴 실패 횟수 기록까지 롤백되기 때문).
+  // .single()은 0행에도 기술적인 에러 메시지를 만들어내므로 배열로 직접 확인한다.
+  const { data, error } = await supabase.rpc('verify_parent_pin', { p_phone: normalized, p_pin: pin })
   if (error) throw new Error(error.message || 'PIN이 올바르지 않습니다.')
-  const row = data as { parent_id: number; phone: string; is_default_pin: boolean; children: ParentChild[]; session_token: string }
+  const rows = data as { parent_id: number; phone: string; is_default_pin: boolean; children: ParentChild[]; session_token: string }[]
+  if (!rows || rows.length === 0) throw new Error('PIN이 올바르지 않습니다.')
+  const row = rows[0]
   return {
     parentId: row.parent_id,
     phone: row.phone,
@@ -80,9 +85,11 @@ export async function studentLookup(phone: string) {
 // ── 학생 PIN 검증 (2단계) ──
 export async function studentLoginWithPin(phone: string, pin: string) {
   const normalized = phone.replace(/-/g, '').replace(/\s/g, '')
-  const { data, error } = await supabase.rpc('verify_student_pin', { p_phone: normalized, p_pin: pin }).single()
+  const { data, error } = await supabase.rpc('verify_student_pin', { p_phone: normalized, p_pin: pin })
   if (error) throw new Error(error.message || 'PIN이 올바르지 않습니다.')
-  const row = data as { student_id: number; name: string; phone: string; is_default_pin: boolean; session_token: string }
+  const rows = data as { student_id: number; name: string; phone: string; is_default_pin: boolean; session_token: string }[]
+  if (!rows || rows.length === 0) throw new Error('PIN이 올바르지 않습니다.')
+  const row = rows[0]
   // 기존 학생 로그인은 유지하고, 시험 제출용 서버 검증 세션도 발급한다.
   if (!row.is_default_pin) await fetch('/api/student-tests', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },

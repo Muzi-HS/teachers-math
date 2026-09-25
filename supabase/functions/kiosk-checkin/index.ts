@@ -14,8 +14,11 @@ const CORS = {
 const DOW = ['일', '월', '화', '수', '목', '금', '토']
 
 // 등원 체크인을 실제로 수행한다. 두 경로에서 호출된다:
-// - 태블릿 키오스크(/checkin): 관리자가 학생을 특정한 뒤 student_id로 호출
-// - 공용 NFC 카드(/tag-checkin): 학부모 로그인(자동 로그인 포함)으로 학생을 특정한 뒤 student_id로 호출 (관리자 로그인 불필요)
+// - 태블릿 키오스크(/checkin): 관리자가 학생을 특정한 뒤 student_id + admin_access_token으로 호출
+// - 공용 NFC 카드(/tag-checkin): 학부모 로그인(자동 로그인 포함)으로 학생을 특정한 뒤 student_id + session_token으로 호출 (관리자 로그인 불필요)
+// student_id만 믿고 처리하면 Edge Function URL과 공개 anon key만으로 누구나 임의의
+// 학생을 등원 처리하고 학부모에게 가짜 알림을 보낼 수 있어, 두 경로 모두 실제로 그
+// student_id를 다룰 권한이 있는지 서버에서 다시 검증한다(아래 authorized 체크).
 // - 오늘 요일에 해당하는 수업 시간과 비교해 지각/정시를 자동 판정해 student_checkins에 남긴다
 //   (반관리 > 수업기록 작성 시 이 값을 그대로 불러와 지각 여부를 자동 반영한다)
 // - 문의하기 스레드에 관리자 명의로 등원 완료 메시지를 남기고 학부모에게 푸시를 보낸다
@@ -25,7 +28,7 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
   try {
-    const { student_id } = await req.json()
+    const { student_id, session_token, admin_access_token } = await req.json()
     if (!student_id) {
       return new Response(JSON.stringify({ error: 'student_id가 필요합니다.' }), {
         status: 400, headers: { ...CORS, 'Content-Type': 'application/json' },
@@ -33,6 +36,27 @@ serve(async (req) => {
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+
+    // 이 함수는 두 경로에서 호출되므로, 그 확인 절차가 실제로 지켜졌는지 여기서 다시 검사한다.
+    // - /checkin(관리자 키오스크): admin_access_token으로 로그인한 계정이 승인된 관리자인지 확인
+    // - /tag-checkin(공용 NFC): session_token이 실제로 이 student_id를 소유(자녀)하는지 확인
+    // 둘 다 없거나 검증에 실패하면 어떤 student_id로도 등원 처리를 만들 수 없게 막는다.
+    let authorized = false
+    if (admin_access_token) {
+      const { data: { user } } = await supabase.auth.getUser(admin_access_token)
+      if (user) {
+        const { data: profile } = await supabase.from('teachers').select('role, approved').eq('user_id', user.id).maybeSingle()
+        authorized = profile?.role === 'admin' && profile.approved === true
+      }
+    } else if (session_token) {
+      const { data: owns } = await supabase.rpc('session_owns_student', { p_token: session_token, p_student_id: student_id })
+      authorized = owns === true
+    }
+    if (!authorized) {
+      return new Response(JSON.stringify({ error: '권한이 없습니다. 다시 로그인해 주세요.' }), {
+        status: 403, headers: { ...CORS, 'Content-Type': 'application/json' },
+      })
+    }
 
     const { data: student, error: stuErr } = await supabase
       .from('students').select('id, name').eq('id', student_id).single()

@@ -151,6 +151,9 @@ function CheckinKioskInner() {
   async function confirmCheckin(c: Candidate) {
     setBusy(true)
     try {
+      // 이 화면은 관리자 로그인(KioskLoginGate) 뒤에서만 열리므로, 지금 로그인한 관리자의
+      // 실제 Supabase Auth 토큰을 함께 보내 Edge Function이 관리자 권한을 다시 확인하게 한다.
+      const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/kiosk-checkin`,
         {
@@ -159,7 +162,7 @@ function CheckinKioskInner() {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
           },
-          body: JSON.stringify({ student_id: c.studentId }),
+          body: JSON.stringify({ student_id: c.studentId, admin_access_token: session?.access_token }),
         }
       )
       const result = await res.json().catch(() => null)
