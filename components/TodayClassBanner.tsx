@@ -12,17 +12,17 @@ type TodayClass = { id: number; name: string; time: string }
 
 // 학부모/학생 화면이 공유하는 "오늘 수업 시간" 배너 — 앱에 들어오자마자 오늘
 // 무슨 반 수업이 몇 시에 있는지 바로 보여준다.
-export default function TodayClassBanner({ studentId }: { studentId: number | null }) {
+export default function TodayClassBanner({ studentId, sessionToken }: { studentId: number | null; sessionToken: string | undefined }) {
   const [classes, setClasses] = useState<TodayClass[] | null>(null)
 
   useEffect(() => {
-    if (!studentId) { setClasses(null); return }
+    if (!studentId || !sessionToken) { setClasses(null); return }
     let cancelled = false
     async function load() {
       const now = kstNow()
       const todayDow = DOW[now.getDay()]
-      const { data: csRows } = await supabase.from('class_students').select('class_id').eq('student_id', studentId)
-      const classIds = (csRows ?? []).map(r => r.class_id)
+      const { data: csRows } = await supabase.rpc('client_class_students', { p_token: sessionToken, p_student_id: studentId })
+      const classIds = ((csRows ?? []) as { class_id: number }[]).map(r => r.class_id)
       if (classIds.length === 0) { if (!cancelled) setClasses([]); return }
       const { data: cls } = await supabase.from('classes').select('id,name,days,time').in('id', classIds)
       const todays = (cls ?? [])
@@ -33,7 +33,7 @@ export default function TodayClassBanner({ studentId }: { studentId: number | nu
     }
     load()
     return () => { cancelled = true }
-  }, [studentId])
+  }, [studentId, sessionToken])
 
   if (!classes || classes.length === 0) return null
 

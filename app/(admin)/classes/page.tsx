@@ -10,6 +10,8 @@ import ClassPrepModal from '@/components/ClassPrepModal'
 import ClassNoticeModal from '@/components/ClassNoticeModal'
 import { IconClock } from '@/components/icons'
 import { useMobileMode } from '@/context/MobileModeContext'
+import { navy, navyDk, navyM, gold, goldL, bg, bd, tx, tx2, tx3, re, rbg, gr, gbg } from '@/lib/ui-tokens'
+import AdminTestResultCard from '@/components/AdminTestResultCard'
 
 type Class = { id: number; name: string; days: string; time: string; mode?: string; active?: boolean }
 type Student = { id: number; name: string; birth_year: number; school: string; parent_phone?: string }
@@ -22,23 +24,17 @@ type RecForm = {
   late: boolean; has_test: boolean; testItems: TestItem[]; feedback: string
 }
 type Rec = RecForm & {
-  id: number; date: string; sms_sent: boolean; is_draft: boolean
+  id: number; date: string; is_draft: boolean
   record_test_items?: {
     id: number; test_id: number; t_total: number; t_cor: number; t_score: number
     tests: { name: string } | null
   }[]
 }
 
-const navy = 'var(--ui-primary)', navyDk = 'var(--ui-primary-text)', navyM = 'var(--ui-surface-2)'
-const gold = 'var(--ui-primary)', goldL = 'var(--ui-primary-hover)', wa = 'var(--ui-warning)'
-const bg = 'var(--ui-bg)', bd = 'var(--ui-border)'
-const tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)'
-const re = 'var(--ui-danger)', rbg = 'var(--ui-danger-bg)', gr = 'var(--ui-success)', gbg = 'var(--ui-success-bg)'
+const wa = 'var(--ui-warning)'
 
 function rateColor(v: number) { return v >= 80 ? 'var(--ui-success)' : v >= 60 ? 'var(--ui-warning)' : 'var(--ui-danger)' }
-function rateBg(v: number) { return v >= 80 ? 'var(--ui-success-bg)' : v >= 60 ? 'var(--ui-warning-bg)' : 'var(--ui-danger-bg)' }
 function attColor(v: number) { return v >= 8 ? 'var(--ui-success)' : v >= 5 ? 'var(--ui-warning)' : 'var(--ui-danger)' }
-function attBg(v: number) { return v >= 8 ? 'var(--ui-success-bg)' : v >= 5 ? 'var(--ui-warning-bg)' : 'var(--ui-danger-bg)' }
 function attLabel(v: number) { return v >= 8 ? '우수' : v >= 5 ? '보통' : '노력필요' }
 
 export default function ClassesPage() {
@@ -168,15 +164,15 @@ export default function ClassesPage() {
       .in('record_id', recIds)
 
     // 3. tests 조회 (시험명)
-    const testIds = [...new Set((items ?? []).map((x: any) => x.test_id))]
-    let testsMap: Record<number, string> = {}
+    const testIds = [...new Set((items ?? []).map(x => x.test_id))]
+    const testsMap: Record<number, string> = {}
     if (testIds.length > 0) {
       const { data: testsData } = await supabase.from('tests').select('id,name').in('id', testIds)
       for (const t of (testsData ?? [])) testsMap[t.id] = t.name
     }
 
     // 4. record_id별로 그룹화
-    const itemsByRecord: Record<number, any[]> = {}
+    const itemsByRecord: Record<number, NonNullable<Rec['record_test_items']>> = {}
     for (const item of (items ?? [])) {
       if (!itemsByRecord[item.record_id]) itemsByRecord[item.record_id] = []
       itemsByRecord[item.record_id].push({
@@ -197,14 +193,8 @@ export default function ClassesPage() {
   function toast(msg: string, ok = true) { setNotif({ msg, ok }); setTimeout(() => setNotif(null), 3000) }
   function ageOf(b: number) { return new Date().getFullYear() - b + 1 }
 
-  // 한국 시간 기준 날짜 포맷 (YYYY년 M월 D일)
-  function fmtKorDate(dateStr: string) {
-    const [y, m, d] = dateStr.split('-')
-    return `${y}년 ${parseInt(m)}월 ${parseInt(d)}일`
-  }
-  const isAdmin = role === 'admin'
   // 반 추가/수정/삭제, 반에 학생 추가/제외 — admin만 가능
-  const canManageClassInfo = role ? can.manageClassInfo(role as any) : false
+  const canManageClassInfo = role ? can.manageClassInfo(role) : false
 
   /* ─── 반 추가/수정 ─── */
   function openAddCls() { setEditClsId(null); setClsForm({ name: '', days: '', time: '', mode: '강의' }); setClsModal(true) }
@@ -258,16 +248,6 @@ export default function ClassesPage() {
     if (added > 0) toast(added + '명 추가됨')
     else toast('이미 소속된 학생이거나 오류 발생', false)
     setSelStus(new Set()); setStuModal(false); await fetchAll()
-  }
-
-  async function delRec(id: number) {
-    if (!confirm('기록을 삭제하시겠습니까?')) return
-    // record_test_items 먼저 삭제 (test_scores 보존을 위해 CASCADE 방지)
-    await supabase.from('record_test_items').delete().eq('record_id', id)
-    // records 삭제
-    await supabase.from('records').delete().eq('id', id)
-    toast('기록 삭제됨', false)
-    if (curStu) await fetchStuRecs(curStu.id); await fetchAll()
   }
 
   const filtered = classes.filter(c => {
@@ -640,10 +620,10 @@ export default function ClassesPage() {
                 )}
 
                 {/* 시험 결과 — 점수 강조형 */}
-                {tItems.length > 0 && tItems.map((ti: any, idx: number) => {
+                {tItems.length > 0 && tItems.map((ti, idx: number) => {
                   const pct = ti.t_total > 0 ? Math.round(ti.t_cor / ti.t_total * 100) : 0
                   const sc = ti.t_score ?? 0
-                  return <StuTestResultCard key={idx} testName={ti.tests?.name ?? '시험'} score={sc} cor={ti.t_cor} total={ti.t_total} pct={pct} testId={ti.test_id} />
+                  return <AdminTestResultCard key={idx} testName={ti.tests?.name ?? '시험'} score={sc} cor={ti.t_cor} total={ti.t_total} pct={pct} testId={ti.test_id} />
                 })}
 
                 {/* 피드백 */}
@@ -842,84 +822,6 @@ export default function ClassesPage() {
 }
 
 // ── 시험평균/최고점 셀 (records-page의 TestAvgCell과 동일) ──
-function StuTestResultCard({ testName, score, cor, total, pct, testId }: {
-  testName: string; score: number; cor: number; total: number; pct: number; testId: number
-}) {
-  const [stats, setStats] = useState<{ avg: number; max: number; rank: number; totalCnt: number } | null>(null)
-  const navy = 'var(--ui-primary)', tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)', bd = 'var(--ui-border)'
-  const gr = 'var(--ui-success)', re = 'var(--ui-danger)', gbg = 'var(--ui-success-bg)'
-
-  useEffect(() => {
-    async function load() {
-      const { data: sc } = await supabase.from('test_scores').select('student_id, score').eq('test_id', testId)
-      let list = (sc ?? []).map(s => ({ student_id: s.student_id, score: s.score }))
-
-      if (list.length === 0) {
-        const { data: items } = await supabase.from('record_test_items').select('record_id, t_score, t_cor, t_total').eq('test_id', testId)
-        if (items && items.length > 0) {
-          const recIds = items.map(x => x.record_id)
-          const { data: recsData } = await supabase.from('records').select('id, student_id').in('id', recIds)
-          const recMap: Record<number, number> = {}
-          for (const r of (recsData ?? [])) recMap[r.id] = r.student_id
-          const byStudent = new Map<number, number>()
-          for (const item of items) {
-            const sid = recMap[item.record_id]
-            if (!sid) continue
-            const s = item.t_score ? item.t_score : (item.t_total > 0 ? Math.round(item.t_cor / item.t_total * 100) : 0)
-            if (!byStudent.has(sid) || s > byStudent.get(sid)!) byStudent.set(sid, s)
-          }
-          list = [...byStudent.entries()].map(([student_id, score]) => ({ student_id, score }))
-        }
-      }
-      if (list.length === 0) return
-      list.sort((a, b) => b.score - a.score)
-      const avg = Math.round(list.reduce((a, b) => a + b.score, 0) / list.length)
-      const max = list[0].score
-      const rankIdx = list.findIndex(s => s.score === score)
-      setStats({ avg, max, rank: rankIdx >= 0 ? rankIdx + 1 : 0, totalCnt: list.length })
-    }
-    load()
-  }, [testId, score])
-
-  const diff = stats ? score - stats.avg : null
-
-  return (
-    <div style={{ border: `1px solid ${bd}`, borderRadius: 10, padding: 12, marginBottom: 8, background: '#fff' }}>
-      <p style={{ fontSize: 12, fontWeight: 700, color: tx, margin: '0 0 8px' }}>{testName}</p>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, marginBottom: 2 }}>
-        <span style={{ fontSize: 26, fontWeight: 700, color: navy, lineHeight: 1 }}>{score}</span>
-        <span style={{ fontSize: 13, color: tx2 }}>점</span>
-        {stats && stats.totalCnt > 0 && (
-          <span style={{ marginLeft: 'auto', background: gbg, color: gr, fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 20 }}>
-            {stats.rank}등 / {stats.totalCnt}명
-          </span>
-        )}
-      </div>
-      <p style={{ fontSize: 11, color: tx2, margin: '0 0 10px' }}>{cor}/{total}문항 정답 (정답률 {pct}%)</p>
-
-      <div style={{ height: 1, background: bd, marginBottom: 8 }} />
-
-      <div style={{ display: 'flex', alignItems: 'center' }}>
-        <div style={{ flex: 1, textAlign: 'center' }}>
-          <p style={{ fontSize: 10, color: tx3, margin: '0 0 3px' }}>시험평균</p>
-          <p style={{ fontSize: 14, fontWeight: 700, color: stats ? tx : tx3, margin: 0 }}>{stats ? `${stats.avg}점` : '—'}</p>
-        </div>
-        <div style={{ width: 1, height: 26, background: bd }} />
-        <div style={{ flex: 1, textAlign: 'center' }}>
-          <p style={{ fontSize: 10, color: tx3, margin: '0 0 3px' }}>최고점</p>
-          <p style={{ fontSize: 14, fontWeight: 700, color: stats ? tx : tx3, margin: 0 }}>{stats ? `${stats.max}점` : '—'}</p>
-        </div>
-        <div style={{ width: 1, height: 26, background: bd }} />
-        <div style={{ flex: 1, textAlign: 'center' }}>
-          <p style={{ fontSize: 10, color: tx3, margin: '0 0 3px' }}>평균과 차이</p>
-          <p style={{ fontSize: 14, fontWeight: 700, color: diff == null ? tx3 : diff >= 0 ? gr : re, margin: 0 }}>
-            {diff == null ? '—' : (diff > 0 ? '+' : '') + diff + '점'}
-          </p>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 const Modal = React.memo(function Modal({ onClose, title, children, footer, wide = false }: {
   onClose: () => void; title: string; children: React.ReactNode; footer: React.ReactNode; wide?: boolean

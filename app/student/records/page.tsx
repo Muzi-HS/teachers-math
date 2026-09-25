@@ -31,42 +31,53 @@ export default function StudentRecords() {
   const [showStats, setShowStats] = useState(false)
 
   useEffect(() => {
-    if (!student?.studentId) return
-    fetchRecs(student.studentId)
-  }, [student?.studentId])
+    if (!student?.studentId || !student?.sessionToken) return
+    const controller = new AbortController()
+    fetchRecs(student.studentId, student.sessionToken, controller.signal)
+    return () => controller.abort()
+  }, [student?.studentId, student?.sessionToken])
 
-  async function fetchRecs(stuId: number) {
+  async function fetchRecs(stuId: number, token: string, signal: AbortSignal) {
     setLoading(true)
-    const { data: recsData } = await supabase
-      .from('records')
-      .select('id,date,content,homework,hw_rate,hw_cor,late,has_test,class_id')
-      .eq('student_id', stuId)
-      .eq('is_draft', false)
-      .eq('released_to_parent', true)
-      .order('date', { ascending: false })
+    setRecs([])
+    setClassNames({})
+    // records 테이블은 더 이상 직접 조회할 수 없다 — client_records RPC가 이 토큰이 정말
+    // 본인 기록인지 서버에서 확인한 뒤에만 돌려준다.
+    const { data: recsRaw } = await supabase
+      .rpc('client_records', { p_token: token, p_student_id: stuId })
+      .abortSignal(signal)
+    const recsData = recsRaw as Rec[] | null
 
+    if (signal.aborted) return
     if (!recsData || recsData.length === 0) { setRecs([]); setLoading(false); return }
 
     const classIds = [...new Set(recsData.map(r => r.class_id).filter((id): id is number => id != null))]
     if (classIds.length > 0) {
-      const { data: classesData } = await supabase.from('classes').select('id,name').in('id', classIds)
+      const { data: classesData } = await supabase.from('classes').select('id,name').in('id', classIds).abortSignal(signal)
+      if (signal.aborted) return
       const cmap: Record<number, string> = {}
       for (const c of (classesData ?? [])) cmap[c.id] = c.name
       setClassNames(cmap)
     }
 
+    type TestItemRawRow = { record_id: number; test_id: number; t_total: number; t_cor: number; t_score: number }
     const recIds = recsData.map(r => r.id)
-    const { data: items } = await supabase
-      .from('record_test_items').select('id,record_id,test_id,t_total,t_cor,t_score').in('record_id', recIds)
+    const { data: itemsRaw } = await supabase
+      .rpc('client_record_test_items', { p_token: token, p_record_ids: recIds })
+      .abortSignal(signal)
+    if (signal.aborted) return
+    const items = itemsRaw as TestItemRawRow[] | null
 
-    const testIds = [...new Set((items ?? []).map((x: any) => x.test_id))]
-    let testsMap: Record<number, string> = {}
+    const testIds = [...new Set((items ?? []).map(x => x.test_id))]
+    const testsMap: Record<number, string> = {}
     if (testIds.length > 0) {
-      const { data: testsData } = await supabase.from('tests').select('id,name').in('id', testIds)
+      const { data: testsData } = await supabase.from('tests').select('id,name').in('id', testIds).abortSignal(signal)
+      if (signal.aborted) return
       for (const t of (testsData ?? [])) testsMap[t.id] = t.name
     }
 
-    const itemsByRecord: Record<number, any[]> = {}
+    type TestItemRow = { test_id: number; t_total: number; t_cor: number; t_score: number; tests: { name: string } | null }
+    const itemsByRecord: Record<number, TestItemRow[]> = {}
     for (const item of (items ?? [])) {
       if (!itemsByRecord[item.record_id]) itemsByRecord[item.record_id] = []
       itemsByRecord[item.record_id].push({
@@ -97,8 +108,8 @@ export default function StudentRecords() {
 
   return (
     <div>
-      {student?.studentId && <StreakCouponPrompt studentId={student.studentId} chronoRecs={chronoRecs} />}
-      <TodayClassBanner studentId={student?.studentId ?? null} />
+      {student?.studentId && <StreakCouponPrompt studentId={student.studentId} sessionToken={student.sessionToken} chronoRecs={chronoRecs} />}
+      <TodayClassBanner studentId={student?.studentId ?? null} sessionToken={student?.sessionToken} />
 
       {/* 학생 헤더 */}
       <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: '14px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>

@@ -149,10 +149,10 @@ export default function ClassBulkRecordModal({
     setLoading(false)
   }
 
-  function setBF(sid: number, key: keyof RecForm, val: any) {
+  function setBF<K extends keyof RecForm>(sid: number, key: K, val: RecForm[K]) {
     setBulkForms(p => ({ ...p, [sid]: { ...p[sid], [key]: val } }))
   }
-  function setBulkTestItem(sid: number, idx: number, key: keyof TestItem, val: any) {
+  function setBulkTestItem<K extends keyof TestItem>(sid: number, idx: number, key: K, val: TestItem[K]) {
     const token = ++scoreLookup.current
     setBulkForms(p => {
       const items = [...(p[sid]?.testItems || [])]

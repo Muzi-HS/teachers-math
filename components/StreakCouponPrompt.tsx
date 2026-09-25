@@ -1,8 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { kstDateStr } from '@/lib/kst'
-import { computeStreak, generateCouponCode, COUPON_MILESTONES, type StreakRec } from '@/lib/streak'
+import { type StreakRec } from '@/lib/streak'
 import { IconCoupon } from '@/components/icons'
 
 const navy = 'var(--ui-primary)', navyDk = 'var(--ui-primary)', gold = 'var(--ui-primary)'
@@ -11,75 +10,40 @@ const tx2 = 'var(--ui-text-2)'
 // 숙제 이행률 100% 연속 달성 마일스톤(5/10/15/20/25/30일)에 새로 도달했을 때 한 번만
 // "쿠폰 받기 vs 다음 목표 도전" 선택지를 보여준다.
 //
-// "쿠폰을 받으면 처음부터 다시 센다"는 요구에 따라, 스트릭은 마지막으로 쿠폰을 받은
-// 날짜(last_claimed_date) 이후의 기록만으로 계산한다 — 쿠폰을 받는 순간 그 시점부터
-// 완전히 새로 시작. 반면 "다음 목표 도전하기"(넘기기)는 같은 스트릭을 계속 이어가야
-// 하므로 last_claimed_date는 그대로 두고 last_prompted_milestone만 올려서, 다음 상위
-// 마일스톤에 도달할 때까지는 다시 묻지 않게 한다.
-export default function StreakCouponPrompt({ studentId, chronoRecs }: { studentId: number; chronoRecs: StreakRec[] }) {
+// 연속일수 계산과 쿠폰 발급/코드 생성은 전부 서버(DB 함수)에서 한다 — 클라이언트가
+// "30일 연속 달성했다"고 주장하는 값을 그대로 믿고 쿠폰을 내주지 않도록, 본인 세션
+// 토큰으로 서버가 본인 기록에서 직접 다시 계산한 결과만 인정한다. chronoRecs는 값 자체는
+// 더 이상 쓰지 않고, 수업기록을 새로 불러올 때마다 다시 확인하기 위한 트리거로만 쓴다.
+export default function StreakCouponPrompt({ studentId, sessionToken, chronoRecs }: { studentId: number; sessionToken: string | undefined; chronoRecs: StreakRec[] }) {
   const [prompt, setPrompt] = useState<{ milestone: number; nextMilestone: number | null; streakValue: number } | null>(null)
   const [busy, setBusy] = useState(false)
   const [claimedCode, setClaimedCode] = useState<string | null>(null)
 
   useEffect(() => {
+    if (!sessionToken) return
     let cancelled = false
     async function check() {
-      const { data: state } = await supabase
-        .from('student_streak_state').select('last_seen_streak, last_prompted_milestone, last_claimed_date')
-        .eq('student_id', studentId).maybeSingle()
-
-      // 마지막 쿠폰 수령일 이후 기록만 대상으로 스트릭을 계산한다 (없으면 전체 기록)
-      const lastClaimedDate: string | null = state?.last_claimed_date ?? null
-      const scopedRecs = lastClaimedDate ? chronoRecs.filter(r => r.date > lastClaimedDate) : chronoRecs
-      const { current } = computeStreak(scopedRecs)
-      if (current === 0) return // 셀 게 없으면(막 초기화됐거나 스트릭이 끊긴 상태) 확인할 것도 없음
-
-      const lastSeen = state?.last_seen_streak ?? 0
-      let lastPrompted = state?.last_prompted_milestone ?? 0
-      if (current < lastSeen) lastPrompted = 0 // 스트릭이 끊겼다 새로 쌓이는 중 → 재도전 가능하게 초기화
-
-      const reached = COUPON_MILESTONES.filter(m => current >= m && m > lastPrompted)
-      const target = reached.length > 0 ? reached[reached.length - 1] : null
-
-      await supabase.from('student_streak_state').upsert({
-        student_id: studentId, last_seen_streak: current, last_prompted_milestone: lastPrompted,
-        last_claimed_date: lastClaimedDate, updated_at: new Date().toISOString(),
-      })
-
-      if (target && !cancelled) {
-        const idx = COUPON_MILESTONES.indexOf(target)
-        setPrompt({ milestone: target, nextMilestone: COUPON_MILESTONES[idx + 1] ?? null, streakValue: current })
-      }
+      const { data } = await supabase.rpc('client_streak_status', { p_token: sessionToken })
+      const status = data as { milestone: number; nextMilestone: number | null; streakValue: number } | null
+      if (status && !cancelled) setPrompt(status)
     }
     check()
     return () => { cancelled = true }
-  }, [studentId, chronoRecs]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [studentId, sessionToken, chronoRecs])
 
   async function claim() {
-    if (!prompt) return
+    if (!prompt || !sessionToken) return
     setBusy(true)
-    // 코드 유니크 제약과 충돌하면(극히 드묾) 새 코드로 재시도
-    let code = ''
-    for (let attempt = 0; attempt < 5; attempt++) {
-      code = generateCouponCode()
-      const { error } = await supabase.from('student_coupons')
-        .insert({ student_id: studentId, milestone: prompt.milestone, streak_value: prompt.streakValue, code })
-      if (!error) break
-      if (attempt === 4) { setBusy(false); return }
-    }
-    // 쿠폰을 받으면 오늘부터 처음부터 다시 세도록 기준일을 오늘로 리셋
-    await supabase.from('student_streak_state').update({
-      last_prompted_milestone: 0, last_seen_streak: 0, last_claimed_date: kstDateStr(),
-    }).eq('student_id', studentId)
+    const { data, error } = await supabase.rpc('client_claim_streak_coupon', { p_token: sessionToken })
     setBusy(false)
-    setClaimedCode(code)
+    if (error || !data) return
+    setClaimedCode((data as { code: string }).code)
   }
 
   async function decline() {
-    if (!prompt) return
+    if (!prompt || !sessionToken) return
     setBusy(true)
-    // 같은 스트릭을 계속 이어가야 하므로 기준일은 그대로 두고, 이 마일스톤만 다시 안 묻도록 표시
-    await supabase.from('student_streak_state').update({ last_prompted_milestone: prompt.milestone }).eq('student_id', studentId)
+    await supabase.rpc('client_decline_streak_milestone', { p_token: sessionToken, p_milestone: prompt.milestone })
     setBusy(false)
     setPrompt(null)
   }
@@ -111,7 +75,7 @@ export default function StreakCouponPrompt({ studentId, chronoRecs }: { studentI
               확인
             </button>
             <p style={{ fontSize: 11, color: 'var(--ui-text-3)', margin: '14px 0 0' }}>
-              이 코드는 "쿠폰함"에서 언제든 다시 볼 수 있어요
+              이 코드는 &quot;쿠폰함&quot;에서 언제든 다시 볼 수 있어요
             </p>
           </>
         ) : prompt && (
@@ -142,7 +106,7 @@ export default function StreakCouponPrompt({ studentId, chronoRecs }: { studentI
             </button>
 
             <p style={{ fontSize: 11, color: 'var(--ui-text-3)', margin: '14px 0 0' }}>
-              받은 쿠폰은 "쿠폰함"에서 확인할 수 있어요
+              받은 쿠폰은 &quot;쿠폰함&quot;에서 확인할 수 있어요
             </p>
           </>
         )}

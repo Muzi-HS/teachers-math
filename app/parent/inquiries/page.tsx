@@ -51,22 +51,18 @@ export default function ParentInquiriesPage() {
   const [nSubmitting, setNSubmitting] = useState(false)
   const [nErr, setNErr] = useState('')
 
-  useEffect(() => { if (parent?.parentId) fetchMsgs(parent.parentId) }, [parent?.parentId])
-  useEffect(() => { if (parent?.parentId) fetchNotices(parent.parentId) }, [parent?.parentId])
+  useEffect(() => { if (parent?.sessionToken) fetchMsgs(parent.sessionToken) }, [parent?.sessionToken])
+  useEffect(() => { if (parent?.sessionToken) fetchNotices(parent.sessionToken) }, [parent?.sessionToken])
 
-  async function fetchMsgs(parentId: number) {
+  async function fetchMsgs(token: string) {
     setLoading(true)
-    const { data } = await supabase.from('inquiry_messages').select('*').eq('parent_id', parentId).order('created_at', { ascending: true })
-    setMsgs(data ?? [])
+    const { data } = await supabase.rpc('client_inquiry_messages', { p_token: token })
+    setMsgs((data ?? []) as Msg[])
     setLoading(false)
   }
 
-  async function fetchNotices(parentId: number) {
-    const { data } = await supabase
-      .from('attendance_notices')
-      .select('id,student_id,date,type,reason')
-      .eq('parent_id', parentId)
-      .order('date', { ascending: false })
+  async function fetchNotices(token: string) {
+    const { data } = await supabase.rpc('client_attendance_notices', { p_token: token })
     setNotices((data ?? []) as AttNotice[])
   }
 
@@ -81,13 +77,13 @@ export default function ParentInquiriesPage() {
   }, [msgs.length, loading])
 
   async function send() {
-    if (!parent?.parentId || !input.trim() || sending) return
+    if (!parent?.parentId || !parent?.sessionToken || !input.trim() || sending) return
     setSending(true)
     setErr('')
     const content = input.trim()
-    const { data, error } = await supabase.from('inquiry_messages').insert({
-      parent_id: parent.parentId, sender_type: 'parent', content,
-    }).select('*').single()
+    const { data, error } = await supabase
+      .rpc('client_send_inquiry_message', { p_token: parent.sessionToken, p_content: content })
+      .single()
     setSending(false)
     if (error) { setErr('전송에 실패했습니다.'); return }
     setMsgs(prev => [...prev, data as Msg])
@@ -131,30 +127,32 @@ export default function ParentInquiriesPage() {
   }
 
   async function submitNotice() {
-    if (!parent?.parentId) return
+    if (!parent?.parentId || !parent?.sessionToken) return
     if (!nStudentId) { setNErr('자녀를 선택하세요.'); return }
     if (!nDate) { setNErr('날짜를 선택하세요.'); return }
     setNSubmitting(true)
     setNErr('')
 
     if (editingNoticeId) {
-      const { error } = await supabase.from('attendance_notices')
-        .update({ student_id: nStudentId, date: nDate, type: nType, reason: nReason.trim() || null })
-        .eq('id', editingNoticeId)
+      const { error } = await supabase.rpc('client_upsert_attendance_notice', {
+        p_token: parent.sessionToken, p_id: editingNoticeId, p_student_id: nStudentId,
+        p_date: nDate, p_type: nType, p_reason: nReason.trim() || null,
+      })
       setNSubmitting(false)
       if (error) { setNErr('수정에 실패했습니다. 다시 시도해주세요.'); return }
       setNoticeModal(false)
-      fetchNotices(parent.parentId)
+      fetchNotices(parent.sessionToken)
       return
     }
 
-    const { error } = await supabase.from('attendance_notices').insert({
-      parent_id: parent.parentId, student_id: nStudentId, date: nDate, type: nType, reason: nReason.trim() || null,
+    const { error } = await supabase.rpc('client_upsert_attendance_notice', {
+      p_token: parent.sessionToken, p_id: null, p_student_id: nStudentId,
+      p_date: nDate, p_type: nType, p_reason: nReason.trim() || null,
     })
     setNSubmitting(false)
     if (error) { setNErr('등록에 실패했습니다. 다시 시도해주세요.'); return }
     setNoticeModal(false)
-    fetchNotices(parent.parentId)
+    fetchNotices(parent.sessionToken)
 
     const name = children.find(c => c.id === nStudentId)?.name ?? '학생'
     fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push-admin`, {
@@ -169,11 +167,11 @@ export default function ParentInquiriesPage() {
   }
 
   async function deleteNotice(id: number) {
-    if (!parent?.parentId) return
+    if (!parent?.sessionToken) return
     if (!confirm('이 등록 내역을 삭제하시겠습니까?')) return
-    const { error } = await supabase.from('attendance_notices').delete().eq('id', id)
+    const { error } = await supabase.rpc('client_delete_attendance_notice', { p_token: parent.sessionToken, p_id: id })
     if (error) return
-    fetchNotices(parent.parentId)
+    fetchNotices(parent.sessionToken)
   }
 
   function childName(studentId: number) {

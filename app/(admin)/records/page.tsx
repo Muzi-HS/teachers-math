@@ -8,10 +8,11 @@ import ClassBulkRecordModal from '@/components/ClassBulkRecordModal'
 import { IconBook, IconSend } from '@/components/icons'
 import { isUnreadParentComment, RecordComment, groupCommentsByRecord } from '@/lib/records'
 import { useMobileMode } from '@/context/MobileModeContext'
+import { navy, navyDk, navyM, gold, goldL, bg, bd, tx, tx2, tx3, re, rbg, gr, gbg } from '@/lib/ui-tokens'
+import AdminTestResultCard from '@/components/AdminTestResultCard'
 
 type Student = { id: number; name: string; parent_phone: string }
 type Class_ = { id: number; name: string }
-type TestItem = { testId: number | null; testName?: string; tTotal: number; tCor: number; tScore: number }
 type Test = { id: number; name: string; date: string; total: number }
 type Rec = {
   id: number; student_id: number; date: string; class_id: number | null
@@ -20,7 +21,6 @@ type Rec = {
   late: boolean; has_test: boolean; feedback: string
   parent_comment: string | null; parent_comment_at: string | null
   parent_comment_read_at: string | null
-  // sms_sent: boolean; sms_sent_at: string | null;
   push_sent: boolean; push_sent_at: string | null; viewed_at: string | null
   released_to_parent: boolean
   is_draft: boolean
@@ -30,18 +30,11 @@ type Rec = {
   }[]
 }
 
-const navy = 'var(--ui-primary)', navyDk = 'var(--ui-primary-text)', navyM = 'var(--ui-surface-2)'
-const gold = 'var(--ui-primary)', goldL = 'var(--ui-primary-hover)'
 const hlYellow = 'var(--ui-info-border)' // 학부모 의견은 선택/완료와 별도 색으로 구분
-const bg = 'var(--ui-bg)', bd = 'var(--ui-border)'
-const tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)'
-const re = 'var(--ui-danger)', rbg = 'var(--ui-danger-bg)', gr = 'var(--ui-success)', gbg = 'var(--ui-success-bg)'
 const DOW = ['일', '월', '화', '수', '목', '금', '토']
 
 function rateColor(v: number) { return v >= 80 ? 'var(--ui-success)' : v >= 60 ? 'var(--ui-warning)' : 'var(--ui-danger)' }
-function rateBg(v: number) { return v >= 80 ? 'var(--ui-success-bg)' : v >= 60 ? 'var(--ui-warning-bg)' : 'var(--ui-danger-bg)' }
 function attColor(v: number) { return v >= 8 ? 'var(--ui-success)' : v >= 5 ? 'var(--ui-warning)' : 'var(--ui-danger)' }
-function attBg(v: number) { return v >= 8 ? 'var(--ui-success-bg)' : v >= 5 ? 'var(--ui-warning-bg)' : 'var(--ui-danger-bg)' }
 function attLabel(v: number) { return v >= 8 ? '우수' : v >= 5 ? '보통' : '노력필요' }
 // 개별 기록의 공개/읽음 상태 — 색 점 하나로만 표시한다(제목 텍스트는 title 툴팁으로).
 // 발송은 학부모 공개 여부로 판단하며, 푸시 수신 여부와는 무관하다.
@@ -54,107 +47,6 @@ function todayStr() { return kstDateStr() }
 function fmtDate(dt: string) {
   const [y, m, d] = dt.split('-')
   return `${y}년 ${parseInt(m)}월 ${parseInt(d)}일`
-}
-
-// 시험 평균/최고점 조회 (test_scores 우선, 없으면 record_test_items에서 집계)
-async function getTestStat(testId: number): Promise<{ avg: number; max: number } | null> {
-  const { data: sc } = await supabase.from('test_scores').select('score').eq('test_id', testId)
-  if (sc && sc.length > 0) {
-    const avg = Math.round(sc.reduce((a, b) => a + b.score, 0) / sc.length)
-    const max = Math.max(...sc.map(x => x.score))
-    return { avg, max }
-  }
-  const { data: items } = await supabase.from('record_test_items').select('t_score,t_cor,t_total').eq('test_id', testId)
-  if (!items || items.length === 0) return null
-  const scores = items.map(x => x.t_score ? x.t_score : (x.t_total > 0 ? Math.round(x.t_cor / x.t_total * 100) : 0))
-  const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
-  const max = Math.max(...scores)
-  return { avg, max }
-}
-
-async function buildSms(name: string, r: Rec, testItems?: TestItem[]) {
-  const d = new Date(r.date)
-  const dows = ['일', '월', '화', '수', '목', '금', '토']
-  const dateStr = `${d.getMonth() + 1}월 ${d.getDate()}일(${dows[d.getDay()]})`
-
-  // 숙제 이행률/정답률: -1(숙제없음)/-2(숙제 미제출)/채점안함 처리
-  const hwRateText = r.hw_rate === -1 ? '숙제 없음' : r.hw_rate === -2 ? '숙제 미제출' : `${r.hw_rate}%`
-  const hwCorText  = r.hw_cor  < 0 ? '채점 안함' : `${r.hw_cor}%`
-
-  // 구분선: 짧고 모든 폰트에서 너비가 일정한 대시 사용
-  const LINE = '----------------------'
-
-  const section1 = `[수업 진도/과제]
-- 수업내용: ${r.content || '미입력'}
-- 당일과제: ${r.homework || '미입력'}
-- 숙제이행률: ${hwRateText}
-- 숙제정답률: ${hwCorText}`
-
-  const sectionAtt = `[수업태도/출결]
-- 수업태도: ${r.attitude}/10점
-- 출결: ${r.late ? '지각' : '정시출석'}
-- 피드백: ${r.feedback || '미입력'}`
-
-  const footer = `${LINE}
-문의사항은 언제든 연락주세요.
-- 티처스 수학학원 -`
-
-  // ── 케이스 1: 시험 없음 ──
-  if (!testItems || testItems.length === 0) {
-    return `[티처스수학] 수업 안내
-안녕하세요, ${name} 학부모님.
-${dateStr} 수업 내용 공유드립니다.
-
-${section1}
-
-${sectionAtt}
-
-${footer}`
-  }
-
-  // 각 시험의 평균/최고점 미리 조회
-  const stats = await Promise.all(
-    testItems.map(t => t.testId ? getTestStat(t.testId) : Promise.resolve(null))
-  )
-
-  // ── 케이스 2: 시험 1개 ──
-  if (testItems.length === 1) {
-    const t = testItems[0]
-    const stat = stats[0]
-    return `[티처스수학] 수업+시험결과 안내
-안녕하세요, ${name} 학부모님.
-${dateStr} 수업 및 시험 결과입니다.
-
-${section1}
-
-[시험결과 - ${t.testName || '미입력'}]
-- 점수: ${t.tScore}점
-- 정답: ${t.tCor}/${t.tTotal}문항${stat ? `\n- 시험평균: ${stat.avg}점\n- 최고점: ${stat.max}점` : ''}
-
-${sectionAtt}
-
-${footer}`
-  }
-
-  // ── 케이스 3: 시험 여러 개 ──
-  const testSections = testItems.map((t, i) => {
-    const stat = stats[i]
-    return `${i + 1}차: ${t.testName || '미입력'}
-   점수 ${t.tScore}점 (${t.tCor}/${t.tTotal}문항)${stat ? `\n   평균 ${stat.avg}점 / 최고 ${stat.max}점` : ''}`
-  }).join('\n\n')
-
-  return `[티처스수학] 수업+종합시험결과
-안녕하세요, ${name} 학부모님.
-${dateStr} 수업 및 시험 ${testItems.length}건 결과입니다.
-
-${section1}
-
-[시험결과 ${testItems.length}건]
-${testSections}
-
-${sectionAtt}
-
-${footer}`
 }
 
 export default function RecordsPage() {
@@ -173,15 +65,13 @@ export default function RecordsPage() {
   const [justReadIds, setJustReadIds] = useState<Set<number>>(new Set())
   const [dayRecs,  setDayRecs]  = useState<Rec[]>([])
   const [unsentOnly, setUnsentOnly] = useState(false)
+  const [selectedClassIds, setSelectedClassIds] = useState<Set<number>>(new Set())
   const [bulkSendState, setBulkSendState] = useState<{ date: string; clicked: Set<number>; error: boolean } | null>(null)
   const [comments, setComments] = useState<RecordComment[]>([])
   const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({})
   const [sendingCommentId, setSendingCommentId] = useState<number | null>(null)
   const [loading,  setLoading]  = useState(false)
   const [singleEditRec, setSingleEditRec] = useState<Rec | null>(null) // 개별 수정 대상 (반관리·수업기록 공용 모달로 열림)
-  const [smsModal, setSmsModal] = useState(false)
-  const [smsTarget,setSmsTarget]= useState<'all' | number>('all')
-  const [sending,  setSending]  = useState(false)
   const [pushing,  setPushing]  = useState(false)
   const [pushingOneId, setPushingOneId] = useState<number | null>(null)
   const [notif,    setNotif]    = useState<{ msg: string; ok: boolean } | null>(null)
@@ -240,13 +130,13 @@ export default function RecordsPage() {
     const last = new Date(llYear, llMonth + 1, 0).getDate()
     const to   = `${ym}-${String(last).padStart(2, '0')}`
     const { data } = await supabase.from('records').select('date').eq('is_draft', false).gte('date', from).lte('date', to)
-    setRecDates(new Set((data ?? []).map((r: any) => r.date)))
+    setRecDates(new Set((data ?? []).map(r => r.date)))
 
     const { data: withComment } = await supabase.from('records')
       .select('date,parent_comment,parent_comment_at,parent_comment_read_at')
       .eq('is_draft', false).not('parent_comment', 'is', null)
       .gte('date', from).lte('date', to)
-    setUnreadCommentDates(new Set((withComment ?? []).filter(isUnreadParentComment).map((r: any) => r.date)))
+    setUnreadCommentDates(new Set((withComment ?? []).filter(isUnreadParentComment).map(r => r.date)))
   }
 
   async function fetchDayRecs() {
@@ -270,8 +160,8 @@ export default function RecordsPage() {
     ])
 
     // 3. tests 조회 (시험명)
-    const testIds = [...new Set((items ?? []).map((x: any) => x.test_id))]
-    let testsMap: Record<number, string> = {}
+    const testIds = [...new Set((items ?? []).map(x => x.test_id))]
+    const testsMap: Record<number, string> = {}
     if (testIds.length > 0) {
       const { data: testsData } = await supabase
         .from('tests')
@@ -281,7 +171,8 @@ export default function RecordsPage() {
     }
 
     // 4. record_id별로 그룹화
-    const itemsByRecord: Record<number, any[]> = {}
+    type TestItemRow = { id: number; test_id: number; t_total: number; t_cor: number; t_score: number; tests: { name: string } | null }
+    const itemsByRecord: Record<number, TestItemRow[]> = {}
     for (const item of (items ?? [])) {
       if (!itemsByRecord[item.record_id]) itemsByRecord[item.record_id] = []
       itemsByRecord[item.record_id].push({
@@ -365,6 +256,13 @@ export default function RecordsPage() {
     setSelDate(dt)
     const [y, m] = dt.split('-').map(Number)
     if (y !== llYear || m !== llMonth + 1) { setLlYear(y); setLlMonth(m - 1) }
+  }
+  function toggleClassFilter(id: number) {
+    setSelectedClassIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
   }
 
   async function delRec(id: number) {
@@ -457,45 +355,11 @@ export default function RecordsPage() {
     }
   }
 
-  // ── 문자 발송 (주석처리 — 푸시 알림으로 대체됨) ──
-  async function sendSms(target: 'all' | number) {
-    setSending(true)
-    const targets = target === 'all' ? dayRecs : dayRecs.filter(r => r.student_id === target)
-
-    const messagesRaw = await Promise.all(targets.map(async r => {
-      const stu = students.find(s => s.id === r.student_id)
-      if (!stu?.parent_phone) return null
-      const testItems: TestItem[] = (r.record_test_items ?? []).map(ti => ({
-        testId:   ti.test_id,
-        testName: ti.tests?.name ?? '',
-        tTotal:   ti.t_total,
-        tCor:     ti.t_cor,
-        tScore:   ti.t_score,
-      }))
-      const text = await buildSms(stu.name, r, testItems)
-      return { to: stu.parent_phone, text }
-    }))
-    const messages = messagesRaw.filter(Boolean)
-
-    if (!messages.length) { toast('발송 가능한 학부모 연락처가 없습니다.', false); setSending(false); setSmsModal(false); return }
-    try {
-      const res = await fetch('/api/sms', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages }) })
-      const result = await res.json()
-      if (!res.ok) throw new Error(result.error ?? '발송 실패')
-      const ids = targets.map(r => r.id)
-      await supabase.from('records').update({ sms_sent: true, sms_sent_at: new Date().toISOString() }).in('id', ids)
-      toast(`${messages.length}명에게 문자 발송 완료`)
-      await fetchDayRecs()
-    } catch (e: any) { toast('발송 실패: ' + e.message, false) }
-    setSending(false); setSmsModal(false)
-  }
-
   const dim   = new Date(llYear, llMonth + 1, 0).getDate()
   const fd    = new Date(llYear, llMonth, 1).getDay()
   const pmd   = new Date(llYear, llMonth, 0).getDate()
   const trail = (7 - ((fd + dim) % 7)) % 7
   const today = todayStr()
-  // const hasUnsent = dayRecs.some(r => !r.sms_sent)
 
   // 반별 그룹핑 (달력 날짜 기준)
   function recClsId(r: Rec) { return r.class_id ?? (csMap[r.student_id] ?? null) }
@@ -530,8 +394,11 @@ export default function RecordsPage() {
   })()
 
   const bulkStatusReady = bulkSendState?.date === selDate && !bulkSendState.error
-  const unsentGroups = bulkStatusReady ? clsGroups.filter(group => !bulkSendState.clicked.has(recClsId(group.recs[0]) ?? 0)) : []
-  const visibleGroups = unsentOnly ? unsentGroups : clsGroups
+  const classFilteredGroups = selectedClassIds.size === 0
+    ? clsGroups
+    : clsGroups.filter(group => selectedClassIds.has(group.cls?.id ?? 0))
+  const unsentGroups = bulkStatusReady ? classFilteredGroups.filter(group => !bulkSendState.clicked.has(recClsId(group.recs[0]) ?? 0)) : []
+  const visibleGroups = unsentOnly ? unsentGroups : classFilteredGroups
 
   const css = `
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
@@ -603,13 +470,6 @@ export default function RecordsPage() {
           <h1 style={{ fontSize: mobileMode ? 17 : 21, fontWeight: 700, color: tx }}>수업 기록</h1>
           {!mobileMode && <p style={{ fontSize: 13, color: tx2, marginTop: 4 }}>날짜를 선택하면 해당 날짜에 작성된 수업 기록을 확인할 수 있습니다</p>}
         </div>
-        {/* 문자 발송 버튼 주석처리 — 반별 푸시 발송으로 대체
-        {dayRecs.length > 0 && (
-          <button className="bgrn" onClick={() => { setSmsTarget('all'); setSmsModal(true) }}>
-            일괄 문자 발송
-          </button>
-        )}
-        */}
       </div>
 
       {/* 2단 레이아웃 (모바일에서는 위아래로) */}
@@ -666,6 +526,34 @@ export default function RecordsPage() {
             <span className="badge" style={{ background: navyM, color: navy }}>{dayRecs.length}건</span>
           </div>
 
+          {!loading && clsGroups.length > 1 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+              {clsGroups.map(({ cls: clsG, recs: clsRecs }) => {
+                const key = clsG?.id ?? 0
+                const active = selectedClassIds.has(key)
+                const hasComment = clsRecs.some(isHighlighted)
+                return (
+                  <button
+                    key={key}
+                    className="class-chip"
+                    aria-pressed={active}
+                    onClick={() => toggleClassFilter(key)}
+                    style={{
+                      padding: '6px 13px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                      border: `1.5px solid ${active ? navy : hasComment ? 'var(--ui-info)' : bd}`,
+                      background: active ? navy : hasComment ? 'var(--ui-info-bg)' : '#fff',
+                      color: active ? '#fff' : hasComment ? 'var(--ui-info)' : tx2,
+                    }}>
+                    {clsG?.name ?? '반 미지정'}
+                  </button>
+                )
+              })}
+              {selectedClassIds.size > 0 && (
+                <button className="bout" style={{ borderRadius: 20 }} onClick={() => setSelectedClassIds(new Set())}>전체 보기</button>
+              )}
+            </div>
+          )}
+
           {!loading && dayRecs.length > 0 && (
             <div style={{ marginBottom: 16 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: navy, cursor: 'pointer' }}>
@@ -686,6 +574,7 @@ export default function RecordsPage() {
           ) : (
             <div>
             {unsentOnly && bulkStatusReady && visibleGroups.length === 0 && <p style={{ textAlign: 'center', padding: '24px 0', color: tx3, fontSize: 13 }}>선택한 날짜의 모든 반에서 일괄 발송을 실행했습니다.</p>}
+            {!unsentOnly && selectedClassIds.size > 0 && visibleGroups.length === 0 && <p style={{ textAlign: 'center', padding: '24px 0', color: tx3, fontSize: 13 }}>선택한 반의 수업 기록이 없습니다.</p>}
             {visibleGroups.map(({ cls: clsG, recs: clsRecs }) => {
               const clsAlreadySent = bulkSendState?.clicked.has(recClsId(clsRecs[0]) ?? 0) ?? false
               return (
@@ -831,7 +720,7 @@ export default function RecordsPage() {
                 {tItems.length > 0 && tItems.map((ti, idx) => {
                   const pct = ti.t_total > 0 ? Math.round(ti.t_cor / ti.t_total * 100) : 0
                   const sc  = ti.t_score ?? 0
-                  return <TestResultCard key={idx} testName={ti.tests?.name ?? '시험'} score={sc} cor={ti.t_cor} total={ti.t_total} pct={pct} testId={ti.test_id} />
+                  return <AdminTestResultCard key={idx} testName={ti.tests?.name ?? '시험'} score={sc} cor={ti.t_cor} total={ti.t_total} pct={pct} testId={ti.test_id} />
                 })}
 
                 {/* 피드백 */}
@@ -937,117 +826,8 @@ export default function RecordsPage() {
         />
       )}
 
-      {/* ══ 문자 발송 모달 (주석처리 — 푸시 알림으로 대체됨) ══ */}
-      {false && smsModal && (
-        <div onClick={() => setSmsModal(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.42)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 12, width: 480, maxWidth: '100%', maxHeight: '80vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
-            <div style={{ padding: '18px 22px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 15, fontWeight: 600, color: tx }}>{smsTarget === 'all' ? '일괄 문자 발송' : '개별 문자 발송'}</span>
-              <button onClick={() => setSmsModal(false)} style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: bg, cursor: 'pointer', fontSize: 17, color: tx2 }}>×</button>
-            </div>
-            <div style={{ padding: '16px 22px' }}>
-              {(smsTarget === 'all' ? dayRecs : dayRecs.filter(r => r.student_id === smsTarget)).map(r => {
-                const stu = students.find(s => s.id === r.student_id)
-                return (
-                  <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: `1px solid ${bd}` }}>
-                    <div style={{ width: 30, height: 30, borderRadius: '50%', background: navyM, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: navy }}>{stu?.name[0]}</div>
-                    <div style={{ flex: 1 }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: tx }}>{stu?.name}</span>
-                      <span style={{ fontSize: 12, color: tx3, marginLeft: 8 }}>→ {stu?.parent_phone || '번호 없음'}</span>
-                    </div>
-                    {!stu?.parent_phone && <span className="badge" style={{ background: rbg, color: re }}>번호없음</span>}
-                  </div>
-                )
-              })}
-            </div>
-            <div style={{ padding: '0 22px 18px', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button onClick={() => setSmsModal(false)} style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, border: `1px solid ${bd}`, background: '#fff', cursor: 'pointer', color: tx2, fontFamily: 'inherit' }}>취소</button>
-              <button className="bgrn" onClick={() => sendSms(smsTarget)} disabled={sending} style={{ opacity: sending ? 0.7 : 1 }}>{sending ? '발송 중...' : '발송하기'}</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
 
 // ── 시험 결과 카드: 점수 강조형 (통계 페이지와 동일 디자인) ──
-function TestResultCard({ testName, score, cor, total, pct, testId }: {
-  testName: string; score: number; cor: number; total: number; pct: number; testId: number
-}) {
-  const [stats, setStats] = useState<{ avg: number; max: number; rank: number; totalCnt: number } | null>(null)
-  const navy='var(--ui-primary)', tx='var(--ui-text)', tx2='var(--ui-text-2)', tx3='var(--ui-text-3)', bd='var(--ui-border)'
-  const gr='var(--ui-success)', re='var(--ui-danger)', gbg='var(--ui-success-bg)'
-
-  useEffect(() => {
-    async function load() {
-      const { data: sc } = await supabase.from('test_scores').select('student_id, score').eq('test_id', testId)
-      let list = (sc??[]).map(s=>({student_id:s.student_id, score:s.score}))
-
-      if (list.length === 0) {
-        const { data: items } = await supabase.from('record_test_items').select('record_id, t_score, t_cor, t_total').eq('test_id', testId)
-        if (items && items.length > 0) {
-          const recIds = items.map(x=>x.record_id)
-          const { data: recsData } = await supabase.from('records').select('id, student_id').in('id', recIds)
-          const recMap: Record<number, number> = {}
-          for (const r of (recsData??[])) recMap[r.id] = r.student_id
-          const byStudent = new Map<number, number>()
-          for (const item of items) {
-            const sid = recMap[item.record_id]
-            if (!sid) continue
-            const s = item.t_score ? item.t_score : (item.t_total>0 ? Math.round(item.t_cor/item.t_total*100) : 0)
-            if (!byStudent.has(sid) || s > byStudent.get(sid)!) byStudent.set(sid, s)
-          }
-          list = [...byStudent.entries()].map(([student_id, score])=>({student_id, score}))
-        }
-      }
-      if (list.length === 0) return
-      list.sort((a,b)=>b.score-a.score)
-      const avg = Math.round(list.reduce((a,b)=>a+b.score,0)/list.length)
-      const max = list[0].score
-      // 내 점수와 일치하는 항목 기준으로 순위 추정 (student_id 모르므로 score로 근사)
-      const rankIdx = list.findIndex(s=>s.score===score)
-      setStats({ avg, max, rank: rankIdx>=0?rankIdx+1:0, totalCnt: list.length })
-    }
-    load()
-  }, [testId, score])
-
-  const diff = stats ? score - stats.avg : null
-
-  return (
-    <div style={{ border: `1px solid ${bd}`, borderRadius: 10, padding: 12, marginBottom: 8, background: '#fff' }}>
-      <p style={{ fontSize: 12, fontWeight: 700, color: tx, margin: '0 0 8px' }}>{testName}</p>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, marginBottom: 2 }}>
-        <span style={{ fontSize: 26, fontWeight: 700, color: navy, lineHeight: 1 }}>{score}</span>
-        <span style={{ fontSize: 13, color: tx2 }}>점</span>
-        {stats && stats.totalCnt > 0 && (
-          <span style={{ marginLeft: 'auto', background: gbg, color: gr, fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 20 }}>
-            {stats.rank}등 / {stats.totalCnt}명
-          </span>
-        )}
-      </div>
-      <p style={{ fontSize: 11, color: tx2, margin: '0 0 10px' }}>{cor}/{total}문항 정답 (정답률 {pct}%)</p>
-
-      <div style={{ height: 1, background: bd, marginBottom: 8 }} />
-
-      <div style={{ display: 'flex', alignItems: 'center' }}>
-        <div style={{ flex: 1, textAlign: 'center' }}>
-          <p style={{ fontSize: 10, color: tx3, margin: '0 0 3px' }}>시험평균</p>
-          <p style={{ fontSize: 14, fontWeight: 700, color: stats?tx:tx3, margin: 0 }}>{stats?`${stats.avg}점`:'—'}</p>
-        </div>
-        <div style={{ width: 1, height: 26, background: bd }} />
-        <div style={{ flex: 1, textAlign: 'center' }}>
-          <p style={{ fontSize: 10, color: tx3, margin: '0 0 3px' }}>최고점</p>
-          <p style={{ fontSize: 14, fontWeight: 700, color: stats?tx:tx3, margin: 0 }}>{stats?`${stats.max}점`:'—'}</p>
-        </div>
-        <div style={{ width: 1, height: 26, background: bd }} />
-        <div style={{ flex: 1, textAlign: 'center' }}>
-          <p style={{ fontSize: 10, color: tx3, margin: '0 0 3px' }}>평균과 차이</p>
-          <p style={{ fontSize: 14, fontWeight: 700, color: diff==null?tx3:diff>=0?gr:re, margin: 0 }}>
-            {diff==null?'—':(diff>0?'+':'')+diff+'점'}
-          </p>
-        </div>
-      </div>
-    </div>
-  )
-}

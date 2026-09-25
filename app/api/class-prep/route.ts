@@ -169,7 +169,7 @@ export async function POST(req: NextRequest) {
         'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`,
       },
     })
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message ?? String(e) }, { status: 500 })
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 })
   }
 }

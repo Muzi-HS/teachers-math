@@ -67,7 +67,7 @@ export function useDraftProtection<T>(key: string, value: T, enabled: boolean, b
     const timer = setTimeout(persist, 350)
     return () => clearTimeout(timer)
     // The snapshot is serialized so object identity never restarts the timer.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [key, enabled, serialized, recoverable])
 
   useEffect(() => {

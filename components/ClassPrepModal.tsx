@@ -179,8 +179,8 @@ export default function ClassPrepModal({
       toast(`${checkedStudents.length}명 안내문 생성 완료`)
       if (checkedStudents.length === students.length) protection.markSaved()
       else protection.persist()
-    } catch (e: any) {
-      toast('생성 실패: ' + e.message, false)
+    } catch (e) {
+      toast('생성 실패: ' + (e instanceof Error ? e.message : String(e)), false)
     } finally {
       setGenerating(false)
     }
@@ -216,7 +216,7 @@ export default function ClassPrepModal({
           )}
 
           <p style={{ fontSize: 12, color: tx3, marginBottom: 14 }}>
-            학생을 선택하고 오늘의 진도를 입력하면, 학생별 "오늘의 공부" 안내문(엑셀, 원본 양식 그대로)이
+            학생을 선택하고 오늘의 진도를 입력하면, 학생별 &quot;오늘의 공부&quot; 안내문(엑셀, 원본 양식 그대로)이
             시트 1개에 학생별 페이지로 담겨 파일 1개로 다운로드됩니다. (인쇄 시 학생별로 페이지가 나뉩니다)
             입력한 진도는 오늘 날짜의 수업기록 작성 시 수업 내용(진도)에 자동으로 반영됩니다.
           </p>

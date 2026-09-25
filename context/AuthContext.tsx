@@ -14,12 +14,14 @@ type ParentSession = {
   parentId: number
   phone: string
   children: { id: number; name: string; birth_year: number; school: string }[]
+  sessionToken: string
 }
 
 type StudentSession = {
   studentId: number
   phone: string
   name: string
+  sessionToken: string
 }
 
 type AuthContextType = {
@@ -97,13 +99,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       // 2. 학부모 세션 확인 (sessionStorage, 없으면 자동 로그인 localStorage에서 복원)
+      // sessionToken이 없는 옛 세션(이번 배포 이전 로그인)은 새 게이트웨이 함수를 호출할 수
+      // 없으므로, 빈 화면 대신 로그아웃 상태로 되돌려 다시 로그인하도록 한다.
       try {
         const raw = restoreAutoLogin('parent_auto_login', 'parent_session')
         if (raw) {
           const parsed = JSON.parse(raw)
-          setParent(parsed)
-          setLoading(false)
-          return
+          if (parsed?.sessionToken) {
+            setParent(parsed)
+            setLoading(false)
+            return
+          }
+          sessionStorage.removeItem('parent_session')
+          localStorage.removeItem('parent_auto_login')
         }
       } catch {}
 
@@ -112,7 +120,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const raw = restoreAutoLogin('student_auto_login', 'student_session')
         if (raw) {
           const parsed = JSON.parse(raw)
-          setStudent(parsed)
+          if (parsed?.sessionToken) {
+            setStudent(parsed)
+          } else {
+            sessionStorage.removeItem('student_session')
+            localStorage.removeItem('student_auto_login')
+          }
         }
       } catch {}
 

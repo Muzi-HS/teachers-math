@@ -71,7 +71,7 @@ serve(async (req) => {
       // 학생이 스스로 챙기라는 용도라 학부모 쪽에는 보내지 않는다.
       const body = `${cls.start} ${cls.name} 수업이 곧 시작합니다!`
 
-      const pushes: Promise<any>[] = studentIds.map(studentId =>
+      const pushes: Promise<Response | void>[] = studentIds.map(studentId =>
         fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ANON_KEY}` },

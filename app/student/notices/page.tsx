@@ -17,20 +17,22 @@ export default function StudentNotices() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!student?.studentId) return
-    load(student.studentId)
-  }, [student?.studentId])
+    if (!student?.studentId || !student?.sessionToken) return
+    load(student.studentId, student.sessionToken)
+  }, [student?.studentId, student?.sessionToken])
 
-  async function load(studentId: number) {
+  async function load(studentId: number, token: string) {
     setLoading(true)
-    const { data: csRows } = await supabase.from('class_students').select('class_id').eq('student_id', studentId)
-    const classIds = [...new Set((csRows ?? []).map(r => r.class_id))]
+    const { data: csRows } = await supabase.rpc('client_class_students', { p_token: token, p_student_id: studentId })
+    const classIds = [...new Set(((csRows ?? []) as { class_id: number }[]).map(r => r.class_id))]
     if (classIds.length === 0) { setNotices([]); setLoading(false); return }
 
-    const [{ data: classesData }, { data: noticesData }] = await Promise.all([
+    type ClassNoticeRow = { id: number; class_id: number; content: string; created_at: string }
+    const [{ data: classesData }, { data: noticesRaw }] = await Promise.all([
       supabase.from('classes').select('id,name').in('id', classIds),
-      supabase.from('class_notices').select('id,class_id,content,created_at').in('class_id', classIds).order('created_at', { ascending: true }),
+      supabase.rpc('client_class_notices', { p_token: token, p_class_ids: classIds }),
     ])
+    const noticesData = noticesRaw as ClassNoticeRow[] | null
     const classNames: Record<number, string> = {}
     for (const c of (classesData ?? [])) classNames[c.id] = c.name
 

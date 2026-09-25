@@ -4,7 +4,6 @@ import { supabase } from '@/lib/supabase'
 import { useMobileMode } from '@/context/MobileModeContext'
 import { IconCoupon } from '@/components/icons'
 
-const navy = 'var(--ui-primary)', gold = 'var(--ui-primary)'
 const bg = 'var(--ui-bg)', bd = 'var(--ui-border)'
 const tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)'
 const re = 'var(--ui-danger)', gr = 'var(--ui-success)', gbg = 'var(--ui-success-bg)'

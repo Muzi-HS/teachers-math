@@ -80,7 +80,7 @@ serve(async (req) => {
         .from('parent_students')
         .select('parent_id')
         .in('student_id', student_ids)
-      parentIds = [...new Set((ps ?? []).map((r: any) => r.parent_id))]
+      parentIds = [...new Set((ps ?? []).map((r: { parent_id: number }) => r.parent_id))]
       if (parentIds.length === 0) {
         return new Response(JSON.stringify({ message: '대상 학부모 없음' }), {
           status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }

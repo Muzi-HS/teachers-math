@@ -3,11 +3,11 @@ export type Role = 'admin' | 'teacher' | 'assistant' | 'parent' | 'student'
 export const can = {
   // 공지사항 — 전원 열람, 작성/수정/삭제는 admin만
   writeNotice:      (role: Role) => role === 'admin',
-  readNotice:       (role: Role) => true,
+  readNotice:       () => true,
 
   // 학원 일정 — 전원 열람, 작성/수정/삭제는 admin만
   writeSchedule:    (role: Role) => role === 'admin',
-  readSchedule:     (role: Role) => true,
+  readSchedule:     () => true,
 
   // 학생 정보
   // - admin: 전체 정보(연락처 포함) 열람
@@ -28,7 +28,7 @@ export const can = {
   // 수업 기록 작성/수정/삭제 — 반관리 화면 내에서 admin, teacher, assistant 모두 가능
   writeClassRecords:(role: Role) => role === 'admin' || role === 'teacher' || role === 'assistant',
 
-  // 수업기록 메뉴(문자 발송 포함) 자체 접근 — admin, teacher만. assistant(조교)는 기존 teacher
+  // 수업기록 메뉴 자체 접근 — admin, teacher만. assistant(조교)는 기존 teacher
   // 권한과 동일하게 메뉴 자체가 안 보임
   viewRecordsMenu:  (role: Role) => role === 'admin' || role === 'teacher',
 
@@ -37,9 +37,6 @@ export const can = {
 
   // 통계 — admin, teacher, assistant 모두 전체 기능
   viewStats:        (role: Role) => role === 'admin' || role === 'teacher' || role === 'assistant',
-
-  // 문자 발송 — admin만
-  sendSms:          (role: Role) => role === 'admin',
 
   // 선생님 계정 관리 — admin만
   manageTeachers:   (role: Role) => role === 'admin',

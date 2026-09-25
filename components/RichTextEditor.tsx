@@ -21,13 +21,12 @@ export default function RichTextEditor({ value, onChange, onImageUpload, placeho
 
   useEffect(() => {
     let cancelled = false
-    let quill: any = null
 
     async function init() {
       const { default: Quill } = await import('quill')
       if (cancelled || !containerRef.current) return
 
-      quill = new Quill(containerRef.current, {
+      const editor = new Quill(containerRef.current, {
         theme: 'snow',
         placeholder: placeholder ?? '',
         modules: {
@@ -42,15 +41,15 @@ export default function RichTextEditor({ value, onChange, onImageUpload, placeho
         },
       })
 
-      if (value) quill.clipboard.dangerouslyPasteHTML(value)
+      if (value) editor.clipboard.dangerouslyPasteHTML(value)
 
-      quill.on('text-change', () => {
-        const html = quill.root.innerHTML
+      editor.on('text-change', () => {
+        const html = editor.root.innerHTML
         onChangeRef.current(html === '<p><br></p>' ? '' : html)
       })
 
       // 이미지 버튼 — base64로 본문에 박아넣지 않고 Storage에 업로드 후 URL을 삽입
-      const toolbar = quill.getModule('toolbar')
+      const toolbar = editor.getModule('toolbar') as { addHandler: (name: string, fn: () => void) => void }
       toolbar.addHandler('image', () => {
         const input = document.createElement('input')
         input.type = 'file'
@@ -60,9 +59,9 @@ export default function RichTextEditor({ value, onChange, onImageUpload, placeho
           if (!file) return
           const url = await onImageUploadRef.current(file)
           if (!url) return
-          const range = quill.getSelection(true) ?? { index: quill.getLength(), length: 0 }
-          quill.insertEmbed(range.index, 'image', url, 'user')
-          quill.setSelection(range.index + 1, 0)
+          const range = editor.getSelection(true) ?? { index: editor.getLength(), length: 0 }
+          editor.insertEmbed(range.index, 'image', url, 'user')
+          editor.setSelection(range.index + 1, 0)
         }
         input.click()
       })

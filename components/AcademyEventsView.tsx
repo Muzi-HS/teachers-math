@@ -25,7 +25,7 @@ const DOW = ['일','월','화','수','목','금','토']
 export default function AcademyEventsView() {
   const [events,   setEvents]   = useState<Event_[]>([])
   const [loading,  setLoading]  = useState(true)
-  const [today,    setToday]    = useState(() => new Date())
+  const [today] = useState(() => new Date())
   const [curYear,  setCurYear]  = useState(() => new Date().getFullYear())
   const [curMonth, setCurMonth] = useState(() => new Date().getMonth())
   const [selDate,  setSelDate]  = useState<string | null>(null)

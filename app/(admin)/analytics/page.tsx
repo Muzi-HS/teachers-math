@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart, Bar } from 'recharts'
 import { supabase } from '@/lib/supabase'
-import { kstDateStr, kstDateOf } from '@/lib/kst'
+import { EMPTY_ANALYTICS, type AnalyticsSummary } from '@/lib/analytics'
 import { useMobileMode } from '@/context/MobileModeContext'
 import { IconUsers, IconChat, IconClock } from '@/components/icons'
 
@@ -13,8 +13,6 @@ const accent = 'var(--ui-info)'
 const bd = 'var(--ui-border)'
 const tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)'
 
-type Visit = { visited_at: string; is_mobile: boolean | null }
-type Consult = { created_at: string }
 
 function StatCard({ label, value, unit, icon }: { label: string; value: string | number; unit?: string; icon?: React.ReactNode }) {
   return (
@@ -31,79 +29,28 @@ export default function AnalyticsPage() {
   const { mobileMode } = useMobileMode()
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
-  const [visits, setVisits] = useState<Visit[]>([])
-  const [consults, setConsults] = useState<Consult[]>([])
-  const [unreadInquiries, setUnreadInquiries] = useState(0)
-  const [pendingTeachers, setPendingTeachers] = useState(0)
+  const [summary, setSummary] = useState<AnalyticsSummary>(EMPTY_ANALYTICS)
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      try {
+        const { data, error } = await supabase.rpc('admin_analytics_summary')
+        if (cancelled) return
+        if (error || !data) { setLoadError(true); return }
+        setSummary(data as AnalyticsSummary)
+      } catch {
+        if (!cancelled) setLoadError(true)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [])
 
-  async function load() {
-    setLoading(true)
-    setLoadError(false)
-    const since = new Date(Date.now() - 366 * 24 * 60 * 60 * 1000).toISOString() // 최근 1년
-
-    const [visitsRes, consultRes, inqRes, teacherRes] = await Promise.all([
-      supabase.from('site_visits').select('visited_at, is_mobile').gte('visited_at', since),
-      supabase.from('consultation_requests').select('created_at').gte('created_at', since),
-      supabase.from('inquiry_messages').select('id', { count: 'exact', head: true }).eq('sender_type', 'parent').eq('is_read', false),
-      supabase.from('teachers').select('id', { count: 'exact', head: true }).eq('approved', false),
-    ])
-
-    if (visitsRes.error) { setLoadError(true); setLoading(false); return }
-
-    setVisits((visitsRes.data ?? []) as Visit[])
-    setConsults((consultRes.data ?? []) as Consult[])
-    setUnreadInquiries(inqRes.count ?? 0)
-    setPendingTeachers(teacherRes.count ?? 0)
-    setLoading(false)
-  }
-
-  const today = kstDateStr()
-  const monthPrefix = today.slice(0, 7)
-
-  const todayCount = visits.filter(v => kstDateOf(v.visited_at) === today).length
-  const monthCount = visits.filter(v => kstDateOf(v.visited_at).startsWith(monthPrefix)).length
-  const consultThisMonth = consults.filter(c => kstDateOf(c.created_at).startsWith(monthPrefix)).length
-  const consultTotal = consults.length
-  const mobileCount = visits.filter(v => v.is_mobile).length
-  const mobilePct = visits.length ? Math.round((mobileCount / visits.length) * 100) : 0
-
-  // 최근 14일 일별 방문 추이
-  const dayBuckets: Record<string, number> = {}
-  for (let i = 13; i >= 0; i--) {
-    const d = kstDateOf(new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString())
-    dayBuckets[d] = 0
-  }
-  for (const v of visits) {
-    const d = kstDateOf(v.visited_at)
-    if (d in dayBuckets) dayBuckets[d]++
-  }
-  const dailyChartData = Object.entries(dayBuckets).map(([date, count]) => ({ date: date.slice(5), count }))
-
-  // 최근 12개월 방문량 + 상담 신청량 (한 그래프)
-  const monthKeys: string[] = []
-  for (let i = 11; i >= 0; i--) {
-    const d = new Date()
-    d.setMonth(d.getMonth() - i)
-    monthKeys.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`)
-  }
-  const monthlyVisits: Record<string, number> = {}
-  const monthlyConsults: Record<string, number> = {}
-  for (const k of monthKeys) { monthlyVisits[k] = 0; monthlyConsults[k] = 0 }
-  for (const v of visits) {
-    const m = kstDateOf(v.visited_at).slice(0, 7)
-    if (m in monthlyVisits) monthlyVisits[m]++
-  }
-  for (const c of consults) {
-    const m = kstDateOf(c.created_at).slice(0, 7)
-    if (m in monthlyConsults) monthlyConsults[m]++
-  }
-  const monthlyChartData = monthKeys.map(k => ({
-    month: `${k.slice(2, 4)}.${k.slice(5, 7)}`,
-    visits: monthlyVisits[k],
-    consults: monthlyConsults[k],
-  }))
+  const { totalVisits, todayCount, monthCount, consultThisMonth, consultTotal,
+    mobilePct, unreadInquiries, pendingTeachers, dailyChartData, monthlyChartData } = summary
 
   return (
     <div style={{ padding: mobileMode ? '16px 14px 88px' : '28px 32px', fontFamily: "'Noto Sans KR',sans-serif" }}>
@@ -119,7 +66,7 @@ export default function AnalyticsPage() {
         <p style={{ fontSize: 13, color: tx3, textAlign: 'center', padding: '40px 0' }}>불러오는 중...</p>
       ) : loadError ? (
         <p role="alert" style={{ fontSize: 13, color: 'var(--ui-danger)', textAlign: 'center', padding: '40px 0' }}>
-          데이터를 불러오지 못했습니다. site_visits_migration.sql이 실행됐는지 확인해주세요.
+          통계를 불러오지 못했습니다. 잠시 후 새로고침해 주세요.
         </p>
       ) : (
         <>
@@ -141,7 +88,7 @@ export default function AnalyticsPage() {
           <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: 18, marginBottom: 12, boxShadow: '0 1px 4px rgba(0,0,0,.06)' }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: tx, marginBottom: 4 }}>최근 12개월 방문량 · 상담 신청량</div>
             <p style={{ fontSize: 11.5, color: tx3, margin: '0 0 12px' }}>월별 홈페이지 방문 수(막대)와 상담 신청 수(선)를 함께 볼 수 있습니다</p>
-            {visits.length === 0 && consults.length === 0 ? (
+            {totalVisits === 0 && consultTotal === 0 ? (
               <p style={{ fontSize: 13, color: tx3, textAlign: 'center', padding: '30px 0' }}>아직 기록된 데이터가 없습니다</p>
             ) : (
               <ResponsiveContainer width="100%" height={260}>
@@ -160,7 +107,7 @@ export default function AnalyticsPage() {
 
           <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: 18, boxShadow: '0 1px 4px rgba(0,0,0,.06)' }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: tx, marginBottom: 12 }}>최근 14일 방문 추이</div>
-            {visits.length === 0 ? (
+            {totalVisits === 0 ? (
               <p style={{ fontSize: 13, color: tx3, textAlign: 'center', padding: '30px 0' }}>아직 기록된 방문이 없습니다</p>
             ) : (
               <ResponsiveContainer width="100%" height={220}>
@@ -168,7 +115,7 @@ export default function AnalyticsPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke={bd} />
                   <XAxis dataKey="date" tick={{ fontSize: 10, fill: tx3 }} axisLine={{ stroke: bd }} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: tx3 }} axisLine={{ stroke: bd }} />
-                  <Tooltip formatter={(v: any) => v + '회'} contentStyle={{ fontSize: 12, borderRadius: 8, border: `1px solid ${bd}` }} />
+                  <Tooltip formatter={(v: unknown) => `${v}회`} contentStyle={{ fontSize: 12, borderRadius: 8, border: `1px solid ${bd}` }} />
                   <Line type="monotone" dataKey="count" stroke={navy} strokeWidth={2.5} dot={{ r: 3, fill: navy }} />
                 </LineChart>
               </ResponsiveContainer>

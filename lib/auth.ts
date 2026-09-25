@@ -31,21 +31,17 @@ export async function teacherLogin(email: string, password: string) {
 
 type ParentChild = { id: number; name: string; birth_year: number; school: string }
 
-// ── 학부모 전화번호 확인 (1단계) — 등록 여부만 확인하고, PIN 값은 다루지 않는다 ──
+// ── 학부모 전화번호 확인 (1단계) — 등록 여부만 확인하고, PIN 값은 다루지 않는다.
+//    parents 테이블을 직접 조회하지 않고 RPC를 거친다 — 필터 없이 테이블 전체를
+//    가져가는 것 자체를 막기 위해서다(정확히 일치하는 1건만 서버가 돌려준다). ──
 export async function parentLookup(phone: string) {
-  const normalized = phone.replace(/-/g, '').replace(/\s/g, '')
+  const { data, error } = await supabase.rpc('lookup_parent_by_phone', { p_phone: phone }).single()
 
-  const { data: parent, error } = await supabase
-    .from('parents')
-    .select('id, phone')
-    .eq('phone', normalized)
-    .single()
-
-  if (error || !parent) {
+  if (error || !data) {
     throw new Error('등록되지 않은 전화번호입니다. 담당 선생님에게 문의하세요.')
   }
-
-  return { parentId: parent.id, phone: parent.phone }
+  const row = data as { id: number; phone: string }
+  return { parentId: row.id, phone: row.phone }
 }
 
 // ── 학부모 PIN 검증 (2단계) — PIN 비교는 DB 함수(verify_parent_pin)가 서버에서 수행하고,
@@ -54,12 +50,13 @@ export async function parentLoginWithPin(phone: string, pin: string) {
   const normalized = phone.replace(/-/g, '').replace(/\s/g, '')
   const { data, error } = await supabase.rpc('verify_parent_pin', { p_phone: normalized, p_pin: pin }).single()
   if (error) throw new Error(error.message || 'PIN이 올바르지 않습니다.')
-  const row = data as { parent_id: number; phone: string; is_default_pin: boolean; children: ParentChild[] }
+  const row = data as { parent_id: number; phone: string; is_default_pin: boolean; children: ParentChild[]; session_token: string }
   return {
     parentId: row.parent_id,
     phone: row.phone,
     children: row.children,
     isDefaultPin: row.is_default_pin,
+    sessionToken: row.session_token,
   }
 }
 
@@ -71,19 +68,13 @@ export async function updateParentPin(parentId: number, oldPin: string, newPin: 
 
 // ── 학생 전화번호 확인 (1단계) — 학부모 로그인과 동일한 방식, students.phone 기준 ──
 export async function studentLookup(phone: string) {
-  const normalized = phone.replace(/-/g, '').replace(/\s/g, '')
+  const { data, error } = await supabase.rpc('lookup_student_by_phone', { p_phone: phone }).maybeSingle()
 
-  const { data: student, error } = await supabase
-    .from('students')
-    .select('id, name, phone')
-    .eq('phone', normalized)
-    .maybeSingle()
-
-  if (error || !student) {
+  if (error || !data) {
     throw new Error('등록되지 않은 전화번호입니다. 담당 선생님에게 문의하세요.')
   }
-
-  return { studentId: student.id, name: student.name, phone: student.phone }
+  const row = data as { id: number; name: string; phone: string }
+  return { studentId: row.id, name: row.name, phone: row.phone }
 }
 
 // ── 학생 PIN 검증 (2단계) ──
@@ -91,7 +82,7 @@ export async function studentLoginWithPin(phone: string, pin: string) {
   const normalized = phone.replace(/-/g, '').replace(/\s/g, '')
   const { data, error } = await supabase.rpc('verify_student_pin', { p_phone: normalized, p_pin: pin }).single()
   if (error) throw new Error(error.message || 'PIN이 올바르지 않습니다.')
-  const row = data as { student_id: number; name: string; phone: string; is_default_pin: boolean }
+  const row = data as { student_id: number; name: string; phone: string; is_default_pin: boolean; session_token: string }
   // 기존 학생 로그인은 유지하고, 시험 제출용 서버 검증 세션도 발급한다.
   if (!row.is_default_pin) await fetch('/api/student-tests', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -102,6 +93,7 @@ export async function studentLoginWithPin(phone: string, pin: string) {
     name: row.name,
     phone: row.phone,
     isDefaultPin: row.is_default_pin,
+    sessionToken: row.session_token,
   }
 }
 
@@ -133,7 +125,10 @@ export async function parentLogin(phone: string) {
     throw new Error('등록되지 않은 전화번호입니다. 담당 선생님에게 문의하세요.')
   }
 
-  const children = (parent.parent_students as any[]).map((ps: any) => ps.students)
+  type ParentStudentRow = { student_id: number; students: ParentChild | null }
+  const children = (parent.parent_students as unknown as ParentStudentRow[])
+    .map(ps => ps.students)
+    .filter((s): s is ParentChild => s != null)
 
   return {
     parentId: parent.id,

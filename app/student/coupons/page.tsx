@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { IconCoupon } from '@/components/icons'
 
-const navy = 'var(--ui-primary)', navyDk = 'var(--ui-primary)', gold = 'var(--ui-primary)'
+const navy = 'var(--ui-primary)', navyDk = 'var(--ui-primary)'
 const bg = 'var(--ui-bg)', bd = 'var(--ui-border)'
 const tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)', gr = 'var(--ui-success)', gbg = 'var(--ui-success-bg)'
 
@@ -19,16 +19,16 @@ export default function StudentCoupons() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!student?.studentId) return
-    load(student.studentId)
-  }, [student?.studentId])
+    if (!student?.sessionToken) return
+    load(student.sessionToken)
+  }, [student?.sessionToken])
 
-  async function load(studentId: number) {
+  async function load(token: string) {
     setLoading(true)
-    const { data } = await supabase
-      .from('student_coupons').select('id,milestone,streak_value,claimed_at,used,code')
-      .eq('student_id', studentId).order('claimed_at', { ascending: false })
-    setCoupons(data ?? [])
+    // student_coupons는 더 이상 직접 조회할 수 없다 — 코드 값(code)이 학원에서 바로
+    // 쓸 수 있는 실질적인 상품권이라, 본인 토큰으로만 본인 쿠폰을 볼 수 있게 막았다.
+    const { data } = await supabase.rpc('client_coupons', { p_token: token })
+    setCoupons((data ?? []) as Coupon[])
     setLoading(false)
   }
 

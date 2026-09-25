@@ -41,56 +41,43 @@ export default function ParentNotices() {
   const [sendingReply, setSendingReply] = useState(false)
 
   useEffect(() => {
-    async function fetch() {
-      const { data } = await supabase
-        .from('notices')
-        .select('id,title,content,pinned,created_at')
-        .eq('parent_visible', true)
-        .order('pinned', { ascending: false })
-        .order('created_at', { ascending: false })
-      const all = data ?? []
-
-      // 대상이 지정된 공지는 내 자녀가 대상에 포함된 경우에만 노출 (지정이 없으면 전체공개)
-      const noticeIds = all.map(n => n.id)
-      const myStudentIds = new Set((parent?.children ?? []).map(c => c.id))
-      let visibleIds = new Set(noticeIds)
-      if (noticeIds.length > 0) {
-        const { data: targets } = await supabase.from('notice_target_students').select('notice_id,student_id').in('notice_id', noticeIds)
-        const targetedNoticeIds = new Set((targets ?? []).map((t: any) => t.notice_id))
-        const allowedNoticeIds = new Set((targets ?? []).filter((t: any) => myStudentIds.has(t.student_id)).map((t: any) => t.notice_id))
-        visibleIds = new Set(noticeIds.filter(id => !targetedNoticeIds.has(id) || allowedNoticeIds.has(id)))
-      }
-
-      setNotices(all.filter(n => visibleIds.has(n.id)))
+    if (!parent?.sessionToken) return
+    async function fetch(token: string) {
+      // notices/notice_target_students를 직접 조회하지 않는다 — "전체공개이거나 내 자녀가
+      // 대상인 공지만" 서버가 판단해서 돌려준다.
+      const { data } = await supabase.rpc('client_visible_notices', { p_token: token })
+      setNotices((data ?? []) as Notice[])
       setLoading(false)
     }
-    fetch()
-  }, [parent?.children])
+    fetch(parent.sessionToken)
+  }, [parent?.sessionToken])
 
+  // 학부모 전체가 아니라, 지금 열어본 공지에 실제로 댓글을 남긴 학부모만 좁혀서 조회한다.
   useEffect(() => {
-    async function fetchIdentities() {
-      const { data } = await supabase.from('parents').select('id, parent_students(students(name))')
+    if (!detail) return
+    async function fetchIdentities(noticeId: number) {
+      const { data } = await supabase.rpc('notice_comment_authors', { p_notice_id: noticeId })
       const map: Record<number, string[]> = {}
-      for (const row of (data ?? []) as any[]) {
-        map[row.id] = (row.parent_students ?? []).map((ps: any) => ps.students?.name).filter(Boolean)
+      for (const row of (data ?? []) as { parent_id: number; child_names: string[] }[]) {
+        map[row.parent_id] = row.child_names ?? []
       }
       setIdentityMap(map)
     }
-    fetchIdentities()
-  }, [])
+    fetchIdentities(detail.id)
+  }, [detail?.id])
 
   useEffect(() => { if (detail) fetchComments(detail.id) }, [detail?.id])
 
   // 공지 상세를 열람하면 이 학부모의 자녀들 기준으로 읽음 기록을 남긴다(조회수/읽음 표시용)
   useEffect(() => {
-    if (!detail || !parent?.children?.length) return
-    const rows = parent.children.map(c => ({ notice_id: detail.id, student_id: c.id }))
-    supabase.from('notice_reads').upsert(rows, { onConflict: 'notice_id,student_id', ignoreDuplicates: true }).then(() => {})
-  }, [detail?.id, parent?.children])
+    if (!detail || !parent?.sessionToken) return
+    supabase.rpc('client_mark_notice_read', { p_token: parent.sessionToken, p_notice_id: detail.id }).then(() => {})
+  }, [detail?.id, parent?.sessionToken])
 
   async function fetchComments(noticeId: number) {
+    if (!parent?.sessionToken) return
     setCommentsLoading(true)
-    const { data } = await supabase.from('notice_comments').select('*').eq('notice_id', noticeId).order('created_at', { ascending: true })
+    const { data } = await supabase.rpc('client_notice_comments', { p_token: parent.sessionToken, p_notice_id: noticeId })
     setComments((data ?? []) as NoticeComment[])
     setCommentsLoading(false)
   }
@@ -105,11 +92,11 @@ export default function ParentNotices() {
 
   async function sendComment() {
     const text = commentInput.trim()
-    if (!text || !detail || !parent?.parentId || sending) return
+    if (!text || !detail || !parent?.sessionToken || sending) return
     setSending(true); setErr('')
-    const { data, error } = await supabase.from('notice_comments').insert({
-      notice_id: detail.id, sender_type: 'parent', parent_id: parent.parentId, is_anonymous: isAnonymous, content: text,
-    }).select('*').single()
+    const { data, error } = await supabase
+      .rpc('client_post_notice_comment', { p_token: parent.sessionToken, p_notice_id: detail.id, p_content: text, p_is_anonymous: isAnonymous })
+      .single()
     setSending(false)
     if (error) { setErr('댓글 등록에 실패했습니다.'); return }
     setComments(cs => [...cs, data as NoticeComment])
@@ -119,12 +106,14 @@ export default function ParentNotices() {
 
   async function sendReply(rootCommentId: number) {
     const text = (replyDrafts[rootCommentId] ?? '').trim()
-    if (!text || !detail || !parent?.parentId || sendingReply) return
+    if (!text || !detail || !parent?.sessionToken || sendingReply) return
     setSendingReply(true)
-    const { data, error } = await supabase.from('notice_comments').insert({
-      notice_id: detail.id, parent_comment_id: rootCommentId, sender_type: 'parent', parent_id: parent.parentId,
-      is_anonymous: replyAnon[rootCommentId] ?? false, content: text,
-    }).select('*').single()
+    const { data, error } = await supabase
+      .rpc('client_post_notice_comment', {
+        p_token: parent.sessionToken, p_notice_id: detail.id, p_content: text,
+        p_is_anonymous: replyAnon[rootCommentId] ?? false, p_parent_comment_id: rootCommentId,
+      })
+      .single()
     setSendingReply(false)
     if (error) { setErr('답글 등록에 실패했습니다.'); return }
     setComments(cs => [...cs, data as NoticeComment])
@@ -281,7 +270,7 @@ export default function ParentNotices() {
           </div>
 
           {/* 고정 공지 */}
-          {pinned.map((n, i) => (
+          {pinned.map((n) => (
             <div key={n.id} onClick={() => setDetail(n)} style={{
               display: 'grid', gridTemplateColumns: '60px 1fr 80px', gap: 8,
               padding: '12px 16px', borderBottom: `1px solid ${bd}`,

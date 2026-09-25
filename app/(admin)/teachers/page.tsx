@@ -1,17 +1,13 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { useAuth } from '@/context/AuthContext'
+import { staffFetch } from '@/lib/staff-fetch'
 import { kstNow } from '@/lib/kst'
 import TimeSlotInput from '@/components/TimeSlotInput'
 import * as XLSX from 'xlsx-js-style'
 import { IconX } from '@/components/icons'
 import { useMobileMode } from '@/context/MobileModeContext'
-
-const navy='var(--ui-primary)', navyDk='var(--ui-primary-text)', navyM='var(--ui-surface-2)'
-const gold='var(--ui-primary)', goldL='var(--ui-primary-hover)', bg='var(--ui-bg)', bd='var(--ui-border)'
-const tx='var(--ui-text)', tx2='var(--ui-text-2)', tx3='var(--ui-text-3)'
-const re='var(--ui-danger)', rbg='var(--ui-danger-bg)', gr='var(--ui-success)', gbg='var(--ui-success-bg)'
+import { navy, navyDk, navyM, gold, goldL, bg, bd, tx, tx2, tx3, re, rbg, gr, gbg } from '@/lib/ui-tokens'
 
 type Teacher = {
   id:number; user_id:string; name:string; email:string
@@ -145,7 +141,6 @@ function xlsxSheetName(name:string, used:Set<string>){
 }
 
 export default function TeachersPage(){
-  const { teacher: me } = useAuth()
   const { mobileMode } = useMobileMode()
   const [tabIdx,     setTabIdx]     = useState(0)
   const [attTabIdx,  setAttTabIdx]  = useState(0) // 0=달력 1=선생님별
@@ -296,9 +291,12 @@ export default function TeachersPage(){
   }
   async function deleteTeacher(t:Teacher){
     if(!confirm(`${t.name} 선생님을 삭제하시겠습니까?`)) return
-    await supabase.auth.admin.deleteUser(t.user_id).catch(()=>{})
-    const {error}=await supabase.from('teachers').delete().eq('id',t.id)
-    if(error) return toast('삭제 실패',false)
+    const res=await staffFetch('/api/teachers',{
+      method:'DELETE', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({targetUserId:t.user_id}),
+    })
+    const json=await res.json()
+    if(!res.ok) return toast(json.error??'삭제 실패',false)
     toast(t.name+' 삭제됨',false)
     fetchTeachers()
   }
@@ -306,10 +304,10 @@ export default function TeachersPage(){
   // 출근부 승인 토글
   async function toggleAttApprove(log:AttLog){
     const next=!log.approved
-    const res=await fetch('/api/attendance/approve',{
+    const res=await staffFetch('/api/attendance/approve',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({logId:log.id, approved:next, approvedBy:me?.userId??null}),
+      body:JSON.stringify({logId:log.id, approved:next}),
     })
     const json=await res.json()
     if(!res.ok||json.error) return toast('처리 실패: '+(json.error??'알 수 없는 오류'),false)
@@ -323,10 +321,10 @@ export default function TeachersPage(){
     if(pending.length===0) return
     setBulkApproving(true)
     const results=await Promise.all(pending.map(l=>
-      fetch('/api/attendance/approve',{
+      staffFetch('/api/attendance/approve',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({logId:l.id, approved:true, approvedBy:me?.userId??null}),
+        body:JSON.stringify({logId:l.id, approved:true}),
       }).then(res=>res.json().then(json=>({res,json})))
     ))
     setBulkApproving(false)
@@ -350,7 +348,7 @@ export default function TeachersPage(){
     if(!valid.length) return toast('올바른 시간을 입력하세요.',false)
     setEditSaving(true)
     const mins=Math.round(calcMin(valid))
-    const res=await fetch('/api/attendance/update',{
+    const res=await staffFetch('/api/attendance/update',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
@@ -358,7 +356,7 @@ export default function TeachersPage(){
         slots:valid,
         clockIn:valid[0].in, clockOut:valid[valid.length-1].out,
         workMinutes:mins, memo:editMemo,
-        approved:true, approvedBy:me?.userId??null,
+        approved:true,
       }),
     })
     const json=await res.json()
@@ -710,7 +708,6 @@ export default function TeachersPage(){
                     const ds=`${selYear}-${String(selMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`
                     const dLogs=dayLogs(ds)
                     const pending=dLogs.filter(l=>!l.approved).length
-                    const approved=dLogs.filter(l=>l.approved).length
                     const dow=(fd+d-1)%7
                     const dEvts = dayEvts(ds)
                     return(

@@ -24,7 +24,7 @@ const navyDk = 'var(--ui-primary)', navy = 'var(--ui-primary)', gold = 'var(--ui
 const re = 'var(--ui-danger)', gr = 'var(--ui-success)'
 
 type Child = { id: number; name: string; school: string | null }
-type ParentSession = { parentId: number; phone: string; children: Child[] }
+type ParentSession = { parentId: number; phone: string; children: Child[]; sessionToken: string }
 type Candidate = { studentId: number; studentName: string; school: string | null; parentId: number }
 
 type Screen = { kind: 'loading' } | { kind: 'input' } | { kind: 'select'; candidates: Candidate[] } | { kind: 'confirm'; c: Candidate }
@@ -43,7 +43,8 @@ export default function TagCheckinPage() {
       const raw = localStorage.getItem(AUTO_KEY)
       if (raw) {
         const session: ParentSession = JSON.parse(raw).session
-        if (session?.children?.length) {
+        if (session?.children?.length && session.sessionToken) {
+          setParentSessions({ [session.parentId]: session })
           proceedWithChildren(session.children.map(c => ({
             studentId: c.id, studentName: c.name, school: c.school, parentId: session.parentId,
           })))
@@ -52,11 +53,13 @@ export default function TagCheckinPage() {
       }
     } catch {}
     setScreen({ kind: 'input' })
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [])  
 
   // 로그인/PIN 없이, 방금 확인된 학생 본인 명의로 이 폰의 FCM 토큰을 등록한다.
   // 실패해도(알림 미지원 브라우저, 권한 거부 등) 등원 체크인 자체에는 영향 없다.
-  async function registerThisDeviceForNotifications(studentId: number) {
+  // sessionToken은 뒷 4자리 확인 시 그 학부모 앞으로 발급된 것 — 그 학부모의 자녀가
+  // 맞는지는 register-fcm-token Edge Function이 서버에서 다시 확인한다.
+  async function registerThisDeviceForNotifications(studentId: number, sessionToken: string) {
     try {
       const token = await requestFCMToken()
       if (!token) return
@@ -66,7 +69,7 @@ export default function TagCheckinPage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
         },
-        body: JSON.stringify({ student_id: studentId, token }),
+        body: JSON.stringify({ student_id: studentId, token, session_token: sessionToken }),
       })
     } catch {}
   }
@@ -85,26 +88,23 @@ export default function TagCheckinPage() {
   async function search(last4: string) {
     setBusy(true)
     try {
-      const { data, error } = await supabase
-        .from('parents')
-        .select('id, phone, parent_students(student_id, students(id, name, school))')
-        .like('phone', `%${last4}`)
+      // parents 테이블을 필터 없이 직접 조회할 수 없다 — 서버 함수가 뒷 4자리 일치 검사를
+      // 직접 수행한 결과만 돌려준다 (여러 가족이 뒷 4자리가 같을 수 있는 건 기존과 동일).
+      const { data, error } = await supabase.rpc('lookup_family_by_phone_suffix', { p_last4: last4 })
 
       if (error || !data || data.length === 0) {
         setScreen({ kind: 'error', message: '일치하는 학부모 전화번호가 없습니다.' })
         return
       }
 
+      type FamilyRow = { parent_id: number; parent_phone: string; parent_session_token: string; student_id: number; student_name: string; student_school: string | null }
       const sessions: Record<number, ParentSession> = {}
       const candidates: Candidate[] = []
-      for (const p of data as any[]) {
-        const children: Child[] = []
-        for (const ps of (p.parent_students ?? [])) {
-          if (!ps.students) continue
-          children.push({ id: ps.students.id, name: ps.students.name, school: ps.students.school ?? null })
-          candidates.push({ studentId: ps.students.id, studentName: ps.students.name, school: ps.students.school ?? null, parentId: p.id })
-        }
-        sessions[p.id] = { parentId: p.id, phone: p.phone, children }
+      for (const row of data as FamilyRow[]) {
+        if (!sessions[row.parent_id]) sessions[row.parent_id] = { parentId: row.parent_id, phone: row.parent_phone, children: [], sessionToken: row.parent_session_token }
+        const child: Child = { id: row.student_id, name: row.student_name, school: row.student_school }
+        sessions[row.parent_id].children.push(child)
+        candidates.push({ studentId: row.student_id, studentName: row.student_name, school: row.student_school, parentId: row.parent_id })
       }
       setParentSessions(sessions)
 
@@ -148,7 +148,7 @@ export default function TagCheckinPage() {
       // 없이 방금 뒷 4자리로 확인된 학생 본인 명의로 바로 등록한다. 로그인 계정이 필요한
       // 알림 등록과 달리, 여기서는 등원 체크인 자체와 동일한 신뢰 수준(뒷 4자리 확인)만 있으면
       // 충분하다고 보고 PIN을 따로 요구하지 않는다.
-      registerThisDeviceForNotifications(c.studentId)
+      if (session) registerThisDeviceForNotifications(c.studentId, session.sessionToken)
       setScreen({ kind: 'success', name: c.studentName, late: !!result.late, already: !!result.already })
     } catch {
       setScreen({ kind: 'error', message: '네트워크 오류로 처리하지 못했습니다.' })

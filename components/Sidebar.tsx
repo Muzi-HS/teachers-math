@@ -1,7 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import Image from 'next/image'
 import { useAuth } from '@/context/AuthContext'
 import { menuAccess, Role } from '@/lib/permissions'
 import { supabase } from '@/lib/supabase'
@@ -73,7 +72,7 @@ export default function Sidebar() {
   const [navOrder, setNavOrderState] = useState<string[]>([])
   const pathname = usePathname()
   const router   = useRouter()
-  const { teacher, role, logout } = useAuth()
+  const { role } = useAuth()
   const { mobileMode } = useMobileMode()
   const [unreadInquiries, setUnreadInquiries] = useState(0)
   const [unreadComments, setUnreadComments] = useState(0)

@@ -43,7 +43,9 @@ function StudentLayoutContent({ children }: { children: React.ReactNode }) {
     try {
       const token = await requestFCMToken()
       if (typeof Notification !== 'undefined') setNotifPerm(Notification.permission)
-      if (!token) return
+      if (!token || !student?.sessionToken) return
+      // session_token을 함께 보내서, Edge Function이 student_id를 그대로 믿지 않고
+      // "이 토큰이 정말 이 studentId의 것인지" 서버에서 확인하게 한다.
       await fetch(
         `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/register-fcm-token`,
         {
@@ -52,7 +54,7 @@ function StudentLayoutContent({ children }: { children: React.ReactNode }) {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
           },
-          body: JSON.stringify({ student_id: studentId, token }),
+          body: JSON.stringify({ student_id: studentId, token, session_token: student.sessionToken }),
         }
       )
     } catch (e) {
@@ -114,7 +116,7 @@ function StudentLayoutContent({ children }: { children: React.ReactNode }) {
       document.removeEventListener('visibilitychange', recheck)
       window.removeEventListener('focus', recheck)
     }
-  }, [student?.studentId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [student?.studentId])  
 
   function navigateToLink(link: string) {
     if (link === window.location.pathname) window.location.reload()

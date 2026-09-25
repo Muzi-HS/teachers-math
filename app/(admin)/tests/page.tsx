@@ -4,7 +4,7 @@ import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { can } from '@/lib/permissions'
 import { kstDateStr, kstNow } from '@/lib/kst'
-import { IconClipboard, IconBarChart, IconTrophy, IconArrowLeft } from '@/components/icons'
+import { IconClipboard, IconBarChart, IconTrophy } from '@/components/icons'
 import { useMobileMode } from '@/context/MobileModeContext'
 import TestEditorModal from '@/components/TestEditorModal'
 import AutoTestStatus from '@/components/AutoTestStatus'
@@ -21,7 +21,7 @@ const navy='var(--ui-primary)', navyDk='var(--ui-primary-text)', navyM='var(--ui
 const gold='var(--ui-primary)', goldL='var(--ui-primary-hover)'
 const bg='var(--ui-bg)', bd='var(--ui-border)'
 const tx='var(--ui-text)', tx2='var(--ui-text-2)', tx3='var(--ui-text-3)'
-const re='var(--ui-danger)', rbg='var(--ui-danger-bg)', gr='var(--ui-success)', gbg='var(--ui-success-bg)'
+const re='var(--ui-danger)', rbg='var(--ui-danger-bg)', gr='var(--ui-success)'
 
 export default function TestsPage() {
   const { role } = useAuth()
@@ -66,7 +66,7 @@ export default function TestsPage() {
       if(scoreList.length===0){
         // fallback: record_test_items
         const { data: items } = await supabase.from('record_test_items').select('t_score,t_cor,t_total').eq('test_id', t.id)
-        scoreList = (items??[]).map((x:any)=> x.t_score ? x.t_score : (x.t_total>0?Math.round(x.t_cor/x.t_total*100):0))
+        scoreList = (items??[]).map(x=> x.t_score ? x.t_score : (x.t_total>0?Math.round(x.t_cor/x.t_total*100):0))
       }
 
       if(scoreList.length===0){
@@ -258,7 +258,7 @@ export default function TestsPage() {
   function scoreColor(s:number){ return s>=80?gr:s>=60?'var(--ui-warning)':re }
 
   // 테스트 관리 메뉴: admin, teacher 모두 전체 기능 (성적 입력/수정/삭제 포함)
-  const canManageTests = role ? can.manageTests(role as any) : false
+  const canManageTests = role ? can.manageTests(role) : false
 
   const css=`
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap');

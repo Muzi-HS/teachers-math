@@ -190,7 +190,6 @@ export default function SchedulePage() {
         setMo(m); setYr(y); setSelectedDate(null)
     }
 
-    const today = kstNow()
     const dim = new Date(yr, mo + 1, 0).getDate()   // days in month
     const fd = new Date(yr, mo, 1).getDay()         // first day of week
     const pmd = new Date(yr, mo, 0).getDate()        // prev month last day

@@ -12,11 +12,11 @@ serve(async (req) => {
   }
 
   try {
-    const { parent_id, student_id, token } = await req.json()
+    const { parent_id, student_id, token, session_token } = await req.json()
 
-    if ((!parent_id && !student_id) || !token) {
+    if ((!parent_id && !student_id) || !token || !session_token) {
       return new Response(
-        JSON.stringify({ error: 'parent_id 또는 student_id, 그리고 token이 필요합니다.' }),
+        JSON.stringify({ error: 'parent_id 또는 student_id, token, session_token이 필요합니다.' }),
         { status: 400, headers: { ...CORS, 'Content-Type': 'application/json' } }
       )
     }
@@ -28,6 +28,24 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
+
+    // session_token이 요청 본문의 parent_id/student_id를 실제로 가리키는지 서버에서
+    // 확인한다 — 그렇지 않으면 남의 parent_id/student_id를 넣어서 그 사람의 알림
+    // 수신처를 내 기기로 바꿔치기할 수 있었다.
+    let authorized = false
+    if (student_id) {
+      const { data } = await supabase.rpc('session_owns_student', { p_token: session_token, p_student_id: student_id })
+      authorized = data === true
+    } else {
+      const { data } = await supabase.rpc('session_subject', { p_token: session_token }).maybeSingle()
+      authorized = !!data && data.subject_type === 'parent' && data.subject_id === parent_id
+    }
+    if (!authorized) {
+      return new Response(
+        JSON.stringify({ error: '이 계정으로 등록할 권한이 없습니다. 다시 로그인해 주세요.' }),
+        { status: 403, headers: { ...CORS, 'Content-Type': 'application/json' } }
+      )
+    }
 
     // 이미 동일 토큰이 등록된 경우 → 중복 저장 불필요
     const { data: existing } = await supabase

@@ -6,6 +6,7 @@ import { can } from '@/lib/permissions'
 import { kstDateStr, kstNow } from '@/lib/kst'
 import { IconUsers, IconLightbulb, IconCoupon } from '@/components/icons'
 import { useMobileMode } from '@/context/MobileModeContext'
+import { navy, navyDk, navyM, gold, goldL, bg, bd, tx, tx2, tx3, re, rbg, gr, gbg } from '@/lib/ui-tokens'
 
 type Student = {
   id: number
@@ -29,12 +30,6 @@ const BLANK: Omit<Student, 'id'> = {
   reg_date: kstDateStr(),
 }
 
-const navy = 'var(--ui-primary)', navyDk = 'var(--ui-primary-text)', navyM = 'var(--ui-surface-2)'
-const gold = 'var(--ui-primary)', goldL = 'var(--ui-primary-hover)'
-const bg = 'var(--ui-bg)', bd = 'var(--ui-border)'
-const tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)'
-const re = 'var(--ui-danger)', rbg = 'var(--ui-danger-bg)'
-const gr = 'var(--ui-success)', gbg = 'var(--ui-success-bg)'
 const pu = '#7C3AED', pubg = '#F3E8FF'
 
 const SCHOOL_TYPES = ['초등', '중등', '고등'] as const
@@ -174,7 +169,7 @@ export default function StudentsPage() {
     ].filter(Boolean) as SchoolEntry[])
 
     const current = highestSchoolEntry(entries)
-    const row: Record<string, any> = {
+    const row: Record<string, unknown> = {
       name: form.name.trim(),
       birth_year: Number(form.birth_year),
       school: current?.school_name ?? '',
@@ -227,7 +222,7 @@ export default function StudentsPage() {
       .select('parent_id')
       .eq('student_id', id)
 
-    const parentIds = [...new Set((ps ?? []).map((r: any) => r.parent_id))]
+    const parentIds = [...new Set((ps ?? []).map(r => r.parent_id))]
 
     const { error } = await supabase.from('students').delete().eq('id', id)
     if (error) return toast('삭제 실패: ' + error.message, false)

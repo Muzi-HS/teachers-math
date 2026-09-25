@@ -1,5 +1,5 @@
 import { initializeApp, getApps } from 'firebase/app'
-import { getMessaging, getToken, onMessage, isSupported } from 'firebase/messaging'
+import { getMessaging, getToken, onMessage, isSupported, type MessagePayload } from 'firebase/messaging'
 
 const firebaseConfig = {
   apiKey:            process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -42,11 +42,11 @@ export async function isFCMSupported(): Promise<boolean> {
   try { return await isSupported() } catch { return false }
 }
 
-export async function onForegroundMessage(callback: (payload: any) => void): Promise<(() => void) | undefined> {
+export async function onForegroundMessage(callback: (payload: MessagePayload) => void): Promise<(() => void) | undefined> {
   try {
     const supported = await isSupported()
     if (!supported) return undefined
     const messaging = getMessaging(app)
     return onMessage(messaging, callback)
-  } catch (e) { return undefined }
+  } catch { return undefined }
 }

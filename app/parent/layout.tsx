@@ -66,7 +66,10 @@ function ParentLayoutContent({ children }: { children: React.ReactNode }) {
       if (typeof Notification !== 'undefined') setNotifPerm(Notification.permission)
       if (!token) return
 
+      if (!parent?.sessionToken) return
       // register-fcm-token Edge Function 호출 (기존 토큰 삭제 후 새 토큰 저장)
+      // session_token을 함께 보내서, Edge Function이 parent_id를 그대로 믿지 않고
+      // "이 토큰이 정말 이 parentId의 것인지" 서버에서 확인하게 한다.
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/register-fcm-token`,
         {
@@ -75,7 +78,7 @@ function ParentLayoutContent({ children }: { children: React.ReactNode }) {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
           },
-          body: JSON.stringify({ parent_id: parentId, token }),
+          body: JSON.stringify({ parent_id: parentId, token, session_token: parent.sessionToken }),
         }
       )
       const data = await res.json()

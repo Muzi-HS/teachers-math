@@ -8,10 +8,10 @@ import { IconChat, IconPencil, IconTrash, IconArrowLeft } from '@/components/ico
 import { useMobileMode } from '@/context/MobileModeContext'
 
 const navy = 'var(--ui-primary)', navyDk = 'var(--ui-primary-text)', navyM = 'var(--ui-surface-2)'
-const gold = 'var(--ui-primary)', goldL = 'var(--ui-primary-hover)'
+const gold = 'var(--ui-primary)'
 const bg = 'var(--ui-bg)', bd = 'var(--ui-border)'
 const tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)'
-const re = 'var(--ui-danger)', rbg = 'var(--ui-danger-bg)', gr = 'var(--ui-success)', gbg = 'var(--ui-success-bg)'
+const re = 'var(--ui-danger)', gr = 'var(--ui-success)'
 
 type Msg = {
   id: number; parent_id: number; sender_type: 'parent' | 'admin'
@@ -77,9 +77,10 @@ function AdminInquiriesPageInner() {
     setMsgs(m ?? [])
     const pmap: Record<number, ParentRow> = {}
     const cmap: Record<number, string[]> = {}
-    for (const row of (p ?? []) as any[]) {
+    type ParentQueryRow = { id: number; phone: string; name: string; parent_students: { students: { name: string } | null }[] | null }
+    for (const row of (p ?? []) as unknown as ParentQueryRow[]) {
       pmap[row.id] = { id: row.id, phone: row.phone, name: row.name }
-      cmap[row.id] = (row.parent_students ?? []).map((ps: any) => ps.students?.name).filter(Boolean)
+      cmap[row.id] = (row.parent_students ?? []).map(ps => ps.students?.name).filter((n): n is string => Boolean(n))
     }
     setParentsMap(pmap)
     setChildrenMap(cmap)

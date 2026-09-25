@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { computeStreak, COUPON_MILESTONES } from '@/lib/streak'
 import { IconTrophy } from '@/components/icons'
 
-const navy='var(--ui-primary)', gold='var(--ui-primary)', tx='var(--ui-text)', tx2='var(--ui-text-2)', tx3='var(--ui-text-3)', bd='var(--ui-border)'
+const navy='var(--ui-primary)', tx='var(--ui-text)', tx3='var(--ui-text-3)', bd='var(--ui-border)'
 
 // 쿠폰 마일스톤(5일부터 5일 단위로 30일까지)과 동일한 기준으로 뱃지를 보여준다
 const STREAK_TIERS = COUPON_MILESTONES
@@ -104,7 +104,7 @@ export default function HomeworkStatsView({ recs, studentId }: { recs: StatRec[]
                 <CartesianGrid strokeDasharray="3 3" stroke={bd} />
                 <XAxis dataKey="date" tick={{ fontSize: 10, fill: tx3 }} axisLine={{ stroke: bd }} />
                 <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: tx3 }} axisLine={{ stroke: bd }} />
-                <Tooltip formatter={(v: any) => v + '%'} contentStyle={{ fontSize: 12, borderRadius: 8, border: `1px solid ${bd}` }} />
+                <Tooltip formatter={(v: unknown) => `${v}%`} contentStyle={{ fontSize: 12, borderRadius: 8, border: `1px solid ${bd}` }} />
                 <Line type="monotone" dataKey="hwRate" stroke={navy} strokeWidth={2.5} dot={{ r: 4, fill: navy }} connectNulls />
               </LineChart>
             </ResponsiveContainer>
@@ -116,7 +116,7 @@ export default function HomeworkStatsView({ recs, studentId }: { recs: StatRec[]
                 <CartesianGrid strokeDasharray="3 3" stroke={bd} />
                 <XAxis dataKey="date" tick={{ fontSize: 10, fill: tx3 }} axisLine={{ stroke: bd }} />
                 <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: tx3 }} axisLine={{ stroke: bd }} />
-                <Tooltip formatter={(v: any) => v + '%'} contentStyle={{ fontSize: 12, borderRadius: 8, border: `1px solid ${bd}` }} />
+                <Tooltip formatter={(v: unknown) => `${v}%`} contentStyle={{ fontSize: 12, borderRadius: 8, border: `1px solid ${bd}` }} />
                 <Line type="monotone" dataKey="hwCor" stroke="var(--ui-chart-2)" strokeWidth={2.5} dot={{ r: 4, fill: "var(--ui-chart-2)" }} connectNulls />
               </LineChart>
             </ResponsiveContainer>

@@ -6,7 +6,7 @@ import { IconSend } from '@/components/icons'
 
 type Notice = { id: number; content: string; created_at: string }
 
-const navy = 'var(--ui-primary)', gold = 'var(--ui-primary)'
+const gold = 'var(--ui-primary)'
 const bg = 'var(--ui-bg)', bd = 'var(--ui-border)'
 const tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)'
 const re = 'var(--ui-danger)'
@@ -88,7 +88,7 @@ export default function ClassNoticeModal({
         <div style={{ padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `1px solid ${bd}` }}>
           <div>
             <p style={{ fontSize: 15, fontWeight: 700, color: tx, margin: 0 }}>{className} 공지하기</p>
-            <p style={{ fontSize: 11.5, color: tx3, margin: '3px 0 0' }}>이 반 학생 계정의 "반 공지사항"에 표시됩니다 (학생은 답장 불가)</p>
+            <p style={{ fontSize: 11.5, color: tx3, margin: '3px 0 0' }}>이 반 학생 계정의 &quot;반 공지사항&quot;에 표시됩니다 (학생은 답장 불가)</p>
           </div>
           <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: bg, cursor: 'pointer', fontSize: 17, color: tx2 }}>×</button>
         </div>

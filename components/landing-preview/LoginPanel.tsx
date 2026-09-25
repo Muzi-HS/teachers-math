@@ -62,7 +62,7 @@ export default function LoginPanel({ open, onClose }: { open: boolean; onClose: 
   const [showSignup, setShowSignup] = useState(false)
   const [sgName, setSgName] = useState(''); const [sgEmail, setSgEmail] = useState('')
   const [sgPhone, setSgPhone] = useState(''); const [sgPw, setSgPw] = useState(''); const [sgPw2, setSgPw2] = useState('')
-  const [parentData, setParentData] = useState<{ studentId?: number; parentId?: number; phone: string; name?: string; children?: unknown } | null>(null)
+  const [parentData, setParentData] = useState<{ studentId?: number; parentId?: number; phone: string; name?: string; children?: unknown; sessionToken?: string } | null>(null)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
@@ -108,13 +108,13 @@ export default function LoginPanel({ open, onClose }: { open: boolean; onClose: 
       }
       if (accountType === 'student') {
         const r = result as Awaited<ReturnType<typeof studentLoginWithPin>>
-        const session = { studentId: r.studentId, phone: r.phone, name: r.name }
+        const session = { studentId: r.studentId, phone: r.phone, name: r.name, sessionToken: r.sessionToken }
         if (autoLogin) localStorage.setItem(STUDENT_AUTO_KEY, JSON.stringify({ session }))
         sessionStorage.setItem('student_session', JSON.stringify(session))
         loginAsStudent(session)
       } else {
         const r = result as Awaited<ReturnType<typeof parentLoginWithPin>>
-        const session = { parentId: r.parentId, phone: r.phone, children: r.children }
+        const session = { parentId: r.parentId, phone: r.phone, children: r.children, sessionToken: r.sessionToken }
         if (autoLogin) localStorage.setItem(AUTO_KEY, JSON.stringify({ session }))
         sessionStorage.setItem('parent_session', JSON.stringify(session))
         loginAsParent(session)
@@ -133,16 +133,16 @@ export default function LoginPanel({ open, onClose }: { open: boolean; onClose: 
         await updateParentPin(parentData?.parentId as number, '0000', newPin)
       }
       if (accountType === 'student') {
-        const session = { studentId: parentData?.studentId, phone: parentData?.phone, name: parentData?.name }
+        const session = { studentId: parentData?.studentId, phone: parentData?.phone, name: parentData?.name, sessionToken: parentData?.sessionToken }
         if (autoLogin) localStorage.setItem(STUDENT_AUTO_KEY, JSON.stringify({ session }))
         sessionStorage.setItem('student_session', JSON.stringify(session))
-        loginAsStudent(session as { studentId: number; phone: string; name: string })
+        loginAsStudent(session as { studentId: number; phone: string; name: string; sessionToken: string })
         return
       }
-      const session = { parentId: parentData?.parentId, phone: parentData?.phone, children: parentData?.children }
+      const session = { parentId: parentData?.parentId, phone: parentData?.phone, children: parentData?.children, sessionToken: parentData?.sessionToken }
       if (autoLogin) localStorage.setItem(AUTO_KEY, JSON.stringify({ session }))
       sessionStorage.setItem('parent_session', JSON.stringify(session))
-      loginAsParent(session as { parentId: number; phone: string; children: { id: number; name: string; birth_year: number; school: string }[] })
+      loginAsParent(session as { parentId: number; phone: string; children: { id: number; name: string; birth_year: number; school: string }[]; sessionToken: string })
     } catch (e) { setError(e instanceof Error ? e.message : 'PIN 설정 실패'); setLoading(false) }
   }
 

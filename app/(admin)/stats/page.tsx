@@ -15,14 +15,13 @@ type Rec = {
   record_test_items?: { test_id:number; t_total:number; t_cor:number; t_score:number; tests:{name:string}|null }[]
 }
 
-const navy='var(--ui-primary)', navyDk='var(--ui-primary-text)', navyM='var(--ui-surface-2)'
-const gold='var(--ui-primary)', goldL='var(--ui-primary-hover)'
+const navy='var(--ui-primary)', navyM='var(--ui-surface-2)'
+const gold='var(--ui-primary)'
 const bg='var(--ui-bg)', bd='var(--ui-border)'
 const tx='var(--ui-text)', tx2='var(--ui-text-2)', tx3='var(--ui-text-3)'
 const re='var(--ui-danger)', rbg='var(--ui-danger-bg)', gr='var(--ui-success)', gbg='var(--ui-success-bg)'
 
 function rateColor(v:number){ return v>=80?'var(--ui-success)':v>=60?'var(--ui-warning)':'var(--ui-danger)' }
-function rateBg(v:number){    return v>=80?'var(--ui-success-bg)':v>=60?'var(--ui-warning-bg)':'var(--ui-danger-bg)' }
 function ageOf(b:number){ return new Date().getFullYear()-b+1 }
 
 export default function StatsPage(){
@@ -72,15 +71,16 @@ export default function StatsPage(){
       .in('record_id',recIds)
 
     // 3. tests 이름 조회
-    const testIds=[...new Set((items??[]).map((x:any)=>x.test_id))]
-    let testsMap:Record<number,string>={}
+    const testIds=[...new Set((items??[]).map(x=>x.test_id))]
+    const testsMap:Record<number,string>={}
     if(testIds.length>0){
       const{data:testsData}=await supabase.from('tests').select('id,name').in('id',testIds)
       for(const t of(testsData??[]))testsMap[t.id]=t.name
     }
 
     // 4. record_id별 그룹화
-    const itemsByRecord:Record<number,any[]>={}
+    type TestItemRow = { test_id:number; t_total:number; t_cor:number; t_score:number; tests:{name:string}|null }
+    const itemsByRecord:Record<number,TestItemRow[]>={}
     for(const item of(items??[])){
       if(!itemsByRecord[item.record_id])itemsByRecord[item.record_id]=[]
       itemsByRecord[item.record_id].push({
@@ -254,7 +254,7 @@ export default function StatsPage(){
                           <CartesianGrid strokeDasharray="3 3" stroke={bd}/>
                           <XAxis dataKey="date" tick={{fontSize:10,fill:tx3}} axisLine={{stroke:bd}}/>
                           <YAxis domain={[0,100]} tick={{fontSize:10,fill:tx3}} axisLine={{stroke:bd}}/>
-                          <Tooltip formatter={(v:any)=>v+'%'} contentStyle={{fontSize:12,borderRadius:8,border:`1px solid ${bd}`}}/>
+                          <Tooltip formatter={(v:unknown)=>`${v}%`} contentStyle={{fontSize:12,borderRadius:8,border:`1px solid ${bd}`}}/>
                           <Line type="monotone" dataKey="hwRate" stroke={navy} strokeWidth={2.5} dot={{r:4,fill:navy}} connectNulls/>
                         </LineChart>
                       </ResponsiveContainer>
@@ -270,7 +270,7 @@ export default function StatsPage(){
                           <CartesianGrid strokeDasharray="3 3" stroke={bd}/>
                           <XAxis dataKey="date" tick={{fontSize:10,fill:tx3}} axisLine={{stroke:bd}}/>
                           <YAxis domain={[0,100]} tick={{fontSize:10,fill:tx3}} axisLine={{stroke:bd}}/>
-                          <Tooltip formatter={(v:any)=>v+'%'} contentStyle={{fontSize:12,borderRadius:8,border:`1px solid ${bd}`}}/>
+                          <Tooltip formatter={(v:unknown)=>`${v}%`} contentStyle={{fontSize:12,borderRadius:8,border:`1px solid ${bd}`}}/>
                           <Line type="monotone" dataKey="hwCor" stroke="var(--ui-chart-2)" strokeWidth={2.5} dot={{ r: 4, fill: "var(--ui-chart-2)" }} connectNulls/>
                         </LineChart>
                       </ResponsiveContainer>

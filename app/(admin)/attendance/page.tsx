@@ -123,7 +123,8 @@ export default function AttendancePage() {
           const msg2 = error.message?.toLowerCase() ?? ''
           // work_minutes가 generated column이면 제외하고 재시도
           if (msg2.includes('non-default') || msg2.includes('generated') || msg2.includes('work_minutes')) {
-            const { work_minutes: _wm, ...noWm } = base as any
+            const noWm = { ...base }
+            delete noWm.work_minutes
             ;({ error } = await doSave(noWm))
           }
         }

@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/context/AuthContext'
 import { useParentChild } from '../layout'
 import { IconArrowUp, IconInbox, IconSend, IconPencil } from '@/components/icons'
 import { RecordComment, groupCommentsByRecord } from '@/lib/records'
@@ -24,7 +25,8 @@ function attColor(v: number)  { return v >= 8  ? gr : v >= 5  ? 'var(--ui-warnin
 function attLabel(v: number)  { return v >= 8  ? '우수' : v >= 5 ? '보통' : '노력필요' }
 
 export default function ParentRecords() {
-  const { selChild, setSelChild, children } = useParentChild()
+  const { parent } = useAuth()
+  const { selChild, children } = useParentChild()
   const [recs,    setRecs]    = useState<Rec[]>([])
   const [loading, setLoading] = useState(false)
   const [comments, setComments] = useState<RecordComment[]>([])
@@ -36,45 +38,58 @@ export default function ParentRecords() {
   const [editedNotice, setEditedNotice] = useState<{ id: number; date: string }[]>([])
 
   useEffect(() => {
-    if (!selChild) return
-    fetchRecs(selChild)
-  }, [selChild])
+    if (!selChild || !parent?.sessionToken) return
+    const controller = new AbortController()
+    fetchRecs(selChild, parent.sessionToken, controller.signal)
+    return () => controller.abort()
+  }, [selChild, parent?.sessionToken])
 
-  async function fetchRecs(stuId: number) {
+  async function fetchRecs(stuId: number, token: string, signal: AbortSignal) {
     setLoading(true)
-    const { data: recsData } = await supabase
-      .from('records')
-      .select('*')
-      .eq('student_id', stuId)
-      .eq('is_draft', false)
-      .eq('released_to_parent', true) // 관리자가 "발송"을 누른 기록만 노출 (실제 푸시 성공 여부와는 무관)
-      .order('date', { ascending: false })
+    setRecs([])
+    setComments([])
+    setClassNames({})
+    setEditedNotice([])
+    // 반드시 client_records RPC를 거친다 — 이 학부모 토큰이 실제로 이 학생의 보호자인지
+    // 서버(DB)가 확인한 뒤에만 기록을 돌려준다. records 테이블은 더 이상 직접 조회할 수 없다.
+    const { data: recsRaw } = await supabase
+      .rpc('client_records', { p_token: token, p_student_id: stuId })
+      .abortSignal(signal)
+    const recsData = recsRaw as Rec[] | null
 
+    if (signal.aborted) return
     if (!recsData || recsData.length === 0) { setRecs([]); setComments([]); setLoading(false); return }
 
     // 반이 2개 이상인 학생은 기록마다 어느 반 숙제인지 배지로 구분해서 보여준다
-    const classIds = [...new Set(recsData.map((r: any) => r.class_id).filter((id: any): id is number => id != null))]
+    const classIds = [...new Set(recsData.map(r => r.class_id).filter((id): id is number => id != null))]
     if (classIds.length > 0) {
-      const { data: classesData } = await supabase.from('classes').select('id,name').in('id', classIds)
+      const { data: classesData } = await supabase.from('classes').select('id,name').in('id', classIds).abortSignal(signal)
+      if (signal.aborted) return
       const cmap: Record<number, string> = {}
       for (const c of (classesData ?? [])) cmap[c.id] = c.name
       setClassNames(cmap)
     }
 
+    type TestItemRawRow = { record_id: number; test_id: number; t_total: number; t_cor: number; t_score: number }
     const recIds = recsData.map(r => r.id)
-    const [{ data: items }, { data: commentsData }] = await Promise.all([
-      supabase.from('record_test_items').select('id,record_id,test_id,t_total,t_cor,t_score').in('record_id', recIds),
-      supabase.from('record_comments').select('*').in('record_id', recIds).order('created_at', { ascending: true }),
+    const [{ data: itemsRaw }, { data: commentsRaw }] = await Promise.all([
+      supabase.rpc('client_record_test_items', { p_token: token, p_record_ids: recIds }).abortSignal(signal),
+      supabase.rpc('client_record_comments', { p_token: token, p_record_ids: recIds }).abortSignal(signal),
     ])
+    if (signal.aborted) return
+    const items = itemsRaw as TestItemRawRow[] | null
+    const commentsData = commentsRaw as RecordComment[] | null
 
-    const testIds = [...new Set((items ?? []).map((x: any) => x.test_id))]
-    let testsMap: Record<number, string> = {}
+    const testIds = [...new Set((items ?? []).map(x => x.test_id))]
+    const testsMap: Record<number, string> = {}
     if (testIds.length > 0) {
-      const { data: testsData } = await supabase.from('tests').select('id,name').in('id', testIds)
+      const { data: testsData } = await supabase.from('tests').select('id,name').in('id', testIds).abortSignal(signal)
+      if (signal.aborted) return
       for (const t of (testsData ?? [])) testsMap[t.id] = t.name
     }
 
-    const itemsByRecord: Record<number, any[]> = {}
+    type TestItemRow = { test_id: number; t_total: number; t_cor: number; t_score: number; tests: { name: string } | null }
+    const itemsByRecord: Record<number, TestItemRow[]> = {}
     for (const item of (items ?? [])) {
       if (!itemsByRecord[item.record_id]) itemsByRecord[item.record_id] = []
       itemsByRecord[item.record_id].push({
@@ -96,7 +111,8 @@ export default function ParentRecords() {
     const unviewedIds = merged.filter(r => !r.viewed_at).map(r => r.id)
     if (unviewedIds.length > 0) {
       const nowIso = new Date().toISOString()
-      supabase.from('records').update({ viewed_at: nowIso }).in('id', unviewedIds).then(({ error }) => {
+      supabase.rpc('client_mark_records_viewed', { p_token: token, p_record_ids: unviewedIds }).then(({ error }) => {
+        if (signal.aborted) return
         if (error) { console.error('[읽음 표시 실패]', error); return }
         setRecs(rs => rs.map(r => unviewedIds.includes(r.id) ? { ...r, viewed_at: nowIso } : r))
       })
@@ -106,31 +122,28 @@ export default function ParentRecords() {
   async function dismissEditedNotice() {
     const ids = editedNotice.map(n => n.id)
     setEditedNotice([])
-    if (ids.length === 0) return
-    await supabase.from('records').update({ edited_at: null }).in('id', ids)
+    if (ids.length === 0 || !parent?.sessionToken) return
+    await supabase.rpc('client_dismiss_edited_notice', { p_token: parent.sessionToken, p_record_ids: ids })
   }
 
   async function sendComment(recId: number) {
     const text = (commentDrafts[recId] ?? '').trim()
-    if (!text) return
+    if (!text || !parent?.sessionToken) return
     setSendingId(recId)
     setCommentErr(e => ({ ...e, [recId]: '' }))
-    const { data, error } = await supabase.from('record_comments')
-      .insert({ record_id: recId, sender_type: 'parent', content: text })
-      .select('*').single()
+    const { data, error } = await supabase
+      .rpc('client_send_record_comment', { p_token: parent.sessionToken, p_record_id: recId, p_content: text })
+      .single()
     setSendingId(null)
     if (error) { setCommentErr(e => ({ ...e, [recId]: '전송에 실패했습니다.' })); return }
     setComments(cs => [...cs, data as RecordComment])
     setCommentDrafts(d => ({ ...d, [recId]: '' }))
 
-    // 의견을 남긴다는 것 자체가 학부모가 기록을 확인했다는 확실한 증거이므로,
-    // 아직 읽음 처리가 안 된 기록이면 여기서 읽음 처리도 보정한다.
+    // client_send_record_comment가 서버에서 읽음 처리까지 함께 반영하므로, 화면 상태만 맞춰준다.
     const alreadyViewed = !!recs.find(r => r.id === recId)?.viewed_at
     if (!alreadyViewed) {
       const nowIso = new Date().toISOString()
-      supabase.from('records').update({ viewed_at: nowIso }).eq('id', recId).then(({ error: e2 }) => {
-        if (!e2) setRecs(rs => rs.map(r => r.id === recId ? { ...r, viewed_at: nowIso } : r))
-      })
+      setRecs(rs => rs.map(r => r.id === recId ? { ...r, viewed_at: nowIso } : r))
     }
 
     fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push-admin`, {
@@ -171,7 +184,7 @@ export default function ParentRecords() {
             </div>
           )}
 
-          <TodayClassBanner studentId={selChild} />
+          <TodayClassBanner studentId={selChild} sessionToken={parent?.sessionToken} />
 
           {/* 학생 헤더 */}
           <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: '14px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>

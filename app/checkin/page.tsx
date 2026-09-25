@@ -32,8 +32,8 @@ function KioskLoginGate({ children }: { children: React.ReactNode }) {
         throw new Error('관리자 계정만 로그인할 수 있습니다.')
       }
       loginAsTeacher(teacher)
-    } catch (e: any) {
-      setErr(e.message)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e))
     } finally {
       setBusy(false)
     }
@@ -124,8 +124,9 @@ function CheckinKioskInner() {
         return
       }
 
+      type ParentQueryRow = { id: number; phone: string; parent_students: { student_id: number; students: { id: number; name: string; school: string | null } | null }[] | null }
       const candidates: Candidate[] = []
-      for (const p of data as any[]) {
+      for (const p of data as unknown as ParentQueryRow[]) {
         for (const ps of (p.parent_students ?? [])) {
           if (!ps.students) continue
           candidates.push({

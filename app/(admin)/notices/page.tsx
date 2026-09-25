@@ -3,11 +3,14 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { can, Role } from '@/lib/permissions'
-import { kstDateOf, kstDateStr, kstTimeOf } from '@/lib/kst'
-import { IconBell, IconPin } from '@/components/icons'
+import { kstDateOf, kstTimeOf } from '@/lib/kst'
+import { IconBell } from '@/components/icons'
 import { useMobileMode } from '@/context/MobileModeContext'
 import RichTextEditor from '@/components/RichTextEditor'
 import { resolveNoticeTargetIds, studentIdsOfClass as resolveStudentIdsOfClass } from '@/lib/notices'
+import { saveNotice } from '@/lib/notice-save'
+import { navy, navyDk, navyM, gold, goldL, bg, bd, tx, tx2, tx3, re, rbg, gr, gbg } from '@/lib/ui-tokens'
+import BoardRow from '@/components/notices/BoardRow'
 
 type Notice = {
   id: number
@@ -36,23 +39,9 @@ const EMPTY = {
 }
 
 /* ── 공통 스타일 상수 (v18 CSS 변수 기반) ── */
-const navy    = 'var(--ui-primary)'
-const navyDk  = 'var(--ui-primary-text)'
-const navyLt  = 'var(--ui-primary)'
-const navyMuted = 'var(--ui-surface-2)'
-const gold    = 'var(--ui-primary)'
-const goldLt  = 'var(--ui-primary-hover)'
-const goldPale = 'var(--ui-surface-2)'
-const bg      = 'var(--ui-bg)'
-const sf      = '#FFFFFF'
-const bd      = 'var(--ui-border)'
-const tx      = 'var(--ui-text)'
-const tx2     = 'var(--ui-text-2)'
-const tx3     = 'var(--ui-text-3)'
-const re      = 'var(--ui-danger)'
-const rbg     = 'var(--ui-danger-bg)'
-const gbg     = 'var(--ui-success-bg)'
-const gr      = 'var(--ui-success)'
+const navyMuted = navyM
+const goldLt = goldL
+const goldPale = navyM
 
 export default function NoticesPage() {
   const { teacher, role } = useAuth()
@@ -94,7 +83,7 @@ export default function NoticesPage() {
     ])
     setNotices(data ?? [])
     const tmap: Record<number, number[]> = {}
-    for (const row of (targets ?? []) as any[]) {
+    for (const row of (targets ?? []) as { notice_id: number; student_id: number }[]) {
       if (!tmap[row.notice_id]) tmap[row.notice_id] = []
       tmap[row.notice_id].push(row.student_id)
     }
@@ -129,10 +118,11 @@ export default function NoticesPage() {
   async function fetchParentsMap() {
     const { data } = await supabase.from('parents').select('id, phone, parent_students(students(name))')
     const map: Record<number, { phone: string; names: string[] }> = {}
-    for (const row of (data ?? []) as any[]) {
+    type ParentQueryRow = { id: number; phone: string; parent_students: { students: { name: string } | null }[] | null }
+    for (const row of (data ?? []) as unknown as ParentQueryRow[]) {
       map[row.id] = {
         phone: row.phone,
-        names: (row.parent_students ?? []).map((ps: any) => ps.students?.name).filter(Boolean),
+        names: (row.parent_students ?? []).map(ps => ps.students?.name).filter((n): n is string => Boolean(n)),
       }
     }
     setParentsMap(map)
@@ -207,31 +197,27 @@ export default function NoticesPage() {
   }
 
   async function save() {
+    if (saving) return
     if (!form.title.trim()) return toast('제목을 입력하세요.', false)
     setSaving(true)
-    // 모든 공지는 항상 학부모에게 공개된다 (비공개 옵션 없음).
-    const payload = { title: form.title, content: form.content, pinned: form.pinned, parent_visible: true }
-    let noticeId = editId
-    if (editId) {
-      await supabase.from('notices').update(payload).eq('id', editId)
-    } else {
-      const { data } = await supabase.from('notices').insert({ ...payload, created_by: teacher?.userId, created_at: kstDateStr() }).select('id').single()
-      noticeId = data?.id ?? null
+    let noticeId: number
+    try {
+      noticeId = await saveNotice(supabase, {
+        id: editId, title: form.title, content: form.content, pinned: form.pinned,
+        targetMode: form.target_mode, studentIds: form.target_student_ids,
+      })
+    } catch (error) {
+      toast(error instanceof Error ? error.message : '공지 저장에 실패했습니다.', false)
+      return
+    } finally {
+      setSaving(false)
     }
 
-    // '반으로 빠르게 선택'으로 담긴 학생도 선택한 학생만 모드와 동일하게 저장된다.
     const resolvedTargetIds = resolveNoticeTargetIds(form.target_mode, form.target_student_ids)
-
-    if (noticeId) {
-      await supabase.from('notice_target_students').delete().eq('notice_id', noticeId)
-      if (resolvedTargetIds.length > 0) {
-        await supabase.from('notice_target_students').insert(resolvedTargetIds.map(sid => ({ notice_id: noticeId, student_id: sid })))
-      }
-    }
 
     const isNew = !editId
     toast(editId ? '공지가 수정되었습니다.' : '공지가 등록되었습니다.')
-    setSaving(false); setModal(false); fetchNotices()
+    setModal(false); fetchNotices()
 
     // 신규 등록인 경우에만 열람 가능한 학부모 전원에게 푸시 발송 (수정 시 알림 스팸 방지)
     if (isNew && noticeId) {
@@ -251,7 +237,8 @@ export default function NoticesPage() {
 
   async function remove(id: number) {
     if (!confirm('공지사항을 삭제하시겠습니까?')) return
-    await supabase.from('notices').delete().eq('id', id)
+    const { error } = await supabase.from('notices').delete().eq('id', id)
+    if (error) return toast('공지를 삭제하지 못했습니다. 다시 시도해 주세요.', false)
     setDetail(null); toast('삭제되었습니다.', false); fetchNotices()
   }
 
@@ -304,11 +291,6 @@ export default function NoticesPage() {
   const filtered    = notices.filter(n => n.title.includes(search))
   const pinnedList  = filtered.filter(n => n.pinned)
   const normalList  = filtered.filter(n => !n.pinned)
-
-  // N 표시 — 24시간 이내 작성된 글
-  function isNew(createdAt: string) {
-    return Date.now() - new Date(createdAt).getTime() < 24 * 60 * 60 * 1000
-  }
 
   function targetLabel(n: Notice): string {
     if (!n.parent_visible) return '비공개'
@@ -719,114 +701,3 @@ export default function NoticesPage() {
   )
 }
 
-// ── 게시판 행 (네이버카페 스타일) ──
-function BoardRow({ notice, index, pinned, canWrite, mobile, visLabel, viewCount, onClick, onEdit, onDelete, isLast }: {
-  notice: Notice; index: number | string; pinned: boolean; canWrite: boolean; mobile?: boolean; visLabel: string; viewCount: number
-  onClick: () => void; onEdit: () => void; onDelete: () => void; isLast: boolean
-}) {
-  const navy = 'var(--ui-primary)', gold = 'var(--ui-primary)', bd = 'var(--ui-border)'
-  const tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)'
-  const re = 'var(--ui-danger)', rbg = 'var(--ui-danger-bg)', gr = 'var(--ui-success)', gbg = 'var(--ui-success-bg)', navyM = 'var(--ui-surface-2)'
-
-  function isNew(createdAt: string) {
-    return Date.now() - new Date(createdAt).getTime() < 24 * 60 * 60 * 1000
-  }
-
-  const visColor = visLabel === '비공개' ? { bg: rbg, color: re } : visLabel === '전체공개' ? { bg: gbg, color: gr } : { bg: navyM, color: navy }
-  const visBadge = <span className="vis-badge" style={{ background: visColor.bg, color: visColor.color }}>{visLabel}</span>
-
-  if (mobile) {
-    return (
-      <div
-        className="notice-row"
-        onClick={onClick}
-        style={{
-          padding: '13px 15px', cursor: 'pointer',
-          background: pinned ? 'var(--ui-info-bg)' : '#fff',
-          borderBottom: isLast ? 'none' : `1px solid ${bd}`,
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 7 }}>
-          {pinned
-            ? <span style={{ background: gold, color: '#fff', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, flexShrink: 0 }}>공지</span>
-            : <span style={{ fontSize: 11, color: tx3, flexShrink: 0, width: 14, textAlign: 'right' }}>{index}</span>
-          }
-          <span style={{ fontSize: 13.5, fontWeight: pinned ? 700 : 500, color: tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{notice.title}</span>
-          {isNew(notice.created_at) && <span style={{ background: rbg, color: re, fontSize: 9.5, fontWeight: 700, flexShrink: 0, padding: '1px 5px', borderRadius: 20 }}>N</span>}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
-          {visBadge}
-          <span style={{ fontSize: 11, color: tx3 }}>조회 {viewCount}</span>
-          <span style={{ fontSize: 11, color: tx3 }}>{kstDateOf(notice.created_at)}</span>
-          {canWrite && (
-            <div style={{ display: 'flex', gap: 5, marginLeft: 'auto' }}>
-              <button
-                onClick={e => { e.stopPropagation(); onEdit() }}
-                style={{ padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 500, cursor: 'pointer', border: `1px solid ${bd}`, background: 'transparent', color: tx2, fontFamily: 'inherit' }}
-              >수정</button>
-              <button
-                onClick={e => { e.stopPropagation(); onDelete() }}
-                style={{ padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 500, cursor: 'pointer', border: 'none', background: rbg, color: re, fontFamily: 'inherit' }}
-              >삭제</button>
-            </div>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div
-      className="notice-row"
-      onClick={onClick}
-      style={{
-        display: 'grid', gridTemplateColumns: '60px 1fr 100px 70px 90px 112px', gap: 10,
-        padding: '13px 18px', alignItems: 'center', cursor: 'pointer',
-        background: pinned ? 'var(--ui-info-bg)' : '#fff',
-        borderBottom: isLast ? 'none' : `1px solid ${bd}`,
-        position: 'relative',
-      }}
-    >
-      <div style={{ textAlign: 'center' }}>
-        {pinned ? (
-          <span style={{ background: gold, color: '#fff', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20 }}>공지</span>
-        ) : (
-          <span style={{ fontSize: 12, color: tx3 }}>{index}</span>
-        )}
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
-        <span style={{
-          fontSize: 13.5, fontWeight: pinned ? 700 : 500, color: tx,
-          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-        }}>{notice.title}</span>
-        {isNew(notice.created_at) && (
-          <span style={{ background: rbg, color: re, fontSize: 9.5, fontWeight: 700, flexShrink: 0, padding: '1px 5px', borderRadius: 20 }}>N</span>
-        )}
-      </div>
-
-      <div style={{ textAlign: 'center' }}>{visBadge}</div>
-
-      <div style={{ textAlign: 'center', fontSize: 12, color: tx3 }}>{viewCount}</div>
-
-      <div style={{ textAlign: 'center', fontSize: 11, color: tx3 }}>{kstDateOf(notice.created_at)}</div>
-
-      <div style={{ textAlign: 'center' }}>
-        {canWrite ? (
-          <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
-            <button
-              onClick={e => { e.stopPropagation(); onEdit() }}
-              style={{ padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500, cursor: 'pointer', border: `1px solid ${bd}`, background: 'transparent', color: tx2, fontFamily: 'inherit' }}
-            >수정</button>
-            <button
-              onClick={e => { e.stopPropagation(); onDelete() }}
-              style={{ padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500, cursor: 'pointer', border: 'none', background: rbg, color: re, fontFamily: 'inherit' }}
-            >삭제</button>
-          </div>
-        ) : (
-          <span style={{ fontSize: 11, color: tx3 }}>-</span>
-        )}
-      </div>
-    </div>
-  )
-}
