@@ -138,12 +138,15 @@ function CheckinKioskInner() {
 
       if (candidates.length === 0) {
         setScreen({ kind: 'error', message: '연결된 학생 정보가 없습니다. 선생님께 문의하세요.' })
+        setBusy(false)
       } else if (candidates.length === 1) {
-        setScreen({ kind: 'confirm', c: candidates[0] })
+        // 일치하는 학생이 한 명뿐이면 확인 화면 없이 바로 등원 처리한다
+        await confirmCheckin(candidates[0])
       } else {
         setScreen({ kind: 'select', candidates })
+        setBusy(false)
       }
-    } finally {
+    } catch {
       setBusy(false)
     }
   }
