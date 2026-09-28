@@ -4,8 +4,9 @@
 
 1. Supabase SQL Editor에서 `supabase/auto_grading_migration.sql`을 실행합니다.
 2. `supabase/auto_grading_cron.sql`을 실행합니다. `pg_cron` 활성화가 필요한 환경에서는 Database → Extensions에서 먼저 활성화합니다.
-3. 서버 환경에 기존 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`가 설정되어 있는지 확인하고 앱을 배포합니다. 서비스 역할 키는 `NEXT_PUBLIC_` 변수로 노출하지 않습니다.
-4. 테스트관리에서 시험을 만들어 학생 계정으로 한 번 응시해 보고, 제출 결과와 수업기록 자동입력을 확인합니다.
+3. 학생 시험 목록 조회가 느리다면 `supabase/student_test_list_indexes_migration.sql`을 실행합니다. 학생 기준 조회 인덱스만 추가하며 시험 데이터나 권한은 바꾸지 않습니다.
+4. 서버 환경에 기존 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`가 설정되어 있는지 확인하고 앱을 배포합니다. 서비스 역할 키는 `NEXT_PUBLIC_` 변수로 노출하지 않습니다.
+5. 테스트관리에서 시험을 만들어 학생 계정으로 한 번 응시해 보고, 제출 결과와 수업기록 자동입력을 확인합니다.
 
 마이그레이션은 기존 시험을 모두 수동 방식으로 유지합니다. 자동채점 설정과 관련된 테이블/함수만 추가하며, 기존 성적은 바꾸지 않습니다. DB를 먼저 적용하고 앱을 배포합니다. 두 SQL 파일은 다시 실행할 수 있습니다.
 

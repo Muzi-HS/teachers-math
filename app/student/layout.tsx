@@ -44,6 +44,11 @@ function StudentLayoutContent({ children }: { children: React.ReactNode }) {
   const [notifRequesting, setNotifRequesting] = useState(false)
   const [unreadNotices, setUnreadNotices] = useState(0)
 
+  // 시험 화면은 별도 API를 사용하므로 화면 코드만 미리 준비해 탭 전환 시간을 줄인다.
+  useEffect(() => {
+    if (student?.studentId) router.prefetch('/student/tests')
+  }, [student?.studentId, router])
+
   // 반 공지(class_notices)에는 서버 쪽 읽음 표시가 없어서, 마지막으로 "공지" 탭을 연
   // 시각(로컬 저장)보다 최근에 올라온 공지 수를 안 읽은 개수로 센다. 공지 탭에 들어가면
   // (app/student/notices/page.tsx) 그 시각을 지금으로 갱신한다.

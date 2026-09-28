@@ -21,9 +21,11 @@ function errorResponse(error: unknown) {
 
 export async function GET(req: NextRequest) {
   try {
-    const { db, key } = serverClient()
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!key) throw new Error('시험 서버 설정을 확인해 주세요.')
     const studentId = readTestSession(req.cookies.get(TEST_SESSION_COOKIE)?.value, key)
     if (!studentId || studentId !== Number(req.nextUrl.searchParams.get('studentId'))) return response({ error: '시험 응시를 위해 PIN을 확인해 주세요.' }, 401)
+    const { db } = serverClient()
     const { data, error } = await db.rpc('student_test_list', { p_student_id: studentId })
     if (error) return errorResponse(error)
     return response({ tests: data })

@@ -75,6 +75,9 @@ test('PostgreSQL migration and exam lifecycle', async t => {
   const migration = readFileSync(new URL('../supabase/auto_grading_migration.sql', import.meta.url), 'utf8')
   await db.exec(migration)
   await db.exec(migration) // SQL Editor reruns must remain safe.
+  const listIndexes = readFileSync(new URL('../supabase/student_test_list_indexes_migration.sql', import.meta.url), 'utf8')
+  await db.exec(listIndexes)
+  await db.exec(listIndexes)
   const questions = [{ points: 20, choices: [2], text: '' }, { points: 30, choices: [1, 3], text: '' }, { points: 50, choices: [], text: 'x = 2' }]
   async function create(published = true, qs = questions) {
     const { rows } = await db.query('select save_auto_test(null,$1,$2,$3,true,$4,$5,$6) as id', ['Test','2026-09-22',qs.length,published,JSON.stringify(qs),[1,2]])
