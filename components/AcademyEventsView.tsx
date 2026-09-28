@@ -21,8 +21,10 @@ function eventColor(e: Event_) {
 
 const DOW = ['일','월','화','수','목','금','토']
 
-// 학부모/학생 화면이 공유하는 학원 일정(달력) 뷰 — 둘 다 events.parent_visible 기준으로 동일하게 노출한다.
-export default function AcademyEventsView() {
+// 학부모/학생 화면이 공유하는 학원 일정(달력) 뷰 — 관리자가 일정 등록 시 학부모/학생을
+// 각각 독립적으로 공개 대상에서 켜고 끌 수 있어(parent_visible/student_visible), 역할에
+// 맞는 컬럼으로 필터링한다.
+export default function AcademyEventsView({ role }: { role: 'parent' | 'student' }) {
   const [events,   setEvents]   = useState<Event_[]>([])
   const [loading,  setLoading]  = useState(true)
   const [today] = useState(() => new Date())
@@ -35,13 +37,13 @@ export default function AcademyEventsView() {
       const { data } = await supabase
         .from('events')
         .select('id,title,start_date,end_date,start_time,end_time,type,memo')
-        .eq('parent_visible', true)
+        .eq(role === 'parent' ? 'parent_visible' : 'student_visible', true)
         .order('start_date', { ascending: true })
       setEvents(data ?? [])
       setLoading(false)
     }
     fetch()
-  }, [])
+  }, [role])
 
   function prevMonth() {
     if (curMonth === 0) { setCurYear(y => y - 1); setCurMonth(11) }

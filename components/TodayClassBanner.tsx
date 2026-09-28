@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { kstNow } from '@/lib/kst'
+import { kstNow, kstDateStr } from '@/lib/kst'
 import { IconClock } from '@/components/icons'
 
 const navy = 'var(--ui-primary)'
@@ -25,8 +25,11 @@ export default function TodayClassBanner({ studentId, sessionToken }: { studentI
       const classIds = ((csRows ?? []) as { class_id: number }[]).map(r => r.class_id)
       if (classIds.length === 0) { if (!cancelled) setClasses([]); return }
       const { data: cls } = await supabase.from('classes').select('id,name,days,time').in('id', classIds)
+      const today = kstDateStr()
+      const { data: cancelRows } = await supabase.from('class_cancellations').select('class_id').eq('cancel_date', today).in('class_id', classIds)
+      const cancelledClassIds = new Set((cancelRows ?? []).map(r => r.class_id))
       const todays = (cls ?? [])
-        .filter(c => (c.days ?? '').includes(todayDow) && c.time)
+        .filter(c => (c.days ?? '').includes(todayDow) && c.time && !cancelledClassIds.has(c.id))
         .map(c => ({ id: c.id, name: c.name, time: c.time as string }))
         .sort((a, b) => a.time.localeCompare(b.time))
       if (!cancelled) setClasses(todays)

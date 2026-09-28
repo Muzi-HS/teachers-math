@@ -5,11 +5,10 @@ import Image from 'next/image'
 import { useAuth } from '@/context/AuthContext'
 import { requestFCMToken, isFCMSupported } from '@/lib/firebase'
 import ForegroundNotification from '@/components/ForegroundNotification'
-import { InternalThemeProvider } from '@/context/InternalThemeContext'
 import { MobileModeProvider } from '@/context/MobileModeContext'
-import ThemeToggle from '@/components/ui/ThemeToggle'
+import { supabase } from '@/lib/supabase'
 
-const navy='var(--ui-primary)', navyDk='var(--ui-primary)', bd='var(--ui-border)', bg='var(--ui-bg)', tx2='var(--ui-text-2)', tx3='var(--ui-text-3)'
+const navy='var(--ui-primary)', navyDk='var(--ui-primary)', bd='var(--ui-border)', bg='var(--ui-bg)', tx2='var(--ui-text-2)'
 
 // ── 자녀 선택 Context ──
 type Child = { id: number; name: string; birth_year: number; school: string }
@@ -28,6 +27,8 @@ export function useParentChild() {
 }
 
 const NAV = [
+  { href: '/parent/home', label: '홈',
+    icon: <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth={2} d="m3 11 9-8 9 8M5 10v10h14V10"/></svg> },
   { href: '/parent/records', label: '수업기록',
     icon: <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg> },
   { href: '/parent/notices', label: '공지사항',
@@ -39,7 +40,11 @@ const NAV = [
 ]
 
 export default function ParentLayout({ children }: { children: React.ReactNode }) {
-  return <InternalThemeProvider><MobileModeProvider><ParentLayoutContent>{children}</ParentLayoutContent></MobileModeProvider></InternalThemeProvider>
+  // 학부모 화면은 테마 선택 없이 그린 테마로 고정한다 (관리자 화면의 InternalThemeProvider/
+  // localStorage 토글을 상속하지 않도록 data-ui-theme을 직접 "green"으로 박아둔다).
+  return <div className="internal-ui" data-ui-theme="green" style={{ display: 'contents' }}>
+    <MobileModeProvider><ParentLayoutContent>{children}</ParentLayoutContent></MobileModeProvider>
+  </div>
 }
 
 function ParentLayoutContent({ children }: { children: React.ReactNode }) {
@@ -49,6 +54,51 @@ function ParentLayoutContent({ children }: { children: React.ReactNode }) {
 
   const [selChild, setSelChild] = useState<number | null>(null)
   const [ready,    setReady]    = useState(false)
+  const [unreadNotices, setUnreadNotices] = useState(0)
+
+  // 진짜 "안 읽음" 개수는 서버에서 SECURITY DEFINER로 계산한다(client_unread_notice_count).
+  // notice_reads 테이블은 anon 직접 SELECT 정책이 보안 강화 과정에서 제거되어(스태프 전용),
+  // 브라우저에서 anon 키로 이 테이블을 직접 조회하면 항상 빈 결과만 받아서 공지를 읽어도
+  // 배지가 절대 사라지지 않는 문제가 있었다 — client_mark_notice_read와 같은 방식으로
+  // 서버 쪽 RPC가 개수를 계산해서 돌려주도록 바꿨다. 공지 화면은 페이지 이동 없이 그
+  // 자리에서 읽음 처리를 하므로, pathname 변화뿐 아니라 그 화면이 쏘는 'notice-read'
+  // 이벤트로도 다시 계산해서 종 배지가 바로 갱신되게 한다.
+  useEffect(() => {
+    if (!parent?.sessionToken || !parent.children || parent.children.length === 0) { setUnreadNotices(0); return }
+    let cancelled = false
+    function checkUnread() {
+      supabase.rpc('client_unread_notice_count', { p_token: parent!.sessionToken }).then(({ data, error }) => {
+        if (cancelled || error) return
+        setUnreadNotices((data as number) ?? 0)
+      })
+    }
+    checkUnread()
+    window.addEventListener('notice-read', checkUnread)
+    return () => { cancelled = true; window.removeEventListener('notice-read', checkUnread) }
+  }, [parent?.sessionToken, parent?.children, pathname])
+
+  // 문의하기 안 읽음 개수 — 문의 메시지에는 서버 쪽 읽음 표시가 없어서, 마지막으로
+  // "문의하기" 탭을 연 시각(로컬 저장, parentId별)보다 최근에 온 "선생님" 답장 수를
+  // 안 읽은 개수로 센다. 문의 탭에 들어가면(app/parent/inquiries/page.tsx) 그 시각을
+  // 지금으로 갱신하고 'inquiry-read' 이벤트를 쏴서 여기서 바로 다시 계산한다.
+  const [unreadInquiries, setUnreadInquiries] = useState(0)
+  useEffect(() => {
+    if (!parent?.sessionToken || !parent.parentId) { setUnreadInquiries(0); return }
+    let cancelled = false
+    function checkUnread() {
+      supabase.rpc('client_inquiry_messages', { p_token: parent!.sessionToken }).then(({ data }) => {
+        if (cancelled) return
+        const msgs = (data ?? []) as { sender_type: 'parent' | 'admin'; created_at: string }[]
+        let seen = ''
+        try { seen = localStorage.getItem(`parent_inquiries_seen_${parent!.parentId}`) ?? '' } catch {}
+        const unread = msgs.filter(m => m.sender_type === 'admin' && (!seen || m.created_at > seen)).length
+        setUnreadInquiries(unread)
+      })
+    }
+    checkUnread()
+    window.addEventListener('inquiry-read', checkUnread)
+    return () => { cancelled = true; window.removeEventListener('inquiry-read', checkUnread) }
+  }, [parent?.sessionToken, parent?.parentId, pathname])
 
   // 알림 권한 배너 — 토큰이 없으면(=권한 미허용) 매 세션마다 다시 안내
   const [notifPerm, setNotifPerm] = useState<NotificationPermission | null>(null)
@@ -184,11 +234,11 @@ function ParentLayoutContent({ children }: { children: React.ReactNode }) {
     return () => navigator.serviceWorker.removeEventListener('message', onMessage)
   }, [router])
 
-  // /parent 루트 접근 시 수업기록으로 리다이렉트 (별도 effect, pathname만 의존)
+  // /parent 루트 접근 시 홈으로 리다이렉트 (별도 effect, pathname만 의존)
   useEffect(() => {
     if (!ready) return
     if (pathname === '/parent') {
-      router.replace('/parent/records')
+      router.replace('/parent/home')
     }
   }, [pathname, ready])
 
@@ -211,62 +261,56 @@ function ParentLayoutContent({ children }: { children: React.ReactNode }) {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Montserrat:wght@700;800&display=swap');
         * { box-sizing: border-box; }
-        .parent-main { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
-        .parent-nav { padding-bottom: env(safe-area-inset-bottom); height: calc(62px + env(safe-area-inset-bottom)); }
+        .parent-main { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
+        .parent-nav { padding-bottom: env(safe-area-inset-bottom); height: calc(70px + env(safe-area-inset-bottom)); }
       `}</style>
 
       {/* 상단 헤더 */}
       <header style={{
-        background: 'linear-gradient(135deg, var(--chrome-bg) 0%, var(--chrome-bg-2) 100%)',
-        padding: '0 16px', height: 54,
+        background: '#fff', borderBottom: '1px solid #EBF0EC',
+        padding: '0 20px', height: 62,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        position: 'sticky', top: 0, zIndex: 100,
-        boxShadow: '0 2px 8px rgba(0,0,0,.2)', flexShrink: 0,
+        position: 'sticky', top: 0, zIndex: 100, flexShrink: 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, overflow: 'hidden' }}>
-          <Image src="/logo.png" alt="로고" width={30} height={30} style={{ objectFit: 'contain', flexShrink: 0 }} />
-          <span style={{ fontFamily: 'Montserrat,sans-serif', fontSize: 13, fontWeight: 800, color: '#fff', letterSpacing: 0.5, flexShrink: 0 }}>
-            TEACHERS MATH
-          </span>
-          <span style={{ fontSize: 10, color: 'var(--chrome-text-2)', background: 'rgba(255,255,255,.1)', padding: '2px 6px', borderRadius: 10, flexShrink: 0 }}>
-            학부모
+          <Image src="/logo.png" alt="로고" width={24} height={24} style={{ objectFit: 'contain', flexShrink: 0 }} />
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#203F30', letterSpacing: -.2, flexShrink: 0, whiteSpace: 'nowrap' }}>
+            티처스 수학학원
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-          <ThemeToggle />
+          <span style={{ fontSize: 11, color: '#627668', whiteSpace: 'nowrap' }}>{childList.find(c => c.id === selChild)?.name ?? ''} 학부모님</span>
           <button
-            onClick={logout}
-            style={{ fontSize: 12, color: 'var(--chrome-text-2)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: "'Noto Sans KR',sans-serif", padding: 0 }}
-            onMouseEnter={e => (e.currentTarget.style.color = 'rgba(255,255,255,.9)')}
-            onMouseLeave={e => (e.currentTarget.style.color = 'var(--chrome-text-2)')}
+            onClick={logout} aria-label="로그아웃"
+            style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#819085', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '50%' }}
           >
-            로그아웃
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5" /><path d="M21 12H9" /></svg>
           </button>
         </div>
       </header>
 
       {/* 자녀 선택 탭 (다자녀인 경우만) */}
       {childList.length > 1 && (
-        <div style={{ background: '#fff', borderBottom: `1px solid ${bd}`, padding: '8px 16px', display: 'flex', gap: 8, overflowX: 'auto', flexShrink: 0 }}>
-          <span style={{ fontSize: 12, color: tx3, alignSelf: 'center', flexShrink: 0 }}>자녀:</span>
-          {childList.map(c => (
-            <button key={c.id} onClick={() => setSelChild(c.id)} style={{
-              padding: '5px 14px', borderRadius: 20, fontSize: 13,
-              fontWeight: selChild === c.id ? 700 : 400,
-              border: `1.5px solid ${selChild === c.id ? navy : bd}`,
-              background: selChild === c.id ? navy : '#fff',
-              color: selChild === c.id ? '#fff' : tx2,
-              cursor: 'pointer', fontFamily: "'Noto Sans KR',sans-serif",
-              flexShrink: 0, transition: 'all .15s', whiteSpace: 'nowrap',
-            }}>
-              {c.name}
-            </button>
-          ))}
+        <div style={{ background: '#fff', borderBottom: '1px solid #EBF0EC', padding: '10px 16px', flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: 4, background: '#E9EFEA', padding: 4, borderRadius: 9, maxWidth: 640, margin: '0 auto' }}>
+            {childList.map(c => (
+              <button key={c.id} onClick={() => setSelChild(c.id)} style={{
+                flex: 1, minWidth: 0, minHeight: 40, border: 0, borderRadius: 6, fontSize: 12,
+                fontWeight: selChild === c.id ? 700 : 500,
+                background: selChild === c.id ? '#fff' : 'transparent',
+                color: selChild === c.id ? '#1C5939' : '#667C6D',
+                boxShadow: selChild === c.id ? '0 1px 4px rgba(28,89,57,.04)' : 'none',
+                cursor: 'pointer', fontFamily: "'Noto Sans KR',sans-serif", whiteSpace: 'nowrap',
+              }}>
+                {c.name}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
       {/* 본문 */}
-      <main className="parent-main" style={{ flex: 1, padding: '16px 16px calc(80px + env(safe-area-inset-bottom))', maxWidth: 640, width: '100%', margin: '0 auto' }}>
+      <main className="parent-main" style={{ flex: 1, padding: '16px 16px calc(88px + env(safe-area-inset-bottom))', maxWidth: 640, width: '100%', margin: '0 auto' }}>
         {notifPerm && notifPerm !== 'granted' && !notifBannerDismissed && (
           <div style={{
             display: 'flex', alignItems: 'center', gap: 10,
@@ -306,26 +350,32 @@ function ParentLayoutContent({ children }: { children: React.ReactNode }) {
       {/* 하단 탭바 */}
       <nav className="parent-nav" style={{
         position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100,
-        background: '#fff', borderTop: `1px solid ${bd}`,
+        background: '#fff', borderTop: '1px solid #E2EAE3',
         display: 'flex',
-        boxShadow: '0 -2px 10px rgba(0,0,0,.08)',
-        alignItems: 'flex-start',
       }}>
         {NAV.map(item => {
           const active = pathname.startsWith(item.href)
+          const badge = item.href === '/parent/notices' ? unreadNotices
+            : item.href === '/parent/inquiries' ? unreadInquiries
+            : 0
           return (
             <button key={item.href} onClick={() => router.push(item.href)} style={{
-              flex: 1, display: 'flex', flexDirection: 'column',
-              alignItems: 'center', justifyContent: 'center', gap: 3,
-              height: 62,
+              flex: 1, display: 'flex', flexDirection: 'column', position: 'relative',
+              alignItems: 'center', justifyContent: 'center', gap: 6,
+              height: 70,
               background: 'none', border: 'none', cursor: 'pointer',
-              color: active ? navy : tx3,
+              color: active ? '#23633F' : '#819085',
               fontFamily: "'Noto Sans KR',sans-serif",
               transition: 'color .15s',
-              borderTop: active ? `2.5px solid ${navy}` : '2.5px solid transparent',
-              paddingTop: 2,
             }}>
-              <span style={{ color: active ? navy : tx3, display: 'flex' }}>{item.icon}</span>
+              {active && <span style={{ position: 'absolute', top: 0, width: 18, height: 2, background: '#23633F', borderRadius: '0 0 2px 2px' }} />}
+              <span style={{ position: 'relative', color: active ? '#23633F' : '#819085', display: 'flex' }}>
+                {item.icon}
+                {badge > 0 && <span style={{
+                  position: 'absolute', top: -4, right: -8, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 8,
+                  background: '#E4574A', color: '#fff', fontSize: 9, fontWeight: 700, lineHeight: '16px', textAlign: 'center',
+                }}>{badge > 99 ? '99+' : badge}</span>}
+              </span>
               <span style={{ fontSize: 10, fontWeight: active ? 700 : 400 }}>{item.label}</span>
             </button>
           )

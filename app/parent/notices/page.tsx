@@ -68,10 +68,14 @@ export default function ParentNotices() {
 
   useEffect(() => { if (detail) fetchComments(detail.id) }, [detail?.id])
 
-  // 공지 상세를 열람하면 이 학부모의 자녀들 기준으로 읽음 기록을 남긴다(조회수/읽음 표시용)
+  // 공지 상세를 열람하면 이 학부모의 자녀들 기준으로 읽음 기록을 남긴다(조회수/읽음 표시용).
+  // 헤더 종 아이콘의 "안 읽은 공지" 배지는 layout에서 계산하는데, 페이지 이동 없이 같은
+  // 화면 안에서 읽음 처리가 일어나므로 이벤트로 알려서 그 자리에서 바로 갱신되게 한다.
   useEffect(() => {
     if (!detail || !parent?.sessionToken) return
-    supabase.rpc('client_mark_notice_read', { p_token: parent.sessionToken, p_notice_id: detail.id }).then(() => {})
+    supabase.rpc('client_mark_notice_read', { p_token: parent.sessionToken, p_notice_id: detail.id }).then(() => {
+      window.dispatchEvent(new Event('notice-read'))
+    })
   }, [detail?.id, parent?.sessionToken])
 
   async function fetchComments(noticeId: number) {

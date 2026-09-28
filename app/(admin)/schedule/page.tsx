@@ -16,6 +16,7 @@ type Evt = {
     end_time: string | null
     type: 'normal' | 'holiday'
     parent_visible: boolean
+    student_visible: boolean
     memo: string | null
 }
 
@@ -29,19 +30,31 @@ type AttNotice = {
     reason: string | null
 }
 
+// 반별 휴강 등록 — class_cancellations 테이블
+type Cancellation = { id: number; class_id: number; cancel_date: string; memo: string | null }
+type ClassRow = { id: number; name: string; days: string }
+
 type FormState = {
   title: string; start_date: string; end_date: string
   start_time: string; end_time: string
   type: 'normal' | 'holiday'
-  parent_visible: boolean; memo: string; useTime: boolean
+  mode: 'event' | 'cancel'
+  targetParent: boolean; targetStudent: boolean
+  memo: string; useTime: boolean
+  cancelClassIds: number[]
 }
 
 const BLANK: FormState = {
     title: '', start_date: '', end_date: '',
     start_time: '', end_time: '',
     type: 'normal',
-    parent_visible: true, memo: '', useTime: false,
+    mode: 'event',
+    targetParent: true, targetStudent: true,
+    memo: '', useTime: false,
+    cancelClassIds: [],
 }
+
+const WEEK_ORDER = ['월', '화', '수', '목', '금', '토', '일']
 
 const navy = 'var(--ui-primary)'
 const navyDk = 'var(--ui-primary-text)'
@@ -72,13 +85,15 @@ export default function SchedulePage() {
     const [mo, setMo] = useState(kstNow().getMonth())  // 0-based
     const [notif, setNotif] = useState<{ msg: string; ok: boolean } | null>(null)
     const [attNotices, setAttNotices] = useState<AttNotice[]>([])
+    const [cancellations, setCancellations] = useState<Cancellation[]>([])
+    const [classesList, setClassesList] = useState<ClassRow[]>([])
     const [studentsMap, setStudentsMap] = useState<Record<number, string>>({})
     const [selectedDate, setSelectedDate] = useState<string | null>(null)
     const [loadError, setLoadError] = useState(false)
     const loadVersion = useRef(0)
 
     useEffect(() => { load() }, [yr, mo])
-    useEffect(() => { fetchStudents() }, [])
+    useEffect(() => { fetchStudents(); fetchClasses() }, [])
 
     async function fetchStudents() {
         const { data } = await supabase.from('students').select('id, name')
@@ -87,12 +102,18 @@ export default function SchedulePage() {
         setStudentsMap(map)
     }
 
+    async function fetchClasses() {
+        const { data } = await supabase.from('classes').select('id, name, days').order('name')
+        setClassesList((data ?? []) as ClassRow[])
+    }
+
     async function load() {
         const version = ++loadVersion.current
         setLoading(true)
         setLoadError(false)
         setEvts([])
         setAttNotices([])
+        setCancellations([])
 
         const ym = `${yr}-${String(mo + 1).padStart(2, '0')}`
         const from = `${ym}-01`
@@ -102,17 +123,19 @@ export default function SchedulePage() {
         const to = `${ym}-${String(lastDay).padStart(2, '0')}`
 
         try {
-            const [starts, overlaps, notices] = await Promise.all([
+            const [starts, overlaps, notices, cancels] = await Promise.all([
                 supabase.from('events').select('*').gte('start_date', from).lte('start_date', to),
                 supabase.from('events').select('*').lt('start_date', from).gte('end_date', from),
                 supabase.from('attendance_notices').select('*').gte('date', from).lte('date', to),
+                supabase.from('class_cancellations').select('id,class_id,cancel_date,memo').gte('cancel_date', from).lte('cancel_date', to),
             ])
             if (version !== loadVersion.current) return
-            if (starts.error || overlaps.error || notices.error) throw new Error('schedule-load')
+            if (starts.error || overlaps.error || notices.error || cancels.error) throw new Error('schedule-load')
             const map = new Map<number, Evt>()
             for (const event of [...(starts.data ?? []), ...(overlaps.data ?? [])]) map.set(event.id, event)
             setEvts([...map.values()].sort((a, b) => a.start_date.localeCompare(b.start_date) || (a.start_time ?? '').localeCompare(b.start_time ?? '')))
             setAttNotices(notices.data ?? [])
+            setCancellations((cancels.data ?? []) as Cancellation[])
         } catch {
             if (version === loadVersion.current) setLoadError(true)
         } finally {
@@ -141,14 +164,58 @@ export default function SchedulePage() {
             start_time: e.start_time ?? '',
             end_time: e.end_time ?? '',
             type: e.type,
-            parent_visible: e.parent_visible,
+            mode: 'event',
+            targetParent: e.parent_visible,
+            targetStudent: e.student_visible,
             memo: e.memo ?? '',
             useTime: !!(e.start_time || e.end_time),
+            cancelClassIds: [],
         })
         setModal(true)
     }
 
+    // 요일 버튼 하나(예: 월)를 누르면 그 요일에 수업이 있는 반을 한꺼번에 선택/해제한다 —
+    // 이미 그 요일 반이 전부 선택된 상태에서 다시 누르면 그 반들만 선택 해제된다.
+    function classIdsOnDay(day: string) {
+        return classesList.filter(c => (c.days ?? '').split(',').map(d => d.trim()).includes(day)).map(c => c.id)
+    }
+    function toggleCancelDay(day: string) {
+        const ids = classIdsOnDay(day)
+        const allSelected = ids.length > 0 && ids.every(id => form.cancelClassIds.includes(id))
+        setForm(f => ({
+            ...f,
+            cancelClassIds: allSelected
+                ? f.cancelClassIds.filter(id => !ids.includes(id))
+                : Array.from(new Set([...f.cancelClassIds, ...ids])),
+        }))
+    }
+    function toggleCancelAll() {
+        const allIds = classesList.map(c => c.id)
+        const allSelected = allIds.length > 0 && allIds.every(id => form.cancelClassIds.includes(id))
+        setForm(f => ({ ...f, cancelClassIds: allSelected ? [] : allIds }))
+    }
+    function toggleCancelClass(id: number) {
+        setForm(f => ({
+            ...f,
+            cancelClassIds: f.cancelClassIds.includes(id) ? f.cancelClassIds.filter(x => x !== id) : [...f.cancelClassIds, id],
+        }))
+    }
+
     async function save() {
+        if (form.mode === 'cancel') {
+            if (!form.start_date) return toast('휴강 날짜를 입력하세요.', false)
+            if (form.cancelClassIds.length === 0) return toast('휴강할 반을 선택하세요.', false)
+            setSaving(true)
+            const rows = form.cancelClassIds.map(class_id => ({
+                class_id, cancel_date: form.start_date, memo: form.memo || null, created_by: teacher?.userId,
+            }))
+            const { error } = await supabase.from('class_cancellations').upsert(rows, { onConflict: 'class_id,cancel_date' })
+            if (error) { toast('저장 실패: ' + error.message, false); setSaving(false); return }
+            toast('휴강이 등록되었습니다.')
+            setSaving(false); setModal(false)
+            await load()
+            return
+        }
         if (!form.title.trim()) return toast('제목을 입력하세요.', false)
         if (!form.start_date) return toast('시작 날짜를 입력하세요.', false)
         if (form.end_date && form.end_date < form.start_date) return toast('종료 날짜는 시작 날짜 이후로 선택해주세요.', false)
@@ -161,7 +228,8 @@ export default function SchedulePage() {
             start_time: form.useTime && form.start_time ? form.start_time : null,
             end_time: form.useTime && form.end_time ? form.end_time : null,
             type: form.type,
-            parent_visible: form.parent_visible,
+            parent_visible: form.targetParent,
+            student_visible: form.targetStudent,
             memo: form.memo || null,
             created_by: teacher?.userId,
         }
@@ -180,6 +248,14 @@ export default function SchedulePage() {
         const { error } = await supabase.from('events').delete().eq('id', id)
         if (error) return toast('삭제하지 못했습니다. 다시 시도해주세요.', false)
         toast('삭제되었습니다.')
+        await load()
+    }
+
+    async function delCancellation(id: number) {
+        if (!confirm('휴강 등록을 취소하시겠습니까?')) return
+        const { error } = await supabase.from('class_cancellations').delete().eq('id', id)
+        if (error) return toast('삭제하지 못했습니다. 다시 시도해주세요.', false)
+        toast('휴강 등록이 취소되었습니다.')
         await load()
     }
 
@@ -207,9 +283,14 @@ export default function SchedulePage() {
     function dayNotices(ds: string) {
         return attNotices.filter(n => n.date === ds)
     }
+    function dayCancellations(ds: string) {
+        return cancellations.filter(c => c.cancel_date === ds)
+    }
     const visibleEvents = selectedDate ? dayEvts(selectedDate) : evts
     const visibleNotices = selectedDate ? dayNotices(selectedDate) : attNotices
+    const visibleCancellations = selectedDate ? dayCancellations(selectedDate) : cancellations
     const listTitle = selectedDate ? `${Number(selectedDate.slice(5, 7))}월 ${Number(selectedDate.slice(8))}일` : `${mo + 1}월 전체`
+    const classNameById = Object.fromEntries(classesList.map(c => [c.id, c.name]))
 
     return (
         <div className="schedule-page" style={{ padding: mobileMode ? '16px 14px 88px' : '28px 32px', fontFamily: "'Noto Sans KR',sans-serif" }}>
@@ -359,7 +440,7 @@ export default function SchedulePage() {
                                             <button key={e.id} className={`ce ${e.type}`}
                                                 onClick={ev => { ev.stopPropagation(); setSelectedDate(ds) }}
                                                 title={e.title + (e.start_time ? ' ' + e.start_time.slice(0, 5) : '')}>
-                                                {!e.parent_visible && <IconLock size={11} strokeWidth={2} />}<span>{e.start_time ? `${e.start_time.slice(0, 5)} ` : ''}{e.title}</span>
+                                                {!(e.parent_visible && e.student_visible) && <IconLock size={11} strokeWidth={2} />}<span>{e.start_time ? `${e.start_time.slice(0, 5)} ` : ''}{e.title}</span>
                                             </button>
                                         ))}
                                         {de.length + dNotices.length > 3 && <button className="calendar-more" onClick={() => setSelectedDate(ds)}>+{de.length + dNotices.length - 3}건 더보기</button>}
@@ -402,8 +483,10 @@ export default function SchedulePage() {
                             {e.end_date && e.end_date !== e.start_date ? ` ~ ${e.end_date.slice(5).replace('-', '/')}` : ''}
                             {e.start_time ? ` · ${e.start_time.slice(0, 5)}` : ''}
                         </span>
-                        {!e.parent_visible && (
-                            <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 20, background: rbg, color: re, whiteSpace: 'nowrap' }}>비공개</span>
+                        {!(e.parent_visible && e.student_visible) && (
+                            <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 20, background: rbg, color: re, whiteSpace: 'nowrap' }}>
+                                {!e.parent_visible && !e.student_visible ? '비공개' : e.parent_visible ? '학부모만 공개' : '학생만 공개'}
+                            </span>
                         )}
                         {canWrite && (
                             <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
@@ -440,6 +523,26 @@ export default function SchedulePage() {
                 ))}
             </div>
 
+            {/* 이번달 휴강 목록 */}
+            <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: mobileMode ? 14 : 22, boxShadow: '0 1px 4px rgba(0,0,0,.06)', marginTop: mobileMode ? 12 : 18 }}>
+                <h2 style={{ fontSize: 14, fontWeight: 600, color: tx, marginBottom: 14 }}>{listTitle} 휴강 목록</h2>
+                {loading ? (
+                    <p style={{ color: tx3, fontSize: 13 }}>불러오는 중...</p>
+                ) : loadError ? <p style={{ color: re, fontSize: 13 }}>불러오기 실패로 휴강 등록을 확인할 수 없습니다.</p> : visibleCancellations.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '30px 0', color: tx3 }}>
+                        <p style={{ fontSize: 14 }}>{selectedDate ? '선택한 날짜에' : '이번 달에'} 등록된 휴강이 없습니다</p>
+                    </div>
+                ) : [...visibleCancellations].sort((a, b) => a.cancel_date.localeCompare(b.cancel_date)).map(c => (
+                    <div key={c.id} style={{ padding: '10px 0', borderBottom: `1px solid ${bd}`, display: 'flex', alignItems: 'center', gap: 10, flexWrap: mobileMode ? 'wrap' : 'nowrap' }}>
+                        <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 3, flexShrink: 0, background: 'rgba(222,53,11,.15)', color: re }}>휴강</span>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: tx, flex: 1 }}>{classNameById[c.class_id] ?? '반 정보 없음'}</span>
+                        {c.memo && <span style={{ fontSize: 12, color: tx2 }}>{c.memo}</span>}
+                        <span style={{ fontSize: 12, color: tx3, whiteSpace: 'nowrap' }}>{c.cancel_date.slice(5).replace('-', '/')}</span>
+                        {canWrite && <button className="bdng" onClick={() => delCancellation(c.id)}>삭제</button>}
+                    </div>
+                ))}
+            </div>
+
             {/* 모달 */}
             {modal && (
                 <div onClick={() => setModal(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.42)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
@@ -450,71 +553,97 @@ export default function SchedulePage() {
                         </div>
                         <div style={{ padding: '18px 22px' }}>
 
-                            <div style={{ marginBottom: 14 }}>
-                                <label className="lb">제목</label>
-                                <input className="fi" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="일정 제목" />
-                            </div>
-
-                            <div style={{ display: 'grid', gridTemplateColumns: mobileMode ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 14 }}>
-                                <div>
-                                    <label className="lb">시작 날짜</label>
-                                    <input type="date" className="fi" value={form.start_date} onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))} />
-                                </div>
-                                <div>
-                                    <label className="lb">종료 날짜 <span style={{ fontWeight: 400, color: tx3 }}>(당일이면 동일)</span></label>
-                                    <input type="date" className="fi" value={form.end_date} onChange={e => setForm(f => ({ ...f, end_date: e.target.value }))} />
-                                </div>
-                            </div>
-
-                            <div style={{ marginBottom: 14 }}>
-                                <label className="lb">시간 설정</label>
-                                <div className="rr">
-                                    <label>
-                                        <input type="radio" checked={!form.useTime} onChange={() => setForm(f => ({ ...f, useTime: false, start_time: '', end_time: '' }))} />
-                                        설정 안 함
-                                    </label>
-                                    <label>
-                                        <input type="radio" checked={form.useTime} onChange={() => setForm(f => ({ ...f, useTime: true }))} />
-                                        시간 지정
-                                    </label>
-                                </div>
-                            </div>
-
-                            {form.useTime && (
-                                <div style={{ display: 'grid', gridTemplateColumns: mobileMode ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 14 }}>
-                                    <div>
-                                        <label className="lb">시작 시간</label>
-                                        <input type="time" className="fi" value={form.start_time} onChange={e => setForm(f => ({ ...f, start_time: e.target.value }))} />
-                                    </div>
-                                    <div>
-                                        <label className="lb">종료 시간</label>
-                                        <input type="time" className="fi" value={form.end_time} onChange={e => setForm(f => ({ ...f, end_time: e.target.value }))} />
+                            {!editId && (
+                                <div style={{ marginBottom: 14 }}>
+                                    <label className="lb">종류</label>
+                                    <div className="rr">
+                                        <label><input type="radio" checked={form.mode === 'event'} onChange={() => setForm(f => ({ ...f, mode: 'event' }))} />일반</label>
+                                        <label><input type="radio" checked={form.mode === 'cancel'} onChange={() => setForm(f => ({ ...f, mode: 'cancel' }))} />휴강 등록</label>
                                     </div>
                                 </div>
                             )}
 
-                            <div style={{ display: 'grid', gridTemplateColumns: mobileMode ? '1fr' : '1fr 1fr', gap: 14, marginBottom: 14 }}>
-                                <div>
-                                    <label className="lb">종류</label>
-                                    <div className="rr">
-                                        <label><input type="radio" checked={form.type === 'normal'} onChange={() => setForm(f => ({ ...f, type: 'normal' }))} />일반</label>
-                                        <label><input type="radio" checked={form.type === 'holiday'} onChange={() => setForm(f => ({ ...f, type: 'holiday' }))} />쉬는 날</label>
+                            {form.mode === 'event' ? <>
+                                <div style={{ marginBottom: 14 }}>
+                                    <label className="lb">제목</label>
+                                    <input className="fi" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="일정 제목" />
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: mobileMode ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 14 }}>
+                                    <div>
+                                        <label className="lb">시작 날짜</label>
+                                        <input type="date" className="fi" value={form.start_date} onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))} />
+                                    </div>
+                                    <div>
+                                        <label className="lb">종료 날짜 <span style={{ fontWeight: 400, color: tx3 }}>(당일이면 동일)</span></label>
+                                        <input type="date" className="fi" value={form.end_date} onChange={e => setForm(f => ({ ...f, end_date: e.target.value }))} />
                                     </div>
                                 </div>
-                                <div>
-                                    <label className="lb">학부모 열람</label>
+
+                                <div style={{ marginBottom: 14 }}>
+                                    <label className="lb">시간 설정</label>
                                     <div className="rr">
                                         <label>
-                                            <input type="radio" checked={form.parent_visible} onChange={() => setForm(f => ({ ...f, parent_visible: true }))} />
-                                            <span style={{ color: gr, fontWeight: 500 }}>공개</span>
+                                            <input type="radio" checked={!form.useTime} onChange={() => setForm(f => ({ ...f, useTime: false, start_time: '', end_time: '' }))} />
+                                            설정 안 함
                                         </label>
                                         <label>
-                                            <input type="radio" checked={!form.parent_visible} onChange={() => setForm(f => ({ ...f, parent_visible: false }))} />
-                                            <span style={{ color: re, fontWeight: 500 }}>비공개</span>
+                                            <input type="radio" checked={form.useTime} onChange={() => setForm(f => ({ ...f, useTime: true }))} />
+                                            시간 지정
                                         </label>
                                     </div>
                                 </div>
-                            </div>
+
+                                {form.useTime && (
+                                    <div style={{ display: 'grid', gridTemplateColumns: mobileMode ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 14 }}>
+                                        <div>
+                                            <label className="lb">시작 시간</label>
+                                            <input type="time" className="fi" value={form.start_time} onChange={e => setForm(f => ({ ...f, start_time: e.target.value }))} />
+                                        </div>
+                                        <div>
+                                            <label className="lb">종료 시간</label>
+                                            <input type="time" className="fi" value={form.end_time} onChange={e => setForm(f => ({ ...f, end_time: e.target.value }))} />
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div style={{ marginBottom: 14 }}>
+                                    <label className="lb">공개 대상</label>
+                                    <div className="rr">
+                                        <label><input type="checkbox" checked={form.targetParent} onChange={() => setForm(f => ({ ...f, targetParent: !f.targetParent }))} />학부모</label>
+                                        <label><input type="checkbox" checked={form.targetStudent} onChange={() => setForm(f => ({ ...f, targetStudent: !f.targetStudent }))} />학생</label>
+                                    </div>
+                                </div>
+                            </> : <>
+                                <div style={{ marginBottom: 14 }}>
+                                    <label className="lb">휴강 날짜</label>
+                                    <input type="date" className="fi" value={form.start_date} onChange={e => setForm(f => ({ ...f, start_date: e.target.value, end_date: e.target.value }))} />
+                                </div>
+
+                                <div style={{ marginBottom: 14 }}>
+                                    <label className="lb">휴강할 반 선택</label>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                                        <button type="button" className="bout" aria-pressed={classesList.length > 0 && classesList.every(c => form.cancelClassIds.includes(c.id))} onClick={toggleCancelAll}>전체</button>
+                                        {WEEK_ORDER.map(d => {
+                                            const ids = classIdsOnDay(d)
+                                            const pressed = ids.length > 0 && ids.every(id => form.cancelClassIds.includes(id))
+                                            return <button type="button" key={d} className="bout" aria-pressed={pressed} onClick={() => toggleCancelDay(d)}>{d}</button>
+                                        })}
+                                    </div>
+                                    {classesList.length === 0 ? (
+                                        <p style={{ fontSize: 12, color: tx3 }}>등록된 반이 없습니다.</p>
+                                    ) : (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto', border: `1px solid ${bd}`, borderRadius: 8, padding: 10 }}>
+                                            {classesList.map(c => (
+                                                <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                                                    <input type="checkbox" checked={form.cancelClassIds.includes(c.id)} onChange={() => toggleCancelClass(c.id)} />
+                                                    {c.name} <span style={{ color: tx3, fontSize: 11 }}>({c.days || '요일 미설정'})</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </>}
 
                             <div>
                                 <label className="lb">메모 (선택)</label>

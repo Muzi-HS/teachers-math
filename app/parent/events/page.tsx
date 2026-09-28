@@ -2,5 +2,5 @@
 import AcademyEventsView from '@/components/AcademyEventsView'
 
 export default function ParentEvents() {
-  return <AcademyEventsView />
+  return <AcademyEventsView role="parent" />
 }

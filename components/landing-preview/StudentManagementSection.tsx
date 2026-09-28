@@ -1,4 +1,3 @@
-'use client'
 import Reveal from './Reveal'
 
 const deep = '#154A32', deep2 = '#2A6349', gold = '#D87E13', line = 'rgba(21,74,50,.14)', mint = '#EAF7F0'

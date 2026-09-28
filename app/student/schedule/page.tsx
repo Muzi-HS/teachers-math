@@ -2,5 +2,5 @@
 import AcademyEventsView from '@/components/AcademyEventsView'
 
 export default function StudentSchedule() {
-  return <AcademyEventsView />
+  return <AcademyEventsView role="student" />
 }

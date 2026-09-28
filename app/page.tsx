@@ -32,8 +32,8 @@ export default function HomePage() {
   useEffect(() => {
     if (authLoading || !role) return
     if (role === 'admin' || role === 'teacher' || role === 'assistant') router.replace('/dashboard')
-    else if (role === 'parent') router.replace('/parent/records')
-    else if (role === 'student') router.replace('/student/records')
+    else if (role === 'parent') router.replace('/parent/home')
+    else if (role === 'student') router.replace('/student/home')
   }, [role, authLoading, router])
 
   // 메인 홈페이지(히어로) 방문 로그 — 관리자 접속 분석 페이지에서 "외부 방문자가 이 사이트를

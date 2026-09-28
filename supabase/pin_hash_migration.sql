@@ -174,7 +174,7 @@ GRANT EXECUTE ON FUNCTION public.admin_reset_student_pin(int) TO authenticated;
 -- ── 시험 응시 PIN 검증(verify_test_student)도 pin_hash 기준으로 맞춘다.
 --    실패 5회 시 5분 잠금 로직은 그대로 유지한다. ──
 CREATE OR REPLACE FUNCTION public.verify_test_student(p_student_id bigint, p_pin text)
-RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE lim public.test_login_limits; expected_hash text;
 BEGIN
   SELECT pin_hash INTO expected_hash FROM public.students WHERE id = p_student_id;

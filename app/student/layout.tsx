@@ -1,31 +1,36 @@
 'use client'
-import { InternalThemeProvider } from '@/context/InternalThemeContext'
 import { MobileModeProvider } from '@/context/MobileModeContext'
-import ThemeToggle from '@/components/ui/ThemeToggle'
 import { useEffect, useRef, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Image from 'next/image'
 import { useAuth } from '@/context/AuthContext'
+import { supabase } from '@/lib/supabase'
 import { requestFCMToken, isFCMSupported } from '@/lib/firebase'
 import ForegroundNotification from '@/components/ForegroundNotification'
 
-const navy='var(--ui-primary)', navyDk='var(--ui-primary)', bd='var(--ui-border)', bg='var(--ui-bg)', tx2='var(--ui-text-2)', tx3='var(--ui-text-3)'
+const NOTICES_SEEN_KEY = (studentId: number) => `student_notices_seen_${studentId}`
+
+const navy='var(--ui-primary)', navyDk='var(--ui-primary)', bd='var(--ui-border)', bg='var(--ui-bg)', tx2='var(--ui-text-2)'
 
 const NAV = [
+  { href: '/student/home', label: '홈',
+    icon: <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth={2} d="m3 11 9-8 9 8M5 10v10h14V10"/></svg> },
   { href: '/student/tests', label: '시험',
     icon: <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><rect x="5" y="4" width="14" height="17" rx="2" strokeWidth={2}/><path d="M9 9h6M9 13h6M9 17h3" strokeWidth={2}/></svg> },
-  { href: '/student/records', label: '수업기록',
-    icon: <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg> },
-  { href: '/student/notices', label: '반 공지',
-    icon: <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg> },
   { href: '/student/schedule', label: '학원일정',
     icon: <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2" strokeWidth={2}/><path strokeWidth={2} d="M16 2v4M8 2v4M3 10h18"/></svg> },
+  { href: '/student/notices', label: '공지',
+    icon: <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg> },
   { href: '/student/coupons', label: '쿠폰함',
     icon: <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth={2} d="M9 5H4a1 1 0 00-1 1v3a2 2 0 010 4v3a1 1 0 001 1h5m0-12h11a1 1 0 011 1v3a2 2 0 000 4v3a1 1 0 01-1 1H9m0-12v12"/></svg> },
 ]
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
-  return <InternalThemeProvider><MobileModeProvider><StudentLayoutContent>{children}</StudentLayoutContent></MobileModeProvider></InternalThemeProvider>
+  // 학생 화면은 테마 선택 없이 그린 테마로 고정한다 (관리자 화면의 InternalThemeProvider/
+  // localStorage 토글을 상속하지 않도록 data-ui-theme을 직접 "green"으로 박아둔다).
+  return <div className="internal-ui" data-ui-theme="green" style={{ display: 'contents' }}>
+    <MobileModeProvider><StudentLayoutContent>{children}</StudentLayoutContent></MobileModeProvider>
+  </div>
 }
 
 function StudentLayoutContent({ children }: { children: React.ReactNode }) {
@@ -37,6 +42,28 @@ function StudentLayoutContent({ children }: { children: React.ReactNode }) {
   const [notifPerm, setNotifPerm] = useState<NotificationPermission | null>(null)
   const [notifBannerDismissed, setNotifBannerDismissed] = useState(false)
   const [notifRequesting, setNotifRequesting] = useState(false)
+  const [unreadNotices, setUnreadNotices] = useState(0)
+
+  // 반 공지(class_notices)에는 서버 쪽 읽음 표시가 없어서, 마지막으로 "공지" 탭을 연
+  // 시각(로컬 저장)보다 최근에 올라온 공지 수를 안 읽은 개수로 센다. 공지 탭에 들어가면
+  // (app/student/notices/page.tsx) 그 시각을 지금으로 갱신한다.
+  useEffect(() => {
+    if (!student?.studentId || !student?.sessionToken) return
+    let cancelled = false
+    async function loadUnread() {
+      const { data: csRows } = await supabase.rpc('client_class_students', { p_token: student!.sessionToken, p_student_id: student!.studentId })
+      const classIds = [...new Set(((csRows ?? []) as { class_id: number }[]).map(r => r.class_id))]
+      if (classIds.length === 0) { if (!cancelled) setUnreadNotices(0); return }
+      const { data: noticesRaw } = await supabase.rpc('client_class_notices', { p_token: student!.sessionToken, p_class_ids: classIds })
+      if (cancelled) return
+      const notices = (noticesRaw ?? []) as { created_at: string }[]
+      let seen = ''
+      try { seen = localStorage.getItem(NOTICES_SEEN_KEY(student!.studentId)) ?? '' } catch {}
+      setUnreadNotices(seen ? notices.filter(n => n.created_at > seen).length : notices.length)
+    }
+    loadUnread()
+    return () => { cancelled = true }
+  }, [student?.studentId, student?.sessionToken, pathname])
   const initDone = useRef(false)
 
   async function registerFCMToken(studentId: number) {
@@ -135,7 +162,7 @@ function StudentLayoutContent({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!ready) return
-    if (pathname === '/student') router.replace('/student/records')
+    if (pathname === '/student') router.replace('/student/home')
   }, [pathname, ready, router])
 
   if (loading || !ready) return (
@@ -155,42 +182,43 @@ function StudentLayoutContent({ children }: { children: React.ReactNode }) {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Montserrat:wght@700;800&display=swap');
         * { box-sizing: border-box; }
-        .student-main { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
-        .student-nav { padding-bottom: env(safe-area-inset-bottom); height: calc(62px + env(safe-area-inset-bottom)); }
+        .student-main { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
+        .student-nav { padding-bottom: env(safe-area-inset-bottom); height: calc(70px + env(safe-area-inset-bottom)); }
       `}</style>
 
       {/* 상단 헤더 */}
       <header style={{
-        background: 'linear-gradient(135deg, var(--chrome-bg) 0%, var(--chrome-bg-2) 100%)',
-        padding: '0 16px', height: 54,
+        background: '#fff', borderBottom: '1px solid #EBF0EC',
+        padding: '0 20px', height: 62,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        position: 'sticky', top: 0, zIndex: 100,
-        boxShadow: '0 2px 8px rgba(0,0,0,.2)', flexShrink: 0,
+        position: 'sticky', top: 0, zIndex: 100, flexShrink: 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, overflow: 'hidden' }}>
-          <Image src="/logo.png" alt="로고" width={30} height={30} style={{ objectFit: 'contain', flexShrink: 0 }} />
-          <span style={{ fontFamily: 'Montserrat,sans-serif', fontSize: 13, fontWeight: 800, color: '#fff', letterSpacing: 0.5, flexShrink: 0 }}>
-            TEACHERS MATH
-          </span>
-          <span style={{ fontSize: 10, color: 'var(--chrome-text-2)', background: 'rgba(255,255,255,.1)', padding: '2px 6px', borderRadius: 10, flexShrink: 0 }}>
-            학생
+          <Image src="/logo.png" alt="로고" width={24} height={24} style={{ objectFit: 'contain', flexShrink: 0 }} />
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#203F30', letterSpacing: -.2, flexShrink: 0, whiteSpace: 'nowrap' }}>
+            티처스 수학학원
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-          <ThemeToggle />
           <button
-            onClick={logout}
-            style={{ fontSize: 12, color: 'var(--chrome-text-2)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: "'Noto Sans KR',sans-serif", padding: 0 }}
-            onMouseEnter={e => (e.currentTarget.style.color = 'rgba(255,255,255,.9)')}
-            onMouseLeave={e => (e.currentTarget.style.color = 'var(--chrome-text-2)')}
+            onClick={() => router.push('/student/notices')} aria-label={`공지 ${unreadNotices}건`}
+            style={{ position: 'relative', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4E6456', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '50%' }}
           >
-            로그아웃
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M6 10a6 6 0 1 1 12 0c0 4 1.5 5.5 1.5 5.5H4.5S6 14 6 10Z" /><path d="M10 19a2 2 0 0 0 4 0" /></svg>
+            {unreadNotices > 0 && <span style={{ position: 'absolute', top: 1, right: 1, minWidth: 14, height: 14, padding: '0 3px', borderRadius: 7, background: '#E4574A', color: '#fff', fontSize: 9, fontWeight: 700, lineHeight: '14px', textAlign: 'center' }}>{unreadNotices}</span>}
+          </button>
+          <span style={{ fontSize: 11, color: '#627668', whiteSpace: 'nowrap' }}>{student?.name ?? ''} 학생</span>
+          <button
+            onClick={logout} aria-label="로그아웃"
+            style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#819085', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '50%' }}
+          >
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5" /><path d="M21 12H9" /></svg>
           </button>
         </div>
       </header>
 
       {/* 본문 */}
-      <main className="student-main" style={{ flex: 1, padding: '16px 16px calc(80px + env(safe-area-inset-bottom))', maxWidth: 640, width: '100%', margin: '0 auto' }}>
+      <main className="student-main" style={{ flex: 1, padding: '16px 16px calc(88px + env(safe-area-inset-bottom))', maxWidth: 640, width: '100%', margin: '0 auto' }}>
         {notifPerm && notifPerm !== 'granted' && !notifBannerDismissed && (
           <div style={{
             display: 'flex', alignItems: 'center', gap: 10,
@@ -228,26 +256,23 @@ function StudentLayoutContent({ children }: { children: React.ReactNode }) {
       {/* 하단 탭바 */}
       <nav className="student-nav" style={{
         position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100,
-        background: '#fff', borderTop: `1px solid ${bd}`,
+        background: '#fff', borderTop: '1px solid #E2EAE3',
         display: 'flex',
-        boxShadow: '0 -2px 10px rgba(0,0,0,.08)',
-        alignItems: 'flex-start',
       }}>
         {NAV.map(item => {
           const active = pathname.startsWith(item.href)
           return (
             <button key={item.href} onClick={() => router.push(item.href)} style={{
-              flex: 1, display: 'flex', flexDirection: 'column',
-              alignItems: 'center', justifyContent: 'center', gap: 3,
-              height: 62,
+              flex: 1, display: 'flex', flexDirection: 'column', position: 'relative',
+              alignItems: 'center', justifyContent: 'center', gap: 6,
+              height: 70,
               background: 'none', border: 'none', cursor: 'pointer',
-              color: active ? navy : tx3,
+              color: active ? '#23633F' : '#819085',
               fontFamily: "'Noto Sans KR',sans-serif",
               transition: 'color .15s',
-              borderTop: active ? `2.5px solid ${navy}` : '2.5px solid transparent',
-              paddingTop: 2,
             }}>
-              <span style={{ color: active ? navy : tx3, display: 'flex' }}>{item.icon}</span>
+              {active && <span style={{ position: 'absolute', top: 0, width: 18, height: 2, background: '#23633F', borderRadius: '0 0 2px 2px' }} />}
+              <span style={{ color: active ? '#23633F' : '#819085', display: 'flex' }}>{item.icon}</span>
               <span style={{ fontSize: 10, fontWeight: active ? 700 : 400 }}>{item.label}</span>
             </button>
           )

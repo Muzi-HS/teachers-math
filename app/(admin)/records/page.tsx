@@ -367,7 +367,7 @@ export default function RecordsPage() {
   function isHighlighted(r: Rec) { return !!r.parent_comment }
   const commentsByRecord = groupCommentsByRecord(comments)
   const clsGroups = (() => {
-    const groups: { cls: Class_ | null; recs: Rec[] }[] = []
+    const groups: { classId: number | null; cls: Class_ | null; recs: Rec[] }[] = []
     const seen = new Set<number | null>()
     for (const r of dayRecs) {
       const clsId = recClsId(r)
@@ -384,7 +384,7 @@ export default function RecordsPage() {
             const bn = students.find(s => s.id === b.student_id)?.name ?? ''
             return an.localeCompare(bn, 'ko')
           })
-        groups.push({ cls, recs: recsForCls })
+        groups.push({ classId: clsId, cls, recs: recsForCls })
       }
     }
     // 카드와 같은 기준으로 학부모 의견이 있는 반을 먼저 표시하고, 동순위는 기존 순서 유지
@@ -396,8 +396,8 @@ export default function RecordsPage() {
   const bulkStatusReady = bulkSendState?.date === selDate && !bulkSendState.error
   const classFilteredGroups = selectedClassIds.size === 0
     ? clsGroups
-    : clsGroups.filter(group => selectedClassIds.has(group.cls?.id ?? 0))
-  const unsentGroups = bulkStatusReady ? classFilteredGroups.filter(group => !bulkSendState.clicked.has(recClsId(group.recs[0]) ?? 0)) : []
+    : clsGroups.filter(group => selectedClassIds.has(group.classId ?? 0))
+  const unsentGroups = bulkStatusReady ? classFilteredGroups.filter(group => !bulkSendState.clicked.has(group.classId ?? 0)) : []
   const visibleGroups = unsentOnly ? unsentGroups : classFilteredGroups
 
   const css = `
@@ -528,8 +528,8 @@ export default function RecordsPage() {
 
           {!loading && clsGroups.length > 1 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
-              {clsGroups.map(({ cls: clsG, recs: clsRecs }) => {
-                const key = clsG?.id ?? 0
+              {clsGroups.map(({ classId, cls: clsG, recs: clsRecs }) => {
+                const key = classId ?? 0
                 const active = selectedClassIds.has(key)
                 const hasComment = clsRecs.some(isHighlighted)
                 return (
@@ -544,7 +544,7 @@ export default function RecordsPage() {
                       background: active ? navy : hasComment ? 'var(--ui-info-bg)' : '#fff',
                       color: active ? '#fff' : hasComment ? 'var(--ui-info)' : tx2,
                     }}>
-                    {clsG?.name ?? '반 미지정'}
+                    {clsG?.name ?? (classId == null ? '반 미지정' : `반 정보 없음 (${classId})`)}
                   </button>
                 )
               })}
@@ -575,14 +575,14 @@ export default function RecordsPage() {
             <div>
             {unsentOnly && bulkStatusReady && visibleGroups.length === 0 && <p style={{ textAlign: 'center', padding: '24px 0', color: tx3, fontSize: 13 }}>선택한 날짜의 모든 반에서 일괄 발송을 실행했습니다.</p>}
             {!unsentOnly && selectedClassIds.size > 0 && visibleGroups.length === 0 && <p style={{ textAlign: 'center', padding: '24px 0', color: tx3, fontSize: 13 }}>선택한 반의 수업 기록이 없습니다.</p>}
-            {visibleGroups.map(({ cls: clsG, recs: clsRecs }) => {
-              const clsAlreadySent = bulkSendState?.clicked.has(recClsId(clsRecs[0]) ?? 0) ?? false
+            {visibleGroups.map(({ classId, cls: clsG, recs: clsRecs }) => {
+              const clsAlreadySent = bulkSendState?.clicked.has(classId ?? 0) ?? false
               return (
-              <div key={clsG?.id ?? 'none'} style={{ marginBottom: 20 }}>
+              <div key={classId ?? 'none'} style={{ marginBottom: 20 }}>
                 {/* 반별 헤더 + 일괄 푸시 버튼 */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: mobileMode ? 'wrap' : 'nowrap', gap: mobileMode ? 8 : 0, marginBottom: 12, padding: '8px 14px', background: bg, borderRadius: 8, border: `1px solid ${bd}` }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: navy }}>{clsG?.name ?? '반 미지정'}</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: navy }}>{clsG?.name ?? (classId == null ? '반 미지정' : `반 정보 없음 (${classId})`)}</span>
                     <span className="badge" style={{ background: navyM, color: navy }}>{clsRecs.length}명</span>
                     {bulkStatusReady && !clsAlreadySent && (
                       <span className="badge" style={{ background: 'var(--ui-warning-bg)', color: gold }}>
@@ -596,7 +596,7 @@ export default function RecordsPage() {
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {clsG && <button className="bout" onClick={() => setBulkModalClsId(clsG.id)}>일괄 수정</button>}
                     <button className="bgrn"
-                      onClick={() => sendPushByClass(recClsId(clsRecs[0]))}
+                      onClick={() => sendPushByClass(classId)}
                       disabled={pushing || pushingOneId !== null || !bulkStatusReady || clsAlreadySent}
                       style={{ opacity: pushing || pushingOneId !== null || !bulkStatusReady || clsAlreadySent ? 0.5 : 1 }}>
                       {pushing ? '발송 중...' : clsAlreadySent ? '발송 완료' : '일괄 발송'}

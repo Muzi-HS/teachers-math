@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
-import { IconInbox, IconBook } from '@/components/icons'
+import { IconInbox } from '@/components/icons'
 import TestResultCard from '@/components/TestResultCard'
 import HomeworkStatsView from '@/components/HomeworkStatsView'
 import TodayClassBanner from '@/components/TodayClassBanner'
@@ -29,6 +29,7 @@ export default function StudentRecords() {
   const [classNames, setClassNames] = useState<Record<number, string>>({})
   const [loading, setLoading] = useState(true)
   const [showStats, setShowStats] = useState(false)
+
 
   useEffect(() => {
     if (!student?.studentId || !student?.sessionToken) return
@@ -92,18 +93,6 @@ export default function StudentRecords() {
     setLoading(false)
   }
 
-  // 반이 2개 이상이면 "이번 숙제"를 반별로 나눠 보여준다 — 반 구분 없이 가장 최근
-  // 기록 하나만 보여주면 다른 반 숙제가 가려지는 문제가 있었다. recs는 최신순이므로
-  // 각 class_id별로 처음 만나는 기록이 그 반의 최신 기록이다. class_id가 없는(레거시)
-  // 기록은 하나로 묶어서 보여준다.
-  const latestByClass: { classId: number | null; rec: Rec }[] = []
-  const seenClassIds = new Set<number | null>()
-  for (const r of recs) {
-    if (seenClassIds.has(r.class_id)) continue
-    seenClassIds.add(r.class_id)
-    latestByClass.push({ classId: r.class_id, rec: r })
-  }
-
   const chronoRecs = [...recs].reverse()
 
   return (
@@ -130,7 +119,7 @@ export default function StudentRecords() {
       </div>
 
       {showStats ? (
-        <HomeworkStatsView recs={recs} studentId={student?.studentId} />
+        <HomeworkStatsView recs={recs} showMilestone={false} />
       ) : loading ? (
         <p style={{ textAlign: 'center', color: tx3, padding: '40px 0' }}>불러오는 중...</p>
       ) : recs.length === 0 ? (
@@ -140,35 +129,8 @@ export default function StudentRecords() {
         </div>
       ) : (
         <>
-          {/* 이번 숙제 — 반이 2개 이상이면 반별로 각각의 최신 숙제를 보여준다 */}
-          <div style={{
-            background: `linear-gradient(135deg,${navy} 0%,var(--ui-primary) 100%)`, borderRadius: 14,
-            padding: '18px 18px', marginBottom: 16, color: '#fff',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-              <IconBook size={15} />
-              <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: .5 }}>이번 숙제</span>
-            </div>
-            {latestByClass.map(({ classId, rec }, idx) => (
-              <div key={classId ?? 'none'} style={{ marginTop: idx > 0 ? 14 : 0, paddingTop: idx > 0 ? 14 : 0, borderTop: idx > 0 ? '1px solid rgba(255,255,255,.15)' : undefined }}>
-                {latestByClass.length > 1 && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--ui-primary-text)', background: 'rgba(255,255,255,.12)', padding: '2px 8px', borderRadius: 20 }}>
-                      {classId != null ? (classNames[classId] ?? '반 정보 없음') : '반 정보 없음'}
-                    </span>
-                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,.55)' }}>{rec.date}</span>
-                  </div>
-                )}
-                {latestByClass.length === 1 && (
-                  <span style={{ fontSize: 11, color: 'rgba(255,255,255,.55)', display: 'block', marginBottom: 4 }}>{rec.date}</span>
-                )}
-                <p style={{ fontSize: 16, fontWeight: 600, lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' }}>
-                  {rec.homework ? rec.homework : '등록된 숙제가 없습니다'}
-                </p>
-              </div>
-            ))}
-          </div>
-
+          {/* 이번 숙제 요약은 홈 화면(app/student/home)에서 보여주므로 여기서는 생략하고
+              바로 지난 수업기록 목록을 보여준다. */}
           {recs.map(r => {
             const tItems = r.record_test_items ?? []
             return (

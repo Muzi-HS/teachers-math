@@ -21,6 +21,12 @@ export default function StudentNotices() {
     load(student.studentId, student.sessionToken)
   }, [student?.studentId, student?.sessionToken])
 
+  // 이 화면을 열면 헤더 종 아이콘의 "안 읽은 공지" 기준 시각을 지금으로 갱신한다.
+  useEffect(() => {
+    if (!student?.studentId) return
+    try { localStorage.setItem(`student_notices_seen_${student.studentId}`, new Date().toISOString()) } catch {}
+  }, [student?.studentId])
+
   async function load(studentId: number, token: string) {
     setLoading(true)
     const { data: csRows } = await supabase.rpc('client_class_students', { p_token: token, p_student_id: studentId })
