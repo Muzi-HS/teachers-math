@@ -1,14 +1,15 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { kstDateStr } from '@/lib/kst'
 import { ExamQuestionDraft, toggleChoice } from '@/lib/auto-grading'
+import { defaultQuestionPoints } from '@/lib/exam-points'
 import { IconLock } from '@/components/icons'
 
 export type EditableTest = { id: number; name: string; date: string; total: number; auto_grading?: boolean; is_published?: boolean }
 type Student = { id: number; name: string; school: string }
 type ClassRow = { id: number; name: string }
-const blank = (): ExamQuestionDraft => ({ points: null, choices: [], text: '' })
+const blank = (points: number): ExamQuestionDraft => ({ points, choices: [], text: '' })
 const navy = 'var(--ui-primary)', gold = 'var(--ui-primary)', bd = 'var(--ui-border)', bg = 'var(--ui-bg)'
 const tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)', gr = 'var(--ui-success)', re = 'var(--ui-danger)'
 
@@ -29,7 +30,8 @@ export default function TestEditorModal({ test, students, onClose, onSaved }: {
   const [date, setDate] = useState(test?.date ?? kstDateStr())
   const [total, setTotal] = useState(test?.total ?? 20)
   const [auto, setAuto] = useState(test?.auto_grading ?? false)
-  const [questions, setQuestions] = useState<ExamQuestionDraft[]>(Array.from({ length: test?.total ?? 20 }, blank))
+  const [questions, setQuestions] = useState<ExamQuestionDraft[]>(() => defaultQuestionPoints(test?.total ?? 20).map(blank))
+  const editedPoints = useRef(new Set<number>())
   const [pointsDraft, setPointsDraft] = useState<Record<number, string>>({})
   const [selected, setSelected] = useState<number[]>([])
   const [classes, setClasses] = useState<ClassRow[]>([])
@@ -59,6 +61,7 @@ export default function TestEditorModal({ test, students, onClose, onSaved }: {
           ])
           if (q.error || s.error || a.error) throw new Error('시험 설정을 불러오지 못했습니다. 다시 열어 주세요.')
           if (cancelled) return
+          editedPoints.current = new Set((q.data ?? []).map((_, index) => index))
           setQuestions((q.data ?? []).map(row => ({ points: row.points, choices: row.kind === 'choice' ? row.correct_answer : [], text: row.kind === 'text' ? row.correct_answer : '' })))
           setSelected((s.data ?? []).map(row => row.student_id)); setLocked((a.count ?? 0) > 0)
         }
@@ -72,8 +75,14 @@ export default function TestEditorModal({ test, students, onClose, onSaved }: {
 
   function changeTotal(value: number) {
     const count = Math.max(1, Math.min(200, value || 1))
+    const defaults = defaultQuestionPoints(count)
     setTotal(count)
-    setQuestions(q => Array.from({ length: count }, (_, i) => q[i] ?? blank()))
+    setQuestions(q => Array.from({ length: count }, (_, i) => {
+      const previous = q[i]
+      return previous && editedPoints.current.has(i) ? previous : { ...(previous ?? blank(defaults[i])), points: defaults[i] }
+    }))
+    editedPoints.current = new Set([...editedPoints.current].filter(index => index < count))
+    setPointsDraft({})
   }
   function updateQuestion(index: number, update: Partial<ExamQuestionDraft>) {
     setQuestions(rows => rows.map((q, i) => i === index ? { ...q, ...update } : q))
@@ -226,6 +235,7 @@ export default function TestEditorModal({ test, students, onClose, onSaved }: {
                           value={pointsDraft[i] ?? (q.points ?? '')}
                           onChange={e => {
                             const filtered = filterPointsInput(e.target.value)
+                            editedPoints.current.add(i)
                             setPointsDraft(d => ({ ...d, [i]: filtered }))
                             if (filtered === '' || filtered === '.') return updateQuestion(i, { points: null })
                             const num = Number(filtered)
