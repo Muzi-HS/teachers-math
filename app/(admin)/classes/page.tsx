@@ -180,9 +180,19 @@ export default function ClassesPage() {
     setRecCnt(cnt)
   }
 
-  function openStaffModal(classId: number) {
-    setStaffDraft(new Set(classAssignments.filter(a => a.class_id === classId).map(a => a.teacher_user_id)))
+  function openStaffModal(cls: Class) {
+    setDetailCls(cls)
+    setStaffDraft(new Set(classAssignments.filter(a => a.class_id === cls.id).map(a => a.teacher_user_id)))
     setStaffModal(true)
+  }
+
+  function assignedNames(classId: number, staffRole: ClassStaff['role']) {
+    return classAssignments
+      .filter(assignment => assignment.class_id === classId)
+      .map(assignment => staffCandidates.find(member => member.user_id === assignment.teacher_user_id))
+      .filter(member => member?.role === staffRole)
+      .map(member => member?.name)
+      .join(', ') || '미배정'
   }
 
   async function saveStaffAssignments() {
@@ -424,7 +434,7 @@ export default function ClassesPage() {
                 onMouseEnter={e => (e.currentTarget.style.background = navyM)}
                 onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
               >
-                <div style={{ width: 4, height: 36, background: c.active === false ? tx3 : barColor, borderRadius: 2, flexShrink: 0 }} />
+                <div style={{ width: 4, minHeight: 36, alignSelf: 'stretch', background: c.active === false ? tx3 : barColor, borderRadius: 2, flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <p style={{ fontSize: 13, fontWeight: 600, color: c.active === false ? tx3 : tx, margin: 0 }}>{c.name}</p>
@@ -433,15 +443,17 @@ export default function ClassesPage() {
                   <p style={{ fontSize: 11, color: tx3, margin: 0 }}>
                     {[c.days, c.time, `학생 ${(csMap[c.id] ?? []).length}명`].filter(Boolean).join(' · ')}
                   </p>
-                  {role === 'admin' && <p style={{ fontSize: 11, color: tx2, margin: '3px 0 0' }}>
-                    담당: {classAssignments.filter(a => a.class_id === c.id).map(a => staffCandidates.find(t => t.user_id === a.teacher_user_id)?.name).filter(Boolean).join(', ') || '미배정'}
-                  </p>}
+                  {role === 'admin' && <div style={{ fontSize: 11, color: tx2, marginTop: 3, lineHeight: 1.5 }}>
+                    <div>선생님: {assignedNames(c.id, 'teacher')}</div>
+                    <div>조교: {assignedNames(c.id, 'assistant')}</div>
+                  </div>}
                 </div>
                 {canManageClassInfo && (
                   <div style={{ display: 'flex', gap: 5 }} onClick={e => e.stopPropagation()}>
                   <button className="bout" onClick={() => toggleClsActive(c)} style={{ color: c.active === false ? gr : wa, borderColor: c.active === false ? 'var(--ui-success-border)' : 'var(--ui-warning-border)' }}>
                       {c.active === false ? '활성화' : '비활성화'}
                     </button>
+                    <button className="bout" onClick={() => openStaffModal(c)}>담당자 배정</button>
                     <button className="bout" onClick={() => openEditCls(c)}>수정</button>
                     <button className="bdng" onClick={() => delCls(c.id, c.name)}>삭제</button>
                   </div>
@@ -474,13 +486,13 @@ export default function ClassesPage() {
               {detailCls.mode && <span style={{ fontSize: 12, padding: '3px 9px', borderRadius: 20, background: navyM, color: navy, fontWeight: 500 }}>{detailCls.mode}</span>}
             </div>
             <p style={{ fontSize: 13, color: tx2, marginTop: 4 }}>{detailCls.days} | {detailCls.time}</p>
-            {role === 'admin' && <p style={{ fontSize: 12, color: tx2, marginTop: 4 }}>
-              담당: {classAssignments.filter(a => a.class_id === detailCls.id).map(a => staffCandidates.find(t => t.user_id === a.teacher_user_id)?.name).filter(Boolean).join(', ') || '미배정'}
-            </p>}
+            {role === 'admin' && <div style={{ fontSize: 12, color: tx2, marginTop: 4, lineHeight: 1.5 }}>
+              <div>선생님: {assignedNames(detailCls.id, 'teacher')}</div>
+              <div>조교: {assignedNames(detailCls.id, 'assistant')}</div>
+            </div>}
           </div>
           {/* 공지하기 → 수업 준비 → 수업기록 작성(primary) → 학생 추가 순으로 통일된 스타일 */}
           <div style={{ display: 'flex', gap: 8 }}>
-            {canManageClassInfo && <button className="chdr-btn chdr-btn-out" onClick={() => openStaffModal(detailCls.id)}>담당자 배정</button>}
             {(role === 'admin' || role === 'teacher') && (
               <button className="chdr-btn chdr-btn-out" onClick={() => setNoticeModal(true)}>
                 <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
@@ -713,17 +725,25 @@ export default function ClassesPage() {
       </>}>
         <p style={{ fontSize: 12, color: tx2, margin: '0 0 12px' }}>선생님과 조교를 여러 명 선택할 수 있습니다. 배정된 담당자는 이 반의 정보와 수업기록을 볼 수 있고 기록을 작성·발송할 수 있습니다.</p>
         {staffCandidates.length === 0 && <p style={{ fontSize: 13, color: tx3 }}>배정 가능한 승인된 선생님·조교가 없습니다.</p>}
-        <div style={{ display: 'grid', gap: 8, maxHeight: 320, overflowY: 'auto' }}>
-          {staffCandidates.map(member => <label key={member.user_id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, border: `1px solid ${bd}`, borderRadius: 8, cursor: 'pointer' }}>
-            <input type="checkbox" checked={staffDraft.has(member.user_id)} onChange={() => setStaffDraft(previous => {
-              const next = new Set(previous)
-              if (next.has(member.user_id)) next.delete(member.user_id)
-              else next.add(member.user_id)
-              return next
-            })} />
-            <span style={{ fontSize: 13, color: tx }}>{member.name}</span>
-            <span style={{ fontSize: 11, color: tx3 }}>{member.role === 'assistant' ? '조교' : '선생님'}</span>
-          </label>)}
+        <div style={{ display: 'grid', gap: 16, maxHeight: 320, overflowY: 'auto' }}>
+          {(['teacher', 'assistant'] as const).map(staffRole => {
+            const members = staffCandidates.filter(member => member.role === staffRole)
+            return <section key={staffRole} aria-label={staffRole === 'teacher' ? '선생님 선택' : '조교 선택'}>
+              <p style={{ fontSize: 12, fontWeight: 700, color: tx, margin: '0 0 8px' }}>{staffRole === 'teacher' ? '선생님' : '조교'} <span style={{ color: tx3, fontWeight: 400 }}>{members.length}명</span></p>
+              <div style={{ display: 'grid', gap: 8 }}>
+                {members.length === 0 && <p style={{ fontSize: 12, color: tx3, margin: 0 }}>배정 가능한 인원이 없습니다.</p>}
+                {members.map(member => <label key={member.user_id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, border: `1px solid ${bd}`, borderRadius: 8, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={staffDraft.has(member.user_id)} onChange={() => setStaffDraft(previous => {
+                    const next = new Set(previous)
+                    if (next.has(member.user_id)) next.delete(member.user_id)
+                    else next.add(member.user_id)
+                    return next
+                  })} />
+                  <span style={{ fontSize: 13, color: tx }}>{member.name}</span>
+                </label>)}
+              </div>
+            </section>
+          })}
         </div>
       </Modal>}
 

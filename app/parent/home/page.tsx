@@ -196,8 +196,8 @@ export default function ParentHome() {
                   </div>
                 )}
                 <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end' }}>
-                  <textarea value={draft} onChange={e => setDraft(e.target.value)} placeholder="선생님께 전달하고 싶은 의견을 남겨주세요" rows={1}
-                    style={{ flex: 1, padding: '8px 10px', border: `1.5px solid ${bd}`, borderRadius: 8, fontSize: 13, fontFamily: 'inherit', color: tx, outline: 'none', resize: 'none', boxSizing: 'border-box' }} />
+                  <textarea value={draft} onChange={e => setDraft(e.target.value)} placeholder="선생님께 의견 남기기" rows={1}
+                    style={{ flex: 1, minWidth: 0, padding: '8px 10px', border: `1.5px solid ${bd}`, borderRadius: 8, fontSize: 16, fontFamily: 'inherit', color: tx, outline: 'none', resize: 'none', boxSizing: 'border-box' }} />
                   <button onClick={sendComment} disabled={sending || !draft.trim()} style={{
                     flexShrink: 0, width: 36, height: 36, borderRadius: 8, border: 'none', background: accent, color: '#fff',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: sending || !draft.trim() ? 'not-allowed' : 'pointer', opacity: sending || !draft.trim() ? .6 : 1,

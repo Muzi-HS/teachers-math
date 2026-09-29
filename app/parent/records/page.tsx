@@ -354,9 +354,9 @@ export default function ParentRecords() {
                     <textarea
                       value={commentDrafts[r.id] ?? ''}
                       onChange={e => setCommentDrafts(d => ({ ...d, [r.id]: e.target.value }))}
-                      placeholder="선생님께 전달하고 싶은 의견을 남겨주세요"
+                      placeholder="선생님께 의견 남기기"
                       rows={1}
-                      style={{ flex: 1, padding: '8px 10px', border: `1.5px solid ${bd}`, borderRadius: 8, fontSize: 13, fontFamily: 'inherit', color: tx, outline: 'none', resize: 'none', boxSizing: 'border-box' }}
+                      style={{ flex: 1, minWidth: 0, padding: '8px 10px', border: `1.5px solid ${bd}`, borderRadius: 8, fontSize: 16, fontFamily: 'inherit', color: tx, outline: 'none', resize: 'none', boxSizing: 'border-box' }}
                     />
                     <button onClick={() => sendComment(r.id)} disabled={sendingId === r.id || !(commentDrafts[r.id] ?? '').trim()}
                       style={{
