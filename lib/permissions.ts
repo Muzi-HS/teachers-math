@@ -28,9 +28,8 @@ export const can = {
   // 수업 기록 작성/수정/삭제 — 반관리 화면 내에서 admin, teacher, assistant 모두 가능
   writeClassRecords:(role: Role) => role === 'admin' || role === 'teacher' || role === 'assistant',
 
-  // 수업기록 메뉴 자체 접근 — admin, teacher만. assistant(조교)는 기존 teacher
-  // 권한과 동일하게 메뉴 자체가 안 보임
-  viewRecordsMenu:  (role: Role) => role === 'admin' || role === 'teacher',
+  // 수업기록 메뉴 접근 — 관리자는 전체, 선생님·조교는 배정된 반만 조회
+  viewRecordsMenu:  (role: Role) => role === 'admin' || role === 'teacher' || role === 'assistant',
 
   // 테스트 관리 — admin, teacher, assistant 모두 전체 기능
   manageTests:      (role: Role) => role === 'admin' || role === 'teacher' || role === 'assistant',
@@ -56,7 +55,7 @@ export const menuAccess: Record<string, (role: Role) => boolean> = {
   dashboard:  (r) => r === 'admin',
   classes:    (r) => r === 'admin' || r === 'teacher' || r === 'assistant',
   students:   (r) => r === 'admin',
-  records:    (r) => r === 'admin' || r === 'teacher', // 수업기록 — admin+teacher (assistant는 접근 불가)
+  records:    (r) => r === 'admin' || r === 'teacher' || r === 'assistant', // 수업기록 — 배정된 반만 접근
   tests:      (r) => r === 'admin' || r === 'teacher' || r === 'assistant',
   notices:    (r) => r !== 'parent' && r !== 'student', // parent/student는 각자 별도 화면에서 열람
   schedule:   (r) => r !== 'parent' && r !== 'student', // parent/student는 각자 별도 화면에서 열람

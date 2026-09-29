@@ -115,7 +115,9 @@ export default function ClassBulkRecordModal({
       if (forms[p.student_id] && p.progress && p.progress.trim()) forms[p.student_id] = { ...forms[p.student_id], content: p.progress }
     }
 
-    const { data: recs } = await supabase.from('records').select('*').in('student_id', students.map(s => s.id)).eq('date', date).eq('is_draft', false)
+    let recordQuery = supabase.from('records').select('*').in('student_id', students.map(s => s.id)).eq('date', date).eq('is_draft', false)
+    recordQuery = classId === null ? recordQuery.is('class_id', null) : recordQuery.eq('class_id', classId)
+    const { data: recs } = await recordQuery
     if (recs && recs.length > 0) {
       const recIdList = recs.map(r => r.id)
       const { data: items } = await supabase.from('record_test_items').select('record_id, test_id, t_total, t_cor, t_score').in('record_id', recIdList)

@@ -144,8 +144,8 @@ body {
     font-size: 16px !important;
   }
 }
-body:has(.parent-inquiry-composer textarea:focus) .parent-nav { display: none; }
-body:has(.iq-composer textarea:focus) .mnav-bar { display: none; }
+body:has(.parent-inquiry-page[data-composing="true"]) .parent-nav { display: none !important; }
+body:has(.iq-composer textarea:focus) .mnav-bar { display: none !important; }
 @media (prefers-reduced-motion: reduce) {
   .ui-btn, .ui-card-hover { transition: none !important; transform: none !important; }
 }

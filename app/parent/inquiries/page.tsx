@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { kstDateOf, kstTimeOf } from '@/lib/kst'
 import { useParentChild } from '../layout'
 import { IconChat, IconSend } from '@/components/icons'
-import { useMobileKeyboardInset } from '@/lib/use-mobile-keyboard-inset'
+import { useMobileVisualViewport } from '@/lib/use-mobile-keyboard-inset'
 
 const navy = 'var(--ui-primary)', navyDk = 'var(--ui-primary-text)'
 const bg = 'var(--ui-bg)', bd = 'var(--ui-border)'
@@ -25,7 +25,7 @@ export default function ParentInquiriesPage() {
   const [sending, setSending] = useState(false)
   const [err, setErr] = useState('')
   const [composing, setComposing] = useState(false)
-  const keyboardInset = useMobileKeyboardInset(composing)
+  const viewport = useMobileVisualViewport(composing)
   const messagesRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -54,6 +54,12 @@ export default function ParentInquiriesPage() {
     if (list) list.scrollTop = list.scrollHeight
   }, [msgs.length, loading])
 
+  useEffect(() => {
+    if (!composing || !viewport.height) return
+    const list = messagesRef.current
+    if (list) list.scrollTop = list.scrollHeight
+  }, [composing, viewport.height])
+
   async function send() {
     if (!parent?.parentId || !parent?.sessionToken || !input.trim() || sending) return
     setSending(true)
@@ -81,17 +87,21 @@ export default function ParentInquiriesPage() {
   }
 
   return (
-    <div>
-      <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+    <div className="parent-inquiry-page" data-composing={composing} style={composing ? {
+      position: 'fixed', top: viewport.top, left: 0, right: 0,
+      height: viewport.height || '100dvh', zIndex: 200,
+      background: bg, display: 'flex', flexDirection: 'column', overflow: 'hidden',
+    } : undefined}>
+      <div style={{ marginBottom: 16, display: composing ? 'none' : 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
         <div>
           <p style={{ fontSize: 20, fontWeight: 700, color: tx, margin: 0 }}>문의하기</p>
           <p style={{ fontSize: 13, color: tx2, marginTop: 4 }}>선생님과 대화하며 궁금한 점을 남겨주세요</p>
         </div>
       </div>
 
-      <div style={{ background: '#fff', borderRadius: 16, border: `1px solid ${bd}`, boxShadow: '0 1px 6px rgba(0,0,0,.06)', minHeight: 300, marginBottom: 90, overflow: 'hidden' }}>
+      <div style={{ background: '#fff', borderRadius: composing ? 0 : 16, border: `1px solid ${bd}`, boxShadow: '0 1px 6px rgba(0,0,0,.06)', minHeight: composing ? 0 : 300, marginBottom: composing ? 0 : 90, overflow: 'hidden', display: composing ? 'flex' : 'block', flexDirection: 'column', flex: composing ? 1 : undefined }}>
         <div style={{ padding: '12px 16px', borderBottom: `1px solid ${bd}`, fontSize: 12, fontWeight: 600, color: tx2 }}>선생님과의 대화</div>
-        <div ref={messagesRef} style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14, minHeight: 260, maxHeight: composing ? 'calc(100dvh - 240px)' : '55vh', overflowY: 'auto', overscrollBehavior: 'contain' }}>
+        <div ref={messagesRef} style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14, minHeight: composing ? 0 : 260, maxHeight: composing ? undefined : '55vh', flex: composing ? 1 : undefined, overflowY: 'auto', overscrollBehavior: 'contain' }}>
           {loading ? (
             <p style={{ textAlign: 'center', color: tx3, padding: '40px 0', fontSize: 13 }}>불러오는 중...</p>
           ) : msgs.length === 0 ? (
@@ -123,7 +133,7 @@ export default function ParentInquiriesPage() {
       </div>
 
       {/* 입력창 — 하단 탭바 위에 고정 */}
-      <div className="parent-inquiry-composer" style={{ position: 'fixed', left: 0, right: 0, bottom: composing ? keyboardInset : 'calc(70px + env(safe-area-inset-bottom))', zIndex: 110, display: 'flex', justifyContent: 'center', background: '#fff', borderTop: `1px solid ${bd}`, boxShadow: '0 -2px 10px rgba(0,0,0,.05)' }}>
+      <div className="parent-inquiry-composer" style={{ position: composing ? 'relative' : 'fixed', left: 0, right: 0, bottom: composing ? undefined : 'calc(70px + env(safe-area-inset-bottom))', zIndex: 110, display: 'flex', justifyContent: 'center', flexShrink: 0, background: '#fff', borderTop: `1px solid ${bd}`, boxShadow: '0 -2px 10px rgba(0,0,0,.05)' }}>
         <div style={{ width: '100%', maxWidth: 640, padding: '10px 16px', boxSizing: 'border-box', display: 'flex', gap: 8, alignItems: 'flex-end' }}>
           <textarea ref={inputRef} rows={1} aria-label="문의 메시지" placeholder="선생님께 메시지를 보내세요"
             value={input} onFocus={() => { setComposing(true); requestAnimationFrame(() => { const list = messagesRef.current; if (list) list.scrollTop = list.scrollHeight }) }} onBlur={() => setComposing(false)}
@@ -136,7 +146,7 @@ export default function ParentInquiriesPage() {
           </button>
         </div>
       </div>
-      {err && <p style={{ position: 'fixed', bottom: composing ? keyboardInset + 76 : 'calc(145px + env(safe-area-inset-bottom))', left: 16, right: 16, zIndex: 111, textAlign: 'center', fontSize: 12, color: re }}>{err}</p>}
+      {err && <p style={{ position: composing ? 'absolute' : 'fixed', bottom: composing ? 76 : 'calc(145px + env(safe-area-inset-bottom))', left: 16, right: 16, zIndex: 111, textAlign: 'center', fontSize: 12, color: re }}>{err}</p>}
     </div>
   )
 }

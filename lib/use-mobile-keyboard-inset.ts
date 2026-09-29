@@ -21,3 +21,28 @@ export function useMobileKeyboardInset(active: boolean) {
 
   return active ? inset : 0
 }
+
+export function useMobileVisualViewport(active: boolean) {
+  const [viewport, setViewport] = useState({ top: 0, height: 0 })
+
+  useEffect(() => {
+    if (!active) return
+    const visualViewport = window.visualViewport
+    const update = () => setViewport({
+      top: visualViewport?.offsetTop ?? 0,
+      height: visualViewport?.height ?? window.innerHeight,
+    })
+    const frame = requestAnimationFrame(update)
+    visualViewport?.addEventListener('resize', update)
+    visualViewport?.addEventListener('scroll', update)
+    window.addEventListener('resize', update)
+    return () => {
+      cancelAnimationFrame(frame)
+      visualViewport?.removeEventListener('resize', update)
+      visualViewport?.removeEventListener('scroll', update)
+      window.removeEventListener('resize', update)
+    }
+  }, [active])
+
+  return viewport
+}

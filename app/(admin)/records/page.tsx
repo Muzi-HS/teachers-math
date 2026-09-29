@@ -50,10 +50,12 @@ function fmtDate(dt: string) {
 }
 
 export default function RecordsPage() {
-  const { teacher } = useAuth()
+  const { teacher, role } = useAuth()
   const { mobileMode } = useMobileMode()
   const [students, setStudents] = useState<Student[]>([])
   const [classes,  setClasses]  = useState<Class_[]>([])
+  const [assignedClassIds, setAssignedClassIds] = useState<Set<number> | null>(null)
+  const [assignmentError, setAssignmentError] = useState('')
   const [tests,    setTests]    = useState<Test[]>([])
   const [csMap,    setCsMap]    = useState<Record<number, number>>({})
   const [clsStudentsMap, setClsStudentsMap] = useState<Record<number, number[]>>({}) // class_id → student_ids[]
@@ -82,10 +84,10 @@ export default function RecordsPage() {
 
   function toast(msg: string, ok = true) { setNotif({ msg, ok }); setTimeout(() => setNotif(null), 3000) }
 
-  useEffect(() => { fetchBase() }, [])
+  useEffect(() => { if (role) fetchBase() }, [role]) // eslint-disable-line react-hooks/exhaustive-deps
   // These refresh helpers read the selected month/date; rerun only when that selection changes.
-  useEffect(() => { fetchMonthDates() }, [llYear, llMonth]) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { fetchDayRecs() }, [selDate]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (role === 'admin' || assignedClassIds) fetchMonthDates() }, [llYear, llMonth, role, assignedClassIds]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (role === 'admin' || assignedClassIds) fetchDayRecs() }, [selDate, role, assignedClassIds]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     let cancelled = false
     supabase.from('class_bulk_sends').select('class_key').eq('date', selDate).then(({ data, error }) => {
@@ -111,51 +113,83 @@ export default function RecordsPage() {
   }, [searchParams])
 
   async function fetchBase() {
+    const { data: assignments, error: assignmentsError } = await supabase
+      .from('class_staff_assignments').select('class_id')
+    if (assignmentsError) {
+      setAssignmentError('반별 담당자 정보를 불러오지 못했습니다. DB 마이그레이션을 확인해주세요.')
+      setAssignedClassIds(new Set())
+      setClasses([])
+      setStudents([])
+      return
+    }
+    setAssignmentError('')
+    const allowedIds = new Set((assignments ?? []).map(row => row.class_id))
     const [{ data: s }, { data: c }, { data: cs }, { data: t }] = await Promise.all([
       supabase.from('students').select('id,name,parent_phone').order('name'),
       supabase.from('classes').select('id,name').order('name'),
       supabase.from('class_students').select('student_id,class_id').order('class_id'),
       supabase.from('tests').select('id,name,date,total').order('date', { ascending: false }),
     ])
-    setStudents(s ?? [])
-    setClasses(c ?? [])
+    const visibleClasses = role === 'admin' ? (c ?? []) : (c ?? []).filter(item => allowedIds.has(item.id))
+    const visibleClassIds = new Set(visibleClasses.map(item => item.id))
+    const visibleMemberships = (cs ?? []).filter(row => visibleClassIds.has(row.class_id))
+    const visibleStudentIds = new Set(visibleMemberships.map(row => row.student_id))
+    setStudents(role === 'admin' ? (s ?? []) : (s ?? []).filter(item => visibleStudentIds.has(item.id)))
+    setClasses(visibleClasses)
     setTests(t ?? [])
     const map: Record<number, number> = {}
     const clsMap: Record<number, number[]> = {}
-    for (const r of (cs ?? [])) {
+    for (const r of visibleMemberships) {
       map[r.student_id] = r.class_id
       if (!clsMap[r.class_id]) clsMap[r.class_id] = []
       clsMap[r.class_id].push(r.student_id)
     }
     setCsMap(map)
     setClsStudentsMap(clsMap)
+    setAssignedClassIds(allowedIds)
   }
 
   async function fetchMonthDates() {
+    if (role !== 'admin' && !assignedClassIds?.size) {
+      setRecDates(new Set())
+      setUnreadCommentDates(new Set())
+      return
+    }
     const ym   = `${llYear}-${String(llMonth + 1).padStart(2, '0')}`
     const from = `${ym}-01`
     const last = new Date(llYear, llMonth + 1, 0).getDate()
     const to   = `${ym}-${String(last).padStart(2, '0')}`
-    const { data } = await supabase.from('records').select('date').eq('is_draft', false).gte('date', from).lte('date', to)
-    setRecDates(new Set((data ?? []).map(r => r.date)))
+    const { data } = await supabase.from('records').select('date,class_id').eq('is_draft', false).gte('date', from).lte('date', to)
+    const scopedDates = role === 'admin' ? (data ?? []) : (data ?? []).filter(r => r.class_id != null && assignedClassIds?.has(r.class_id))
+    setRecDates(new Set(scopedDates.map(r => r.date)))
 
     const { data: withComment } = await supabase.from('records')
-      .select('date,parent_comment,parent_comment_at,parent_comment_read_at')
+      .select('date,class_id,parent_comment,parent_comment_at,parent_comment_read_at')
       .eq('is_draft', false).not('parent_comment', 'is', null)
       .gte('date', from).lte('date', to)
-    setUnreadCommentDates(new Set((withComment ?? []).filter(isUnreadParentComment).map(r => r.date)))
+    setUnreadCommentDates(new Set((withComment ?? [])
+      .filter(r => role === 'admin' || (r.class_id != null && assignedClassIds?.has(r.class_id)))
+      .filter(isUnreadParentComment).map(r => r.date)))
   }
 
   async function fetchDayRecs() {
+    if (role !== 'admin' && !assignedClassIds?.size) {
+      setDayRecs([])
+      setComments([])
+      setLoading(false)
+      return
+    }
     setLoading(true)
 
     // 1. records 기본 조회
-    const { data: recs } = await supabase
+    const { data: fetchedRecs } = await supabase
       .from('records')
       .select('*')
       .eq('date', selDate)
       .eq('is_draft', false)
       .order('student_id')
+    const recs = role === 'admin' ? fetchedRecs : (fetchedRecs ?? [])
+      .filter(r => r.class_id != null && assignedClassIds?.has(r.class_id))
 
     if (!recs || recs.length === 0) { setDayRecs([]); setLoading(false); return }
 
@@ -378,6 +412,7 @@ export default function RecordsPage() {
     const seen = new Set<number | null>()
     for (const r of dayRecs) {
       const clsId = recClsId(r)
+      if (role !== 'admin' && (clsId === null || !assignedClassIds?.has(clsId))) continue
       if (!seen.has(clsId)) {
         seen.add(clsId)
         const cls = clsId !== null ? (classes.find(c => c.id === clsId) ?? null) : null
@@ -464,6 +499,7 @@ export default function RecordsPage() {
     <div style={{ padding: mobileMode ? '16px 14px 88px' : '28px 32px', fontFamily: "'Noto Sans KR',sans-serif" }}>
       <style>{css}</style>
 
+      {assignmentError && <p role="alert" style={{ color: re, fontSize: 13, marginBottom: 12 }}>{assignmentError}</p>}
       {notif && (
         <div style={{ position: 'fixed', top: 18, right: 18, zIndex: 9999, background: '#fff', borderRadius: 8, padding: '11px 14px', borderLeft: `4px solid ${notif.ok ? gr : re}`, boxShadow: '0 4px 18px rgba(0,0,0,.1)', minWidth: 200 }}>
           <div style={{ fontWeight: 600, marginBottom: 2, color: tx, fontSize: 13 }}>{notif.ok ? '완료' : '알림'}</div>

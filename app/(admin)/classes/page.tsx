@@ -14,6 +14,8 @@ import { navy, navyDk, navyM, gold, goldL, bg, bd, tx, tx2, tx3, re, rbg, gr, gb
 import AdminTestResultCard from '@/components/AdminTestResultCard'
 
 type Class = { id: number; name: string; days: string; time: string; mode?: string; active?: boolean }
+type ClassStaff = { user_id: string; name: string; role: 'teacher' | 'assistant' }
+type ClassAssignment = { class_id: number; teacher_user_id: string }
 type Student = { id: number; name: string; birth_year: number; school: string; parent_phone?: string }
 type Test = { id: number; name: string; date: string; total: number }
 type TestItem = { testId: number | null; tTotal: number; tCor: number; tScore: number }
@@ -43,10 +45,16 @@ export default function ClassesPage() {
   // view: list | detail | sturec
   const [view, setView] = useState<'list' | 'detail' | 'sturec'>('list')
   const [classes, setClasses] = useState<Class[]>([])
+  const [staffCandidates, setStaffCandidates] = useState<ClassStaff[]>([])
+  const [classAssignments, setClassAssignments] = useState<ClassAssignment[]>([])
+  const [staffModal, setStaffModal] = useState(false)
+  const [staffDraft, setStaffDraft] = useState<Set<string>>(new Set())
+  const [staffSaving, setStaffSaving] = useState(false)
+  const [assignmentError, setAssignmentError] = useState('')
   const [students, setStudents] = useState<Student[]>([])
   const [tests, setTests] = useState<Test[]>([])
   const [csMap, setCsMap] = useState<Record<number, number[]>>({}) // class_id→student_ids
-  const [recCnt, setRecCnt] = useState<Record<number, number>>({})
+  const [recCnt, setRecCnt] = useState<Record<string, number>>({})
   const [stuRecs, setStuRecs] = useState<Rec[]>([])
   const [detailCls, setDetailCls] = useState<Class | null>(null)
   const [curStu, setCurStu] = useState<Student | null>(null)
@@ -103,7 +111,7 @@ export default function ClassesPage() {
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
 
-  useEffect(() => { fetchAll() }, [])
+  useEffect(() => { if (role) fetchAll() }, [role]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     async function fetchTodayAttNotices() {
@@ -130,30 +138,74 @@ export default function ClassesPage() {
   }, [classes, searchParams])
 
   async function fetchAll() {
+    const { data: assignments, error: assignmentsError } = await supabase
+      .from('class_staff_assignments').select('class_id,teacher_user_id')
+    if (assignmentsError) {
+      setAssignmentError('반별 담당자 설정을 불러오지 못했습니다. DB 마이그레이션을 확인해주세요.')
+      setClasses([])
+      setStudents([])
+      return
+    }
+    setAssignmentError('')
+    setClassAssignments((assignments ?? []) as ClassAssignment[])
+    const allowedClassIds = new Set((assignments ?? []).map(a => a.class_id))
+    if (role === 'admin') {
+      const { data: staff } = await supabase.from('teachers')
+        .select('user_id,name,role').eq('approved', true).in('role', ['teacher', 'assistant']).order('name')
+      setStaffCandidates((staff ?? []) as ClassStaff[])
+    }
     const [{ data: c }, { data: s }, { data: cs }, { data: rc }, { data: t }] = await Promise.all([
       supabase.from('classes').select('*').order('name'),
       supabase.from('students').select('id,name,birth_year,school,parent_phone').order('name'),
       supabase.from('class_students').select('class_id,student_id'),
-      supabase.from('records').select('student_id').eq('is_draft', false),
+      supabase.from('records').select('student_id,class_id').eq('is_draft', false),
       supabase.from('tests').select('id,name,date,total').order('date', { ascending: false }),
     ])
-    setClasses(c ?? [])
-    setStudents(s ?? [])
+    const visibleClasses = role === 'admin' ? (c ?? []) : (c ?? []).filter(item => allowedClassIds.has(item.id))
+    const visibleClassIds = new Set(visibleClasses.map(item => item.id))
+    const visibleMemberships = (cs ?? []).filter(row => visibleClassIds.has(row.class_id))
+    const visibleStudentIds = new Set(visibleMemberships.map(row => row.student_id))
+    setClasses(visibleClasses)
+    setStudents(role === 'admin' ? (s ?? []) : (s ?? []).filter(item => visibleStudentIds.has(item.id)))
     setTests(t ?? [])
     const map: Record<number, number[]> = {}
-    for (const r of (cs ?? [])) { if (!map[r.class_id]) map[r.class_id] = []; map[r.class_id].push(r.student_id) }
+    for (const r of visibleMemberships) { if (!map[r.class_id]) map[r.class_id] = []; map[r.class_id].push(r.student_id) }
     setCsMap(map)
-    const cnt: Record<number, number> = {}
-    for (const r of (rc ?? [])) cnt[r.student_id] = (cnt[r.student_id] ?? 0) + 1
+    const cnt: Record<string, number> = {}
+    for (const r of (rc ?? [])) {
+      if (r.class_id == null || !visibleClassIds.has(r.class_id)) continue
+      const key = `${r.class_id}:${r.student_id}`
+      cnt[key] = (cnt[key] ?? 0) + 1
+    }
     setRecCnt(cnt)
   }
 
+  function openStaffModal(classId: number) {
+    setStaffDraft(new Set(classAssignments.filter(a => a.class_id === classId).map(a => a.teacher_user_id)))
+    setStaffModal(true)
+  }
+
+  async function saveStaffAssignments() {
+    if (!detailCls || staffSaving) return
+    setStaffSaving(true)
+    const { error } = await supabase.rpc('set_class_staff_assignments', {
+      p_class_id: detailCls.id, p_user_ids: [...staffDraft],
+    })
+    setStaffSaving(false)
+    if (error) { toast('담당자 저장에 실패했습니다: ' + error.message, false); return }
+    setStaffModal(false)
+    toast('반 담당자를 저장했습니다.')
+    await fetchAll()
+  }
+
   async function fetchStuRecs(stuId: number) {
+    if (!detailCls) return
     // 1. records 기본 조회
     const { data: recs } = await supabase
       .from('records')
       .select('*')
       .eq('student_id', stuId)
+      .eq('class_id', detailCls.id)
       .eq('is_draft', false)
       .order('date', { ascending: false })
 
@@ -360,6 +412,7 @@ export default function ClassesPage() {
             <p style={{ textAlign: 'center', padding: '30px 0', color: tx3, fontSize: 13 }}>검색 결과가 없습니다</p>
           )}
 
+          {assignmentError && <p role="alert" style={{ color: re, fontSize: 13 }}>{assignmentError}</p>}
           {filtered.map((c, idx) => {
             const barColors = Array.from({ length: 6 }, (_, i) => `var(--ui-chart-${i + 1})`)
             const barColor = barColors[idx % barColors.length]
@@ -380,6 +433,9 @@ export default function ClassesPage() {
                   <p style={{ fontSize: 11, color: tx3, margin: 0 }}>
                     {[c.days, c.time, `학생 ${(csMap[c.id] ?? []).length}명`].filter(Boolean).join(' · ')}
                   </p>
+                  {role === 'admin' && <p style={{ fontSize: 11, color: tx2, margin: '3px 0 0' }}>
+                    담당: {classAssignments.filter(a => a.class_id === c.id).map(a => staffCandidates.find(t => t.user_id === a.teacher_user_id)?.name).filter(Boolean).join(', ') || '미배정'}
+                  </p>}
                 </div>
                 {canManageClassInfo && (
                   <div style={{ display: 'flex', gap: 5 }} onClick={e => e.stopPropagation()}>
@@ -418,9 +474,13 @@ export default function ClassesPage() {
               {detailCls.mode && <span style={{ fontSize: 12, padding: '3px 9px', borderRadius: 20, background: navyM, color: navy, fontWeight: 500 }}>{detailCls.mode}</span>}
             </div>
             <p style={{ fontSize: 13, color: tx2, marginTop: 4 }}>{detailCls.days} | {detailCls.time}</p>
+            {role === 'admin' && <p style={{ fontSize: 12, color: tx2, marginTop: 4 }}>
+              담당: {classAssignments.filter(a => a.class_id === detailCls.id).map(a => staffCandidates.find(t => t.user_id === a.teacher_user_id)?.name).filter(Boolean).join(', ') || '미배정'}
+            </p>}
           </div>
           {/* 공지하기 → 수업 준비 → 수업기록 작성(primary) → 학생 추가 순으로 통일된 스타일 */}
           <div style={{ display: 'flex', gap: 8 }}>
+            {canManageClassInfo && <button className="chdr-btn chdr-btn-out" onClick={() => openStaffModal(detailCls.id)}>담당자 배정</button>}
             {(role === 'admin' || role === 'teacher') && (
               <button className="chdr-btn chdr-btn-out" onClick={() => setNoticeModal(true)}>
                 <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
@@ -501,7 +561,7 @@ export default function ClassesPage() {
 
                   {/* 기록 수 배지 */}
                   <span style={{ background: navyM, color: navy, fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 20, flexShrink: 0 }}>
-                    기록 {recCnt[s.id] ?? 0}개
+                    기록 {recCnt[`${detailCls.id}:${s.id}`] ?? 0}개
                   </span>
 
                   {/* 제외 버튼 */}
@@ -647,6 +707,26 @@ export default function ClassesPage() {
       </>}
 
       {/* ════ mBulkRec: 반 수업기록 일괄 작성/수정 (공용 컴포넌트) ════ */}
+      {staffModal && detailCls && <Modal title={`${detailCls.name} 담당자 배정`} onClose={() => setStaffModal(false)} footer={<>
+        <button className="bout" onClick={() => setStaffModal(false)}>취소</button>
+        <button className="bgold" disabled={staffSaving} onClick={saveStaffAssignments}>{staffSaving ? '저장 중...' : '저장'}</button>
+      </>}>
+        <p style={{ fontSize: 12, color: tx2, margin: '0 0 12px' }}>선생님과 조교를 여러 명 선택할 수 있습니다. 배정된 담당자는 이 반의 정보와 수업기록을 볼 수 있고 기록을 작성·발송할 수 있습니다.</p>
+        {staffCandidates.length === 0 && <p style={{ fontSize: 13, color: tx3 }}>배정 가능한 승인된 선생님·조교가 없습니다.</p>}
+        <div style={{ display: 'grid', gap: 8, maxHeight: 320, overflowY: 'auto' }}>
+          {staffCandidates.map(member => <label key={member.user_id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, border: `1px solid ${bd}`, borderRadius: 8, cursor: 'pointer' }}>
+            <input type="checkbox" checked={staffDraft.has(member.user_id)} onChange={() => setStaffDraft(previous => {
+              const next = new Set(previous)
+              if (next.has(member.user_id)) next.delete(member.user_id)
+              else next.add(member.user_id)
+              return next
+            })} />
+            <span style={{ fontSize: 13, color: tx }}>{member.name}</span>
+            <span style={{ fontSize: 11, color: tx3 }}>{member.role === 'assistant' ? '조교' : '선생님'}</span>
+          </label>)}
+        </div>
+      </Modal>}
+
       {bulkModal && detailCls && (
         <ClassBulkRecordModal
           classId={detailCls.id}
