@@ -540,17 +540,19 @@ export default function SchedulePage() {
                         <p style={{ fontSize: 14 }}>{selectedDate ? '선택한 날짜에' : '이번 달에'} 결석·지각 등록이 없습니다</p>
                     </div>
                 ) : [...visibleNotices].sort((a, b) => a.date.localeCompare(b.date)).map(n => (
-                    <div key={n.id} style={{ padding: '10px 0', borderBottom: `1px solid ${bd}`, display: 'flex', alignItems: 'center', gap: 10, flexWrap: mobileMode ? 'wrap' : 'nowrap' }}>
-                        <span style={{
+                    <div key={n.id} style={{ padding: '12px 0', borderBottom: `1px solid ${bd}` }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                          <span style={{
                             fontSize: 10, padding: '2px 7px', borderRadius: 3, flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 3,
                             background: n.type === 'late' ? 'var(--ui-warning-bg)' : 'var(--ui-danger-bg)',
                             color: n.type === 'late' ? 'var(--ui-warning)' : 'var(--ui-danger)',
                         }}>
                             {n.type === 'late' && <IconClock size={9} />}{n.type === 'late' ? '지각' : '결석'}
                         </span>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: tx, flex: 1 }}>{studentsMap[n.student_id] ?? '학생'}</span>
-                        {n.reason && <span style={{ fontSize: 12, color: tx2 }}>{n.reason}</span>}
-                        <span style={{ fontSize: 12, color: tx3, whiteSpace: 'nowrap' }}>{n.date.slice(5).replace('-', '/')}</span>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: tx, minWidth: 0, overflowWrap: 'anywhere' }}>{studentsMap[n.student_id] ?? '학생'}</span>
+                          <span style={{ fontSize: 12, color: tx3, whiteSpace: 'nowrap', marginLeft: 'auto', flexShrink: 0 }}>{n.date.slice(5).replace('-', '/')}</span>
+                        </div>
+                        {n.reason && <p style={{ fontSize: 12, color: tx2, lineHeight: 1.6, margin: '8px 0 0', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{n.reason}</p>}
                     </div>
                 ))}
             </div>

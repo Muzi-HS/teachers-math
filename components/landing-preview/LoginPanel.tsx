@@ -1,5 +1,6 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import Image from 'next/image'
 import { TEACHER_AUTO_LOGIN_KEY } from '@/lib/supabase'
 import { teacherLogin, parentLookup, parentLoginWithPin, updateParentPin, studentLookup, studentLoginWithPin, updateStudentPin } from '@/lib/auth'
@@ -19,7 +20,7 @@ const TYPES: { key: AccountType; label: string; desc: string }[] = [
 ]
 
 // PIN 입력용 4자리 점 표시 (기존 LoginModal과 동일한 방식)
-function PinDots({ value, onChange, autoFocus = false }: { value: string; onChange: (v: string) => void; autoFocus?: boolean }) {
+function PinDots({ value, onChange, autoFocus = false, inputRef }: { value: string; onChange: (v: string) => void; autoFocus?: boolean; inputRef?: React.Ref<HTMLInputElement> }) {
   return (
     <div style={{ position: 'relative', margin: '18px 0 6px' }}
       onClick={e => (e.currentTarget.querySelector('input') as HTMLInputElement)?.focus()}>
@@ -33,6 +34,7 @@ function PinDots({ value, onChange, autoFocus = false }: { value: string; onChan
         ))}
       </div>
       <input
+        ref={inputRef}
         type="tel" inputMode="numeric" pattern="[0-9]*" value={value} autoFocus={autoFocus}
         aria-label="PIN 4자리"
         onChange={e => onChange(e.target.value.replace(/\D/g, '').slice(0, 4))}
@@ -66,6 +68,7 @@ export default function LoginPanel({ open, onClose }: { open: boolean; onClose: 
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
+  const pinInputRef = useRef<HTMLInputElement>(null)
 
   // ESC로 닫기 + 바깥 스크롤 잠금
   useEffect(() => {
@@ -85,14 +88,16 @@ export default function LoginPanel({ open, onClose }: { open: boolean; onClose: 
   }
 
   async function handlePhoneSubmit() {
-    setError(''); setLoading(true)
+    setError('')
+    if (!phone) { setError('전화번호를 입력하세요.'); return }
+    // Mount and focus during the tap/Enter gesture. iOS will not open its
+    // keyboard when focus happens only after the asynchronous lookup.
+    flushSync(() => { setPin(''); setStep('pin'); setLoading(true) })
+    pinInputRef.current?.focus()
     try {
-      if (!phone) throw new Error('전화번호를 입력하세요.')
       const data = accountType === 'student' ? await studentLookup(phone) : await parentLookup(phone)
       setParentData(data)
-      setPin('')
-      setStep('pin')
-    } catch (e) { setError(e instanceof Error ? e.message : '확인 중 오류가 발생했습니다.') }
+    } catch (e) { setStep('form'); setError(e instanceof Error ? e.message : '확인 중 오류가 발생했습니다.') }
     finally { setLoading(false) }
   }
 
@@ -270,8 +275,8 @@ export default function LoginPanel({ open, onClose }: { open: boolean; onClose: 
                 <>
                   <h2 style={{ fontSize: 19, fontWeight: 800, color: deep, marginBottom: 4 }}>PIN 입력</h2>
                   <p style={{ fontSize: 13, color: deep2, marginBottom: 6 }}>{phone}</p>
-                  <PinDots value={pin} onChange={v => { setPin(v); if (v.length === 4) setTimeout(() => handlePinSubmit(v), 80) }} autoFocus />
-                  <p style={{ fontSize: 11.5, color: 'rgba(21,74,50,.45)', textAlign: 'center' }}>위 영역을 탭하면 키패드가 열립니다</p>
+                  <PinDots value={pin} inputRef={pinInputRef} onChange={v => { if (loading) return; setPin(v); if (v.length === 4) setTimeout(() => handlePinSubmit(v), 80) }} autoFocus />
+                  <p style={{ fontSize: 11.5, color: 'rgba(21,74,50,.45)', textAlign: 'center' }}>{loading ? '전화번호 확인 중...' : 'PIN 4자리를 입력하세요'}</p>
                   {error && <p role="alert" style={{ color: '#B3261E', fontSize: 12.5, textAlign: 'center', marginTop: 8 }}>{error}</p>}
                   <AutoLoginRow checked={autoLogin} onChange={setAutoLogin} />
                 </>

@@ -168,7 +168,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
         height: mobileMode ? 62 : 52, display: 'flex', alignItems: 'center',
         justifyContent: 'space-between', padding: '0 20px',
         borderBottom: mobileMode ? '1px solid #EBF0EC' : '1px solid var(--chrome-border)',
-        zIndex: 100, flexShrink: 0,
+        zIndex: 100, flexShrink: 0, backdropFilter: 'none', WebkitBackdropFilter: 'none',
       }}>
         {/* 왼쪽: 로고 · 학원명 · 배지 · 이름 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, overflow: 'hidden' }}>
