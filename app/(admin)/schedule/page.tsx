@@ -7,6 +7,7 @@ import { kstDateStr, kstNow } from '@/lib/kst'
 import { IconClock, IconLock } from '@/components/icons'
 import { useMobileMode } from '@/context/MobileModeContext'
 import { usePublicHolidays } from '@/lib/use-public-holidays'
+import CompactMonthCalendar from '@/components/CompactMonthCalendar'
 
 type Evt = {
     id: number
@@ -389,6 +390,21 @@ export default function SchedulePage() {
                     <span style={{ fontSize: 12, color: tx2 }} aria-live="polite">{listTitle}{selectedDate ? ' 선택됨' : ''}</span>
                 </div>
 
+                {mobileMode && <CompactMonthCalendar year={yr} month={mo} selectedDate={selectedDate}
+                    holidays={publicHolidays} showNavigation={false} onSelectDate={setSelectedDate}
+                    getDayInfo={date => {
+                        const events = dayEvts(date)
+                        const notices = dayNotices(date)
+                        return {
+                            holiday: events.some(event => event.type === 'holiday'),
+                            markers: [
+                                ...events.map(event => event.type === 'holiday' ? re : navy),
+                                ...notices.map(notice => notice.type === 'absence' ? re : 'var(--ui-warning)'),
+                            ],
+                            description: `일정 ${events.length}건, 결석·지각 ${notices.length}건`,
+                        }
+                    }} />}
+                {!mobileMode && <>
                 {/* 요일 헤더 */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 3, marginBottom: 3 }}>
                     {DOW.map((d, i) => (
@@ -472,6 +488,7 @@ export default function SchedulePage() {
                         </div>
                     ))}
                 </div>
+                </>}
             </div>
 
             {/* 이번달 목록 */}

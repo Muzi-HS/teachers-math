@@ -3,10 +3,10 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { IconClock, IconCalendar } from '@/components/icons'
 import { usePublicHolidays } from '@/lib/use-public-holidays'
+import CompactMonthCalendar from '@/components/CompactMonthCalendar'
 
 const navy='var(--ui-primary)', tx='var(--ui-text)', tx2='var(--ui-text-2)', tx3='var(--ui-text-3)'
 const bd='var(--ui-border)', re='var(--ui-danger)', rbg='var(--ui-danger-bg)'
-const saturday = '#2563A6'
 
 type Event_ = {
   id: number; title: string; start_date: string; end_date: string | null
@@ -21,7 +21,6 @@ function eventColor(e: Event_) {
     : { bg: 'var(--ui-surface-2)', color: navy, dot: navy }
 }
 
-const DOW = ['일','월','화','수','목','금','토']
 
 // 학부모/학생 화면이 공유하는 학원 일정(달력) 뷰 — 관리자가 일정 등록 시 학부모/학생을
 // 각각 독립적으로 공개 대상에서 켜고 끌 수 있어(parent_visible/student_visible), 역할에
@@ -29,7 +28,6 @@ const DOW = ['일','월','화','수','목','금','토']
 export default function AcademyEventsView({ role }: { role: 'parent' | 'student' }) {
   const [events,   setEvents]   = useState<Event_[]>([])
   const [loading,  setLoading]  = useState(true)
-  const [today] = useState(() => new Date())
   const [curYear,  setCurYear]  = useState(() => new Date().getFullYear())
   const [curMonth, setCurMonth] = useState(() => new Date().getMonth())
   const [selDate,  setSelDate]  = useState<string | null>(null)
@@ -70,18 +68,6 @@ export default function AcademyEventsView({ role }: { role: 'parent' | 'student'
     return events.filter(e => dateInEvent(dateStr, e))
   }
 
-  // 달력 날짜 생성
-  const firstDay = new Date(curYear, curMonth, 1).getDay()
-  const daysInMonth = new Date(curYear, curMonth + 1, 0).getDate()
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`
-
-  const calCells: (number | null)[] = [
-    ...Array(firstDay).fill(null),
-    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
-  ]
-  // 6줄 맞추기
-  while (calCells.length % 7 !== 0) calCells.push(null)
-
   // 선택된 날짜의 이벤트
   const selEvents = selDate ? eventsOnDate(selDate) : []
 
@@ -106,55 +92,14 @@ export default function AcademyEventsView({ role }: { role: 'parent' | 'student'
         <>
           {/* 달력 카드 */}
           <div style={{ background: '#fff', borderRadius: 16, border: `1px solid ${bd}`, padding: '16px 12px', marginBottom: 14, boxShadow: '0 1px 6px rgba(0,0,0,.06)' }}>
-            {/* 월 이동 */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-              <button onClick={prevMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 10px', color: tx2, fontSize: 18 }}>‹</button>
-              <span style={{ fontSize: 16, fontWeight: 700, color: tx }}>{curYear}년 {curMonth + 1}월</span>
-              <button onClick={nextMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 10px', color: tx2, fontSize: 18 }}>›</button>
-            </div>
-
-            {/* 요일 헤더 */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', marginBottom: 4 }}>
-              {DOW.map((d, i) => (
-                <div key={d} style={{ textAlign: 'center', fontSize: 11, fontWeight: 600, color: i === 0 ? re : i === 6 ? saturday : tx3, padding: '2px 0' }}>
-                  {d}
-                </div>
-              ))}
-            </div>
-
-            {/* 날짜 셀 */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: '2px 0' }}>
-              {calCells.map((day, idx) => {
-                if (!day) return <div key={idx} />
-                const dateStr = `${curYear}-${String(curMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
-                const dayEvents = eventsOnDate(dateStr)
-                const publicHoliday = publicHolidays?.find(h => h.date === dateStr)
-                const isHoliday = !!publicHoliday || dayEvents.some(e => e.type === 'holiday')
-                const isToday = dateStr === todayStr
-                const isSel   = dateStr === selDate
-                const dow     = idx % 7
-                return (
-                  <button key={idx} aria-label={`${curMonth + 1}월 ${day}일${publicHoliday ? `, ${publicHoliday.name}` : ''}`} onClick={() => setSelDate(isSel ? null : dateStr)} style={{
-                    background: isSel ? (isHoliday ? rbg : navy) : isToday ? 'var(--ui-surface-2)' : 'none',
-                    border: 'none', borderRadius: 8, cursor: 'pointer', padding: '4px 0 6px',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-                    fontFamily: "'Noto Sans KR',sans-serif",
-                  }}>
-                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, maxWidth: '100%' }}>
-                      <span style={{ fontSize: 13, fontWeight: isToday || isSel || isHoliday ? 700 : 400, color: isHoliday ? re : isSel ? '#fff' : isToday ? navy : dow === 0 ? re : dow === 6 ? saturday : tx }}>{day}</span>
-                      {publicHoliday && <span title={publicHoliday.name} style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: re, fontSize: 10, lineHeight: '14px' }}>{publicHoliday.name}</span>}
-                    </span>
-                    {/* 이벤트 점 (최대 3개) */}
-                    <div style={{ display: 'flex', gap: 2 }}>
-                      {dayEvents.slice(0, 3).map(e => {
-                        const tc = eventColor(e)
-                        return <div key={'e'+e.id} style={{ width: 4, height: 4, borderRadius: '50%', background: isSel ? 'rgba(255,255,255,.7)' : tc.dot }} />
-                      })}
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
+            <CompactMonthCalendar year={curYear} month={curMonth} selectedDate={selDate}
+              holidays={publicHolidays}
+              onMoveMonth={delta => delta < 0 ? prevMonth() : nextMonth()}
+              onSelectDate={date => setSelDate(selDate === date ? null : date)}
+              getDayInfo={date => {
+                const dayEvents = eventsOnDate(date)
+                return { holiday: dayEvents.some(event => event.type === 'holiday'), markers: dayEvents.map(event => eventColor(event).dot), description: `일정 ${dayEvents.length}건` }
+              }} />
           </div>
 
           {/* 선택된 날짜의 일정 */}

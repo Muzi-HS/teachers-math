@@ -31,8 +31,12 @@ function pathToMenuKey(pathname: string): string | null {
   return pathname.split('/').filter(Boolean)[0] ?? null
 }
 
-function LogoutButton() {
+function LogoutButton({ mobile }: { mobile: boolean }) {
   const { logout } = useAuth()
+  if (mobile) return <button onClick={logout} aria-label="로그아웃"
+    style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#819085', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '50%' }}>
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5" /><path d="M21 12H9" /></svg>
+  </button>
   return (
     <button
       onClick={logout}
@@ -59,9 +63,9 @@ function MobileModeToggle() {
         onClick={() => setMobileMode(false)}
         style={{
           display: 'flex', alignItems: 'center', gap: 4,
-          background: 'rgba(255,255,255,.14)', border: 'none', borderRadius: 20,
+          background: 'var(--ui-surface-2)', border: 'none', borderRadius: 20,
           cursor: 'pointer', padding: '4px 10px',
-          fontSize: 11, fontWeight: 600, color: '#fff',
+          fontSize: 11, fontWeight: 600, color: 'var(--ui-text-2)',
           fontFamily: "'Noto Sans KR',sans-serif",
         }}
       >
@@ -159,34 +163,35 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Montserrat:wght@700;800&display=swap');`}</style>
 
       {/* 상단 헤더 */}
-      <header style={{
-        background: 'var(--chrome-bg)',
-        height: 52, display: 'flex', alignItems: 'center',
+      <header className={mobileMode ? 'admin-mobile-header' : undefined} style={{
+        background: mobileMode ? '#fff' : 'var(--chrome-bg)',
+        height: mobileMode ? 62 : 52, display: 'flex', alignItems: 'center',
         justifyContent: 'space-between', padding: '0 20px',
-        borderBottom: '1px solid var(--chrome-border)',
+        borderBottom: mobileMode ? '1px solid #EBF0EC' : '1px solid var(--chrome-border)',
         zIndex: 100, flexShrink: 0,
       }}>
         {/* 왼쪽: 로고 · 학원명 · 배지 · 이름 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, overflow: 'hidden' }}>
-          <Image src="/logo.png" alt="로고" width={30} height={30} style={{ objectFit: 'contain', flexShrink: 0 }} />
-          {!mobileMode && (
+          <Image src="/logo.png" alt="로고" width={mobileMode ? 24 : 30} height={mobileMode ? 24 : 30} style={{ objectFit: 'contain', flexShrink: 0 }} />
+          {mobileMode ? <span style={{ fontSize: 13, fontWeight: 700, color: '#203F30', letterSpacing: -.2, whiteSpace: 'nowrap' }}>티처스 수학학원</span> : (
             <span style={{ fontFamily: 'Montserrat,sans-serif', fontSize: 12, fontWeight: 800, color: '#fff', letterSpacing: .5 }}>
               TEACHERS MATH
             </span>
           )}
-          <span style={{ fontSize: 11, color: 'var(--chrome-text-2)', background: 'rgba(255,255,255,.1)', padding: '2px 7px', borderRadius: 10, flexShrink: 0 }}>
+          {!mobileMode && <span style={{ fontSize: 11, color: 'var(--chrome-text-2)', background: 'rgba(255,255,255,.1)', padding: '2px 7px', borderRadius: 10, flexShrink: 0 }}>
             {role === 'admin' ? '관리자' : role === 'assistant' ? '조교' : '선생님'}
-          </span>
-          <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,.85)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          </span>}
+          {!mobileMode && <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,.85)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {teacher?.name ?? ''}
-          </span>
+          </span>}
         </div>
 
         {/* 오른쪽: 모바일 전환 · 로그아웃 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
           {!mobileMode && <ThemeToggle />}
           <MobileModeToggle />
-          <LogoutButton />
+          {mobileMode && <span style={{ fontSize: 11, color: '#627668', maxWidth: 80, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{teacher?.name ?? ''} {role === 'admin' ? '관리자' : role === 'assistant' ? '조교' : '선생님'}</span>}
+          <LogoutButton mobile={mobileMode} />
         </div>
       </header>
 

@@ -6,6 +6,8 @@ import { kstDateStr, kstNow } from '@/lib/kst'
 import TimeSlotInput from '@/components/TimeSlotInput'
 import { IconX } from '@/components/icons'
 import { useMobileMode } from '@/context/MobileModeContext'
+import { usePublicHolidays } from '@/lib/use-public-holidays'
+import CompactMonthCalendar from '@/components/CompactMonthCalendar'
 
 const navy='var(--ui-primary)', bg='var(--ui-bg)', bd='var(--ui-border)'
 const tx='var(--ui-text)', tx2='var(--ui-text-2)', tx3='var(--ui-text-3)'
@@ -46,6 +48,7 @@ export default function AttendancePage() {
   const [memo,     setMemo]     = useState('')
   const [saving,   setSaving]   = useState(false)
   const [notif,    setNotif]    = useState<{msg:string;ok:boolean}|null>(null)
+  const { holidays: publicHolidays, fallback: holidayFallback } = usePublicHolidays(selYear)
 
   const today = logs.find(l => l.date === selDate) ?? null
 
@@ -98,6 +101,11 @@ export default function AttendancePage() {
     setSelDate(d)
     const [y, m] = d.split('-').map(Number)
     setSelYear(y); setSelMonth(m)
+  }
+
+  function moveMonth(delta: number) {
+    const next = new Date(selYear, selMonth - 1 + delta, 1)
+    handleDateChange(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-01`)
   }
 
   function addSlot() { setSlots(p => [...p, {in:'',out:''}]) }
@@ -203,6 +211,16 @@ export default function AttendancePage() {
         ))}
       </div>
 
+      <div style={{background:'#fff',borderRadius:12,border:`1px solid ${bd}`,padding:mobileMode?'16px 12px':20,marginBottom:16,boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
+        <CompactMonthCalendar year={selYear} month={selMonth - 1} selectedDate={selDate}
+          holidays={publicHolidays} onMoveMonth={moveMonth} onSelectDate={handleDateChange}
+          getDayInfo={date => {
+            const log = logs.find(item => item.date === date)
+            return { markers: log ? [log.approved ? gr : gold] : [], description: log ? (log.approved ? '승인됨' : '승인 대기') : undefined }
+          }} />
+        <p style={{fontSize:11,color:tx3,margin:'8px 4px 0'}}>공휴일 표시는 근무 일정과 별개입니다.{holidayFallback && (publicHolidays ? ' 저장된 공휴일 자료를 표시합니다.' : ' 공휴일 정보를 불러오지 못했습니다.')}</p>
+      </div>
+
       {/* 출근 입력 카드 */}
       <div style={{background:'#fff',borderRadius:12,border:`1px solid ${bd}`,padding:20,marginBottom:16,boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
         <div style={{fontSize:14,fontWeight:700,color:tx,marginBottom:14,display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
@@ -273,10 +291,10 @@ export default function AttendancePage() {
       <div style={{background:'#fff',borderRadius:12,border:`1px solid ${bd}`,boxShadow:'0 1px 4px rgba(0,0,0,.06)',overflow:'hidden'}}>
         <div style={{padding:'12px 16px',borderBottom:`1px solid ${bd}`,display:'flex',alignItems:'center',gap:10}}>
           <span style={{fontSize:13,fontWeight:700,color:tx}}>출근 기록</span>
-          <select className="fsel" value={selYear} onChange={e=>setSelYear(Number(e.target.value))}>
+          <select className="fsel" value={selYear} onChange={e=>handleDateChange(`${e.target.value}-${String(selMonth).padStart(2,'0')}-01`)}>
             {[2024,2025,2026,2027].map(y=><option key={y} value={y}>{y}년</option>)}
           </select>
-          <select className="fsel" value={selMonth} onChange={e=>setSelMonth(Number(e.target.value))}>
+          <select className="fsel" value={selMonth} onChange={e=>handleDateChange(`${selYear}-${String(e.target.value).padStart(2,'0')}-01`)}>
             {Array.from({length:12},(_,i)=>i+1).map(m=><option key={m} value={m}>{m}월</option>)}
           </select>
         </div>

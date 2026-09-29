@@ -131,6 +131,7 @@ body {
 .ui-card-hover:hover { box-shadow: var(--ui-shadow-md); border-color: var(--ui-accent); }
 .admin-shell :is(button, a, input, select, textarea):focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 2px; }
 .admin-shell header button:focus-visible { outline-color: var(--chrome-text); }
+.admin-shell header.admin-mobile-header button:focus-visible { outline-color: var(--ui-focus); }
 .admin-shell :is(input, select, textarea) { accent-color: var(--ui-primary); }
 .admin-shell input::placeholder, .admin-shell textarea::placeholder { color: var(--ui-text-3); opacity: 1; }
 .admin-shell button:disabled { cursor: not-allowed; }
