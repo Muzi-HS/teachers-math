@@ -36,7 +36,7 @@ function mount({ width = 1440, coarse = false, saved = null, blocked = false, se
     matches: matches(query),
     addEventListener: (_, callback) => listeners.add(callback),
     removeEventListener: (_, callback) => listeners.delete(callback),
-  }) }
+  }), setTimeout: callback => { callback(); return 1 }, clearTimeout: () => {} }
   vm.runInNewContext(compiled, context)
   const render = () => context.exports.MobileModeProvider({ children: null }).props.value
   render()

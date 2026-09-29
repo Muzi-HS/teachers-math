@@ -7,11 +7,12 @@ import { UNSAVED_CHECK_EVENT } from '@/lib/unsaved-changes'
 export function useDraftProtection<T>(key: string, value: T, enabled: boolean, busy = false) {
   const serialized = JSON.stringify(value)
   const baseline = useRef<{ key: string; value: string } | null>(null)
+  const [baselineValue, setBaselineValue] = useState<{ key: string; value: string } | null>(null)
   const latest = useRef({ key, serialized, enabled, busy })
-  latest.current = { key, serialized, enabled, busy }
+  useEffect(() => { latest.current = { key, serialized, enabled, busy } }, [key, serialized, enabled, busy])
   const [recoverable, setRecoverable] = useState<T | null>(null)
   const [status, setStatus] = useState('')
-  const dirty = enabled && baseline.current?.key === key && baseline.current.value !== serialized
+  const dirty = enabled && baselineValue?.key === key && baselineValue.value !== serialized
 
   function persist() {
     const current = latest.current
@@ -38,6 +39,7 @@ export function useDraftProtection<T>(key: string, value: T, enabled: boolean, b
 
   function markSaved(savedValue: T = value) {
     baseline.current = { key, value: JSON.stringify(savedValue) }
+    setBaselineValue(baseline.current)
     try { sessionStorage.removeItem(key) } catch {}
     setRecoverable(null)
     setStatus('저장 완료')
@@ -52,16 +54,19 @@ export function useDraftProtection<T>(key: string, value: T, enabled: boolean, b
   useEffect(() => {
     if (!enabled) return
     if (baseline.current?.key !== key) {
-      baseline.current = { key, value: serialized }
-      setRecoverable(null)
-      setStatus('')
-      try {
-        const draft = JSON.parse(sessionStorage.getItem(key) || 'null')
-        if (draft?.version === 1 && draft.value && Date.now() - draft.savedAt < 24 * 60 * 60 * 1000) {
-          setRecoverable(draft.value)
-        } else if (draft) sessionStorage.removeItem(key)
-      } catch {}
-      return
+      const timer = window.setTimeout(() => {
+        baseline.current = { key, value: serialized }
+        setBaselineValue(baseline.current)
+        setRecoverable(null)
+        setStatus('')
+        try {
+          const draft = JSON.parse(sessionStorage.getItem(key) || 'null')
+          if (draft?.version === 1 && draft.value && Date.now() - draft.savedAt < 24 * 60 * 60 * 1000) {
+            setRecoverable(draft.value)
+          } else if (draft) sessionStorage.removeItem(key)
+        } catch {}
+      }, 0)
+      return () => window.clearTimeout(timer)
     }
     if (baseline.current.value === serialized || recoverable) return
     const timer = setTimeout(persist, 350)

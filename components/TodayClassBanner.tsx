@@ -16,7 +16,10 @@ export default function TodayClassBanner({ studentId, sessionToken }: { studentI
   const [classes, setClasses] = useState<TodayClass[] | null>(null)
 
   useEffect(() => {
-    if (!studentId || !sessionToken) { setClasses(null); return }
+    if (!studentId || !sessionToken) {
+      const timer = window.setTimeout(() => setClasses(null), 0)
+      return () => window.clearTimeout(timer)
+    }
     let cancelled = false
     async function load() {
       const now = kstNow()

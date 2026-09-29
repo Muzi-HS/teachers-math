@@ -1,6 +1,7 @@
 'use client'
-import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
+import { useResetMenuScroll } from '@/lib/use-reset-menu-scroll'
 import Image from 'next/image'
 import { useAuth } from '@/context/AuthContext'
 import { requestFCMToken, isFCMSupported } from '@/lib/firebase'
@@ -51,6 +52,7 @@ function ParentLayoutContent({ children }: { children: React.ReactNode }) {
   const { parent, role, loading, logout } = useAuth()
   const router   = useRouter()
   const pathname = usePathname()
+  useResetMenuScroll(pathname)
 
   const [selChild, setSelChild] = useState<number | null>(null)
   const [ready,    setReady]    = useState(false)
@@ -64,7 +66,10 @@ function ParentLayoutContent({ children }: { children: React.ReactNode }) {
   // 자리에서 읽음 처리를 하므로, pathname 변화뿐 아니라 그 화면이 쏘는 'notice-read'
   // 이벤트로도 다시 계산해서 종 배지가 바로 갱신되게 한다.
   useEffect(() => {
-    if (!parent?.sessionToken || !parent.children || parent.children.length === 0) { setUnreadNotices(0); return }
+    if (!parent?.sessionToken || !parent.children || parent.children.length === 0) {
+      const timer = window.setTimeout(() => setUnreadNotices(0), 0)
+      return () => window.clearTimeout(timer)
+    }
     let cancelled = false
     function checkUnread() {
       supabase.rpc('client_unread_notice_count', { p_token: parent!.sessionToken }).then(({ data, error }) => {
@@ -75,7 +80,7 @@ function ParentLayoutContent({ children }: { children: React.ReactNode }) {
     checkUnread()
     window.addEventListener('notice-read', checkUnread)
     return () => { cancelled = true; window.removeEventListener('notice-read', checkUnread) }
-  }, [parent?.sessionToken, parent?.children, pathname])
+  }, [parent, pathname])
 
   // 문의하기 안 읽음 개수 — 문의 메시지에는 서버 쪽 읽음 표시가 없어서, 마지막으로
   // "문의하기" 탭을 연 시각(로컬 저장, parentId별)보다 최근에 온 "선생님" 답장 수를
@@ -83,7 +88,10 @@ function ParentLayoutContent({ children }: { children: React.ReactNode }) {
   // 지금으로 갱신하고 'inquiry-read' 이벤트를 쏴서 여기서 바로 다시 계산한다.
   const [unreadInquiries, setUnreadInquiries] = useState(0)
   useEffect(() => {
-    if (!parent?.sessionToken || !parent.parentId) { setUnreadInquiries(0); return }
+    if (!parent?.sessionToken || !parent.parentId) {
+      const timer = window.setTimeout(() => setUnreadInquiries(0), 0)
+      return () => window.clearTimeout(timer)
+    }
     let cancelled = false
     function checkUnread() {
       supabase.rpc('client_inquiry_messages', { p_token: parent!.sessionToken }).then(({ data }) => {
@@ -98,7 +106,7 @@ function ParentLayoutContent({ children }: { children: React.ReactNode }) {
     checkUnread()
     window.addEventListener('inquiry-read', checkUnread)
     return () => { cancelled = true; window.removeEventListener('inquiry-read', checkUnread) }
-  }, [parent?.sessionToken, parent?.parentId, pathname])
+  }, [parent, pathname])
 
   // 알림 권한 배너 — 토큰이 없으면(=권한 미허용) 매 세션마다 다시 안내
   const [notifPerm, setNotifPerm] = useState<NotificationPermission | null>(null)
@@ -108,7 +116,7 @@ function ParentLayoutContent({ children }: { children: React.ReactNode }) {
   // useRef로 초기화 여부 추적 — 리렌더에 영향 없음
   const initDone = useRef(false)
 
-  async function registerFCMToken(parentId: number) {
+  const registerFCMToken = useCallback(async (parentId: number) => {
     try {
       console.log('[FCM] 토큰 등록 시작, parentId:', parentId)
       const token = await requestFCMToken()
@@ -137,7 +145,7 @@ function ParentLayoutContent({ children }: { children: React.ReactNode }) {
     } catch (e) {
       console.error('[FCM] 토큰 등록 오류:', e)
     }
-  }
+  }, [parent])
 
   // 배너의 "알림 켜기" 버튼 — 권한이 아직 결정 안 됐으면(default) 다시 허용 팝업을 띄운다
   // (브라우저는 한 번 "차단"된 권한은 JS로 다시 물어볼 수 없어 안내 문구로 대체)
@@ -164,20 +172,20 @@ function ParentLayoutContent({ children }: { children: React.ReactNode }) {
 
     // 이미 초기화됐으면 추가 로직 없음
     if (initDone.current) return
-    initDone.current = true
+    // Mark initialization after the scheduled update so a cancelled effect can retry.
 
     // 자녀 1명이면 자동 선택
-    if (parent?.children?.length === 1) {
-      setSelChild(parent.children[0].id)
-    }
+    const onlyChildId = parent?.children?.length === 1 ? parent.children[0].id : null
 
     // FCM 토큰 등록 (백그라운드)
-    if (parent?.parentId) {
-      registerFCMToken(parent.parentId)
-    }
-
-    setReady(true)
-  }, [loading, role, parent])
+    const timer = window.setTimeout(() => {
+      initDone.current = true
+      if (onlyChildId != null) setSelChild(onlyChildId)
+      setReady(true)
+      if (parent?.parentId) void registerFCMToken(parent.parentId)
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [loading, role, parent, router, registerFCMToken])
 
   // 알림 권한 배너 표시 여부 — 세션마다 다시 확인해서, 꺼둔 채 다음에 들어와도 다시 안내한다
   useEffect(() => {
@@ -214,21 +222,16 @@ function ParentLayoutContent({ children }: { children: React.ReactNode }) {
       document.removeEventListener('visibilitychange', recheck)
       window.removeEventListener('focus', recheck)
     }
-  }, [parent?.parentId])
+  }, [parent?.parentId, registerFCMToken])
 
   // 사용자가 백그라운드 알림을 직접 클릭한 경우에만 해당 메뉴로 이동한다.
   // 앱 사용 중 수신한 알림은 ForegroundNotification에서 입력 내용을 유지하며 표시한다.
-  function navigateToLink(link: string) {
-    if (link === window.location.pathname) window.location.reload()
-    else router.push(link)
-  }
-
-  // 백그라운드(앱이 닫혀있거나 다른 탭)에서 알림을 클릭했을 때 — 서비스워커가 보내는 이동 요청 처리
   useEffect(() => {
     if (typeof navigator === 'undefined' || !navigator.serviceWorker) return
     function onMessage(e: MessageEvent) {
       if (e.data?.type !== 'push-navigate' || !e.data.link) return
-      navigateToLink(e.data.link)
+      if (e.data.link === window.location.pathname) window.location.reload()
+      else router.push(e.data.link)
     }
     navigator.serviceWorker.addEventListener('message', onMessage)
     return () => navigator.serviceWorker.removeEventListener('message', onMessage)
@@ -240,7 +243,7 @@ function ParentLayoutContent({ children }: { children: React.ReactNode }) {
     if (pathname === '/parent') {
       router.replace('/parent/home')
     }
-  }, [pathname, ready])
+  }, [pathname, ready, router])
 
   if (loading || !ready) return (
     <div style={{ minHeight: '100vh', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

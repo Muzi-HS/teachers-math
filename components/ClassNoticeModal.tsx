@@ -28,7 +28,6 @@ export default function ClassNoticeModal({
   const [sending, setSending] = useState(false)
   const [err, setErr] = useState('')
 
-  useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function load() {
     setLoading(true)
@@ -38,6 +37,8 @@ export default function ClassNoticeModal({
     setNotices(data ?? [])
     setLoading(false)
   }
+
+  useEffect(() => { const timer = window.setTimeout(() => { void load() }, 0); return () => window.clearTimeout(timer) }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function send() {
     const content = draft.trim()

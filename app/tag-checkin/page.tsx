@@ -39,20 +39,24 @@ export default function TagCheckinPage() {
 
   // 이 폰에 저장된 로그인이 있으면 입력 없이 바로 등원 처리 시도
   useEffect(() => {
+    const timer = window.setTimeout(() => {
     try {
       const raw = localStorage.getItem(AUTO_KEY)
       if (raw) {
         const session: ParentSession = JSON.parse(raw).session
         if (session?.children?.length && session.sessionToken) {
           setParentSessions({ [session.parentId]: session })
-          proceedWithChildren(session.children.map(c => ({
+          const candidates = session.children.map(c => ({
             studentId: c.id, studentName: c.name, school: c.school, parentId: session.parentId,
-          })))
+          }))
+          setScreen(candidates.length === 1 ? { kind: 'confirm', c: candidates[0] } : { kind: 'select', candidates })
           return
         }
       }
     } catch {}
     setScreen({ kind: 'input' })
+    }, 0)
+    return () => window.clearTimeout(timer)
   }, [])  
 
   // 로그인/PIN 없이, 방금 확인된 학생 본인 명의로 이 폰의 FCM 토큰을 등록한다.
@@ -72,12 +76,6 @@ export default function TagCheckinPage() {
         body: JSON.stringify({ student_id: studentId, token, session_token: sessionToken }),
       })
     } catch {}
-  }
-
-  function proceedWithChildren(candidates: Candidate[]) {
-    if (candidates.length === 0) setScreen({ kind: 'error', message: '연결된 학생 정보가 없습니다. 선생님께 문의하세요.' })
-    else if (candidates.length === 1) setScreen({ kind: 'confirm', c: candidates[0] })
-    else setScreen({ kind: 'select', candidates })
   }
 
   function reset() {

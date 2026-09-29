@@ -2,9 +2,11 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { IconClock, IconCalendar } from '@/components/icons'
+import { usePublicHolidays } from '@/lib/use-public-holidays'
 
 const navy='var(--ui-primary)', tx='var(--ui-text)', tx2='var(--ui-text-2)', tx3='var(--ui-text-3)'
 const bd='var(--ui-border)', re='var(--ui-danger)', rbg='var(--ui-danger-bg)'
+const saturday = '#2563A6'
 
 type Event_ = {
   id: number; title: string; start_date: string; end_date: string | null
@@ -31,6 +33,7 @@ export default function AcademyEventsView({ role }: { role: 'parent' | 'student'
   const [curYear,  setCurYear]  = useState(() => new Date().getFullYear())
   const [curMonth, setCurMonth] = useState(() => new Date().getMonth())
   const [selDate,  setSelDate]  = useState<string | null>(null)
+  const { holidays: publicHolidays, fallback: holidayFallback } = usePublicHolidays(curYear)
 
   useEffect(() => {
     async function fetch() {
@@ -96,6 +99,7 @@ export default function AcademyEventsView({ role }: { role: 'parent' | 'student'
         <p style={{ fontSize: 13, color: tx2, marginTop: 4 }}>날짜를 탭하면 일정을 확인할 수 있어요</p>
       </div>
 
+      <p style={{ fontSize: 12, color: tx2, marginBottom: 12 }}>공휴일은 학원 휴강 여부와 별개입니다.{holidayFallback && (publicHolidays ? ' 현재 저장된 공휴일 자료를 표시합니다.' : ' 공휴일 정보를 불러오지 못했습니다.')}</p>
       {loading ? (
         <p style={{ textAlign: 'center', color: tx3, padding: '40px 0' }}>불러오는 중...</p>
       ) : (
@@ -112,7 +116,7 @@ export default function AcademyEventsView({ role }: { role: 'parent' | 'student'
             {/* 요일 헤더 */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', marginBottom: 4 }}>
               {DOW.map((d, i) => (
-                <div key={d} style={{ textAlign: 'center', fontSize: 11, fontWeight: 600, color: i === 0 ? re : i === 6 ? navy : tx3, padding: '2px 0' }}>
+                <div key={d} style={{ textAlign: 'center', fontSize: 11, fontWeight: 600, color: i === 0 ? re : i === 6 ? saturday : tx3, padding: '2px 0' }}>
                   {d}
                 </div>
               ))}
@@ -124,20 +128,22 @@ export default function AcademyEventsView({ role }: { role: 'parent' | 'student'
                 if (!day) return <div key={idx} />
                 const dateStr = `${curYear}-${String(curMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
                 const dayEvents = eventsOnDate(dateStr)
+                const publicHoliday = publicHolidays?.find(h => h.date === dateStr)
+                const isHoliday = !!publicHoliday || dayEvents.some(e => e.type === 'holiday')
                 const isToday = dateStr === todayStr
                 const isSel   = dateStr === selDate
                 const dow     = idx % 7
                 return (
-                  <button key={idx} onClick={() => setSelDate(isSel ? null : dateStr)} style={{
-                    background: isSel ? navy : isToday ? 'var(--ui-surface-2)' : 'none',
+                  <button key={idx} aria-label={`${curMonth + 1}월 ${day}일${publicHoliday ? `, ${publicHoliday.name}` : ''}`} onClick={() => setSelDate(isSel ? null : dateStr)} style={{
+                    background: isSel ? (isHoliday ? rbg : navy) : isToday ? 'var(--ui-surface-2)' : 'none',
                     border: 'none', borderRadius: 8, cursor: 'pointer', padding: '4px 0 6px',
                     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
                     fontFamily: "'Noto Sans KR',sans-serif",
                   }}>
-                    <span style={{
-                      fontSize: 13, fontWeight: isToday || isSel ? 700 : 400,
-                      color: isSel ? '#fff' : isToday ? navy : dow === 0 ? re : dow === 6 ? navy : tx,
-                    }}>{day}</span>
+                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, maxWidth: '100%' }}>
+                      <span style={{ fontSize: 13, fontWeight: isToday || isSel || isHoliday ? 700 : 400, color: isHoliday ? re : isSel ? '#fff' : isToday ? navy : dow === 0 ? re : dow === 6 ? saturday : tx }}>{day}</span>
+                      {publicHoliday && <span title={publicHoliday.name} style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: re, fontSize: 10, lineHeight: '14px' }}>{publicHoliday.name}</span>}
+                    </span>
                     {/* 이벤트 점 (최대 3개) */}
                     <div style={{ display: 'flex', gap: 2 }}>
                       {dayEvents.slice(0, 3).map(e => {

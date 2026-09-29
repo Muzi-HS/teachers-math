@@ -137,6 +137,15 @@ body {
 .admin-shell :is(button, a) > svg { flex-shrink: 0; }
 .internal-ui :is(button, a, input, select, textarea):focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 2px; }
 .internal-ui :is(input, select, textarea) { accent-color: var(--ui-primary); }
+/* iOS Safari enlarges the whole page when a focused form control uses text below 16px. */
+@media (max-width: 700px) {
+  .internal-ui :is(input, textarea, select, [contenteditable="true"]),
+  .admin-shell :is(input, textarea, select, [contenteditable="true"]) {
+    font-size: 16px !important;
+  }
+}
+body:has(.parent-inquiry-composer textarea:focus) .parent-nav { display: none; }
+body:has(.iq-composer textarea:focus) .mnav-bar { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .ui-btn, .ui-card-hover { transition: none !important; transform: none !important; }
 }

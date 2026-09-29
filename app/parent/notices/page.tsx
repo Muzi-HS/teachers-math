@@ -5,6 +5,7 @@ import { useAuth } from '@/context/AuthContext'
 import { kstDateOf, kstTimeOf } from '@/lib/kst'
 import { IconPin } from '@/components/icons'
 import 'quill/dist/quill.snow.css'
+import Image from 'next/image'
 
 const navy='var(--ui-primary)', tx='var(--ui-text)', tx2='var(--ui-text-2)', tx3='var(--ui-text-3)', bd='var(--ui-border)', bg='var(--ui-bg)'
 const gold='var(--ui-primary)', re='var(--ui-danger)'
@@ -39,6 +40,7 @@ export default function ParentNotices() {
   const [replyAnon, setReplyAnon] = useState<Record<number, boolean>>({})
   const [replyOpenFor, setReplyOpenFor] = useState<number | null>(null)
   const [sendingReply, setSendingReply] = useState(false)
+  const [openedAt] = useState(() => Date.now())
 
   useEffect(() => {
     if (!parent?.sessionToken) return
@@ -64,9 +66,19 @@ export default function ParentNotices() {
       setIdentityMap(map)
     }
     fetchIdentities(detail.id)
-  }, [detail?.id])
+  }, [detail])
 
-  useEffect(() => { if (detail) fetchComments(detail.id) }, [detail?.id])
+  useEffect(() => {
+    if (!detail || !parent?.sessionToken) return
+    let active = true
+    void supabase.rpc('client_notice_comments', { p_token: parent.sessionToken, p_notice_id: detail.id })
+      .then(({ data }) => {
+        if (!active) return
+        setComments((data ?? []) as NoticeComment[])
+        setCommentsLoading(false)
+      })
+    return () => { active = false }
+  }, [detail, parent?.sessionToken])
 
   // 공지 상세를 열람하면 이 학부모의 자녀들 기준으로 읽음 기록을 남긴다(조회수/읽음 표시용).
   // 헤더 종 아이콘의 "안 읽은 공지" 배지는 layout에서 계산하는데, 페이지 이동 없이 같은
@@ -76,15 +88,7 @@ export default function ParentNotices() {
     supabase.rpc('client_mark_notice_read', { p_token: parent.sessionToken, p_notice_id: detail.id }).then(() => {
       window.dispatchEvent(new Event('notice-read'))
     })
-  }, [detail?.id, parent?.sessionToken])
-
-  async function fetchComments(noticeId: number) {
-    if (!parent?.sessionToken) return
-    setCommentsLoading(true)
-    const { data } = await supabase.rpc('client_notice_comments', { p_token: parent.sessionToken, p_notice_id: noticeId })
-    setComments((data ?? []) as NoticeComment[])
-    setCommentsLoading(false)
-  }
+  }, [detail, parent?.sessionToken])
 
   function notifyAdmin(bodyText: string) {
     fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push-admin`, {
@@ -131,7 +135,7 @@ export default function ParentNotices() {
   const normal   = filtered.filter(n => !n.pinned)
 
   function isNew(createdAt: string) {
-    return Date.now() - new Date(createdAt).getTime() < 24 * 60 * 60 * 1000
+    return openedAt - new Date(createdAt).getTime() < 24 * 60 * 60 * 1000
   }
 
   function identityOf(c: NoticeComment): string {
@@ -168,7 +172,7 @@ export default function ParentNotices() {
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 2000,
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, cursor: 'zoom-out',
         }}>
-          <img src={lightboxSrc} alt="" style={{ maxWidth: '92vw', maxHeight: '92vh', borderRadius: 4, boxShadow: '0 10px 40px rgba(0,0,0,.4)' }} />
+          <Image src={lightboxSrc} alt="" width={1200} height={900} unoptimized style={{ width: 'auto', height: 'auto', maxWidth: '92vw', maxHeight: '92vh', borderRadius: 4, boxShadow: '0 10px 40px rgba(0,0,0,.4)' }} />
           <button onClick={() => setLightboxSrc(null)} style={{ position: 'fixed', top: 18, right: 22, width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,.15)', color: '#fff', fontSize: 20, cursor: 'pointer' }}>×</button>
         </div>
       )}

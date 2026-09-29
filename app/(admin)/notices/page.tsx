@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { can, Role } from '@/lib/permissions'
@@ -73,7 +74,7 @@ export default function NoticesPage() {
   const [sendingReply, setSendingReply] = useState(false)
 
   useEffect(() => { fetchNotices(); fetchStudents(); fetchParentsMap(); fetchClasses() }, [])
-  useEffect(() => { if (detail) fetchComments(detail.id) }, [detail?.id])
+  useEffect(() => { if (detail) fetchComments(detail.id) }, [detail])
 
   async function fetchNotices() {
     const [{ data }, { data: targets }, { data: reads }] = await Promise.all([
@@ -693,7 +694,7 @@ export default function NoticesPage() {
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 2000,
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, cursor: 'zoom-out',
         }}>
-          <img src={lightboxSrc} alt="" style={{ maxWidth: '92vw', maxHeight: '92vh', borderRadius: 4, boxShadow: '0 10px 40px rgba(0,0,0,.4)' }} />
+          <Image src={lightboxSrc} alt="" width={1200} height={900} unoptimized style={{ width: 'auto', height: 'auto', maxWidth: '92vw', maxHeight: '92vh', borderRadius: 4, boxShadow: '0 10px 40px rgba(0,0,0,.4)' }} />
           <button onClick={() => setLightboxSrc(null)} style={{ position: 'fixed', top: 18, right: 22, width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,.15)', color: '#fff', fontSize: 20, cursor: 'pointer' }}>×</button>
         </div>
       )}

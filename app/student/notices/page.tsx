@@ -16,10 +16,6 @@ export default function StudentNotices() {
   const [notices, setNotices] = useState<Notice[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    if (!student?.studentId || !student?.sessionToken) return
-    load(student.studentId, student.sessionToken)
-  }, [student?.studentId, student?.sessionToken])
 
   // 이 화면을 열면 헤더 종 아이콘의 "안 읽은 공지" 기준 시각을 지금으로 갱신한다.
   useEffect(() => {
@@ -48,6 +44,12 @@ export default function StudentNotices() {
     setNotices(merged)
     setLoading(false)
   }
+
+  useEffect(() => {
+    if (!student?.studentId || !student?.sessionToken) return
+    const timer = window.setTimeout(() => { void load(student.studentId, student.sessionToken) }, 0)
+    return () => window.clearTimeout(timer)
+  }, [student?.studentId, student?.sessionToken])
 
   const showClassBadge = new Set(notices.map(n => n.className)).size > 1
 

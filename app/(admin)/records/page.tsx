@@ -83,8 +83,9 @@ export default function RecordsPage() {
   function toast(msg: string, ok = true) { setNotif({ msg, ok }); setTimeout(() => setNotif(null), 3000) }
 
   useEffect(() => { fetchBase() }, [])
-  useEffect(() => { fetchMonthDates() }, [llYear, llMonth])
-  useEffect(() => { fetchDayRecs() }, [selDate])
+  // These refresh helpers read the selected month/date; rerun only when that selection changes.
+  useEffect(() => { fetchMonthDates() }, [llYear, llMonth]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { fetchDayRecs() }, [selDate]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     let cancelled = false
     supabase.from('class_bulk_sends').select('class_key').eq('date', selDate).then(({ data, error }) => {
@@ -99,8 +100,14 @@ export default function RecordsPage() {
     const dt = searchParams.get('date')
     if (!dt) return
     dateParamHandled.current = true
-    selectDate(dt)
-    setUnsentOnly(searchParams.get('unsent') === '1')
+    const timer = window.setTimeout(() => {
+      setSelDate(dt)
+      const [year, month] = dt.split('-').map(Number)
+      setLlYear(year)
+      setLlMonth(month - 1)
+      setUnsentOnly(searchParams.get('unsent') === '1')
+    }, 0)
+    return () => window.clearTimeout(timer)
   }, [searchParams])
 
   async function fetchBase() {

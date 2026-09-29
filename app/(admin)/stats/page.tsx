@@ -34,7 +34,6 @@ export default function StatsPage(){
   const [recs,     setRecs]     = useState<Rec[]>([])
   const [loading,  setLoading]  = useState(false)
 
-  useEffect(()=>{ fetchBase() },[])
 
   async function fetchBase(){
     const [{data:s},{data:c},{data:cs}] = await Promise.all([
@@ -48,6 +47,8 @@ export default function StatsPage(){
     for(const r of(cs??[]))map[r.student_id]=r.class_id
     setCsMap(map)
   }
+
+  useEffect(() => { const timer = window.setTimeout(() => { void fetchBase() }, 0); return () => window.clearTimeout(timer) }, [])
 
   async function selectStu(s:Student){
     setSelStu(s)

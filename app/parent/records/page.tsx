@@ -37,12 +37,6 @@ export default function ParentRecords() {
   const [classNames, setClassNames] = useState<Record<number, string>>({})
   const [editedNotice, setEditedNotice] = useState<{ id: number; date: string }[]>([])
 
-  useEffect(() => {
-    if (!selChild || !parent?.sessionToken) return
-    const controller = new AbortController()
-    fetchRecs(selChild, parent.sessionToken, controller.signal)
-    return () => controller.abort()
-  }, [selChild, parent?.sessionToken])
 
   async function fetchRecs(stuId: number, token: string, signal: AbortSignal) {
     setLoading(true)
@@ -118,6 +112,13 @@ export default function ParentRecords() {
       })
     }
   }
+
+  useEffect(() => {
+    if (!selChild || !parent?.sessionToken) return
+    const controller = new AbortController()
+    const timer = window.setTimeout(() => { void fetchRecs(selChild, parent.sessionToken, controller.signal) }, 0)
+    return () => { window.clearTimeout(timer); controller.abort() }
+  }, [selChild, parent?.sessionToken])
 
   async function dismissEditedNotice() {
     const ids = editedNotice.map(n => n.id)

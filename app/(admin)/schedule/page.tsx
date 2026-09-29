@@ -1,11 +1,12 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { can, Role } from '@/lib/permissions'
 import { kstDateStr, kstNow } from '@/lib/kst'
 import { IconClock, IconLock } from '@/components/icons'
 import { useMobileMode } from '@/context/MobileModeContext'
+import { usePublicHolidays } from '@/lib/use-public-holidays'
 
 type Evt = {
     id: number
@@ -67,6 +68,7 @@ const tx = 'var(--ui-text)'
 const tx2 = 'var(--ui-text-2)'
 const tx3 = 'var(--ui-text-3)'
 const re = 'var(--ui-danger)'
+const saturday = '#2563A6'
 const rbg = 'var(--ui-danger-bg)'
 const gr = 'var(--ui-success)'
 
@@ -92,28 +94,22 @@ export default function SchedulePage() {
     const [loadError, setLoadError] = useState(false)
     const loadVersion = useRef(0)
 
-    useEffect(() => { load() }, [yr, mo])
-    useEffect(() => { fetchStudents(); fetchClasses() }, [])
+    useEffect(() => {
+        let active = true
+        void supabase.from('students').select('id, name').then(({ data }) => {
+            if (!active) return
+            const map: Record<number, string> = {}
+            for (const s of (data ?? [])) map[s.id] = s.name
+            setStudentsMap(map)
+        })
+        void supabase.from('classes').select('id, name, days').order('name').then(({ data }) => {
+            if (active) setClassesList((data ?? []) as ClassRow[])
+        })
+        return () => { active = false }
+    }, [])
 
-    async function fetchStudents() {
-        const { data } = await supabase.from('students').select('id, name')
-        const map: Record<number, string> = {}
-        for (const s of (data ?? [])) map[s.id] = s.name
-        setStudentsMap(map)
-    }
-
-    async function fetchClasses() {
-        const { data } = await supabase.from('classes').select('id, name, days').order('name')
-        setClassesList((data ?? []) as ClassRow[])
-    }
-
-    async function load() {
+    const load = useCallback(async () => {
         const version = ++loadVersion.current
-        setLoading(true)
-        setLoadError(false)
-        setEvts([])
-        setAttNotices([])
-        setCancellations([])
 
         const ym = `${yr}-${String(mo + 1).padStart(2, '0')}`
         const from = `${ym}-01`
@@ -131,17 +127,29 @@ export default function SchedulePage() {
             ])
             if (version !== loadVersion.current) return
             if (starts.error || overlaps.error || notices.error || cancels.error) throw new Error('schedule-load')
+            setLoadError(false)
             const map = new Map<number, Evt>()
             for (const event of [...(starts.data ?? []), ...(overlaps.data ?? [])]) map.set(event.id, event)
             setEvts([...map.values()].sort((a, b) => a.start_date.localeCompare(b.start_date) || (a.start_time ?? '').localeCompare(b.start_time ?? '')))
             setAttNotices(notices.data ?? [])
             setCancellations((cancels.data ?? []) as Cancellation[])
         } catch {
-            if (version === loadVersion.current) setLoadError(true)
+            if (version === loadVersion.current) {
+                setLoadError(true)
+                setEvts([])
+                setAttNotices([])
+                setCancellations([])
+            }
         } finally {
             if (version === loadVersion.current) setLoading(false)
         }
-    }
+    }, [yr, mo])
+
+    useEffect(() => {
+        const versionRef = loadVersion
+        const timer = window.setTimeout(() => { void load() }, 0)
+        return () => { window.clearTimeout(timer); versionRef.current++ }
+    }, [load])
 
     function toast(msg: string, ok = true) {
         setNotif({ msg, ok })
@@ -260,6 +268,8 @@ export default function SchedulePage() {
     }
 
     function moveMo(d: number) {
+        setLoading(true)
+        setLoadError(false)
         let m = mo + d, y = yr
         if (m < 0) { m = 11; y-- }
         if (m > 11) { m = 0; y++ }
@@ -287,6 +297,7 @@ export default function SchedulePage() {
         return cancellations.filter(c => c.cancel_date === ds)
     }
     const visibleEvents = selectedDate ? dayEvts(selectedDate) : evts
+    const { holidays: publicHolidays, fallback: holidayFallback } = usePublicHolidays(yr)
     const visibleNotices = selectedDate ? dayNotices(selectedDate) : attNotices
     const visibleCancellations = selectedDate ? dayCancellations(selectedDate) : cancellations
     const listTitle = selectedDate ? `${Number(selectedDate.slice(5, 7))}월 ${Number(selectedDate.slice(8))}일` : `${mo + 1}월 전체`
@@ -362,8 +373,9 @@ export default function SchedulePage() {
             </div>
 
             {/* 달력 */}
+            <p style={{ fontSize: 12, color: tx2, marginBottom: 10 }}>공휴일은 학원 휴강 여부와 별개입니다.{holidayFallback && (publicHolidays ? ' 현재 저장된 공휴일 자료를 표시합니다.' : ' 공휴일 정보를 불러오지 못했습니다.')}</p>
             {loadError && <div role="alert" style={{ background: rbg, color: re, padding: 14, borderRadius: 10, marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                일정을 불러오지 못했습니다.<button className="bout" onClick={load}>다시 불러오기</button>
+                일정을 불러오지 못했습니다.<button className="bout" onClick={() => { setLoading(true); setLoadError(false); void load() }}>다시 불러오기</button>
             </div>}
             <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: mobileMode ? 12 : 22, boxShadow: '0 1px 4px rgba(0,0,0,.06)', marginBottom: mobileMode ? 12 : 18 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
@@ -372,7 +384,7 @@ export default function SchedulePage() {
                     <button className="bnav" aria-label="다음 달" onClick={() => moveMo(1)}>{mobileMode ? '›' : '▶'}</button>
                 </div>
                 <div className="calendar-tools" style={{ marginBottom: 14 }}>
-                    <button className="bout" onClick={() => { const now = kstNow(); setYr(now.getFullYear()); setMo(now.getMonth()); setSelectedDate(kstDateStr()) }}>오늘</button>
+                    <button className="bout" onClick={() => { const now = kstNow(); if (yr !== now.getFullYear() || mo !== now.getMonth()) { setLoading(true); setLoadError(false) }; setYr(now.getFullYear()); setMo(now.getMonth()); setSelectedDate(kstDateStr()) }}>오늘</button>
                     <button className="bout" aria-pressed={selectedDate === null} onClick={() => setSelectedDate(null)}>월 전체 보기</button>
                     <span style={{ fontSize: 12, color: tx2 }} aria-live="polite">{listTitle}{selectedDate ? ' 선택됨' : ''}</span>
                 </div>
@@ -380,7 +392,7 @@ export default function SchedulePage() {
                 {/* 요일 헤더 */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 3, marginBottom: 3 }}>
                     {DOW.map((d, i) => (
-                        <div key={d} style={{ textAlign: 'center', fontSize: 11, fontWeight: 600, padding: '4px 0', color: i === 0 ? re : i === 6 ? navy : tx3 }}>{d}</div>
+                        <div key={d} style={{ textAlign: 'center', fontSize: 11, fontWeight: 600, padding: '4px 0', color: i === 0 ? re : i === 6 ? saturday : tx3 }}>{d}</div>
                     ))}
                 </div>
 
@@ -400,23 +412,26 @@ export default function SchedulePage() {
                         const dow = (fd + i) % 7
                         const isTod = ds === kstDateStr()
                         const de = dayEvts(ds)
-                        const isHol = de.some(e => e.type === 'holiday')
+                        const publicHoliday = publicHolidays?.find(h => h.date === ds)
+                        const isHol = !!publicHoliday || de.some(e => e.type === 'holiday')
                         let cls = 'cd'
                         if (isTod) cls += ' tod'
                         if (isHol) cls += ' hol'
                         if (selectedDate === ds) cls += ' selected'
-                        const nc = dow === 0 ? re : dow === 6 ? navy : tx
+                        const nc = dow === 0 ? re : dow === 6 ? saturday : tx
                         const dNotices = dayNotices(ds)
                         return (
                             <div key={day} className={cls} onClick={() => setSelectedDate(ds)}
                                 style={mobileMode ? { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '4px 0 6px' } : undefined}>
-                                <button className="day-select" aria-pressed={selectedDate === ds} aria-label={`${mo + 1}월 ${day}일, 일정 ${de.length}건, 결석·지각 ${dNotices.length}건`} onClick={() => setSelectedDate(ds)}>
+                                <button className="day-select" aria-pressed={selectedDate === ds} aria-label={`${mo + 1}월 ${day}일${publicHoliday ? `, ${publicHoliday.name}` : ''}, 일정 ${de.length}건, 결석·지각 ${dNotices.length}건`} onClick={() => setSelectedDate(ds)} style={{ justifyContent: 'flex-start', gap: 4 }}>
                                 <span style={{
                                     fontSize: 12, fontWeight: isTod || isHol ? 700 : 500, marginBottom: mobileMode ? 0 : 2,
-                                    color: isHol ? '#fff' : nc,
+                                    color: isHol ? re : nc,
                                     width: 20, height: 20, lineHeight: '20px', textAlign: 'center',
-                                    borderRadius: '50%', background: isHol ? re : 'transparent',
-                                }}>{day}</span>{isTod && !mobileMode && <span style={{ fontSize: 10, color: navy }}>오늘</span>}
+                                    borderRadius: '50%', background: 'transparent', flexShrink: 0,
+                                }}>{day}</span>
+                                {publicHoliday && <span title={publicHoliday.name} style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10, color: re, lineHeight: '14px' }}>{publicHoliday.name}</span>}
+                                {isTod && !mobileMode && !publicHoliday && <span style={{ fontSize: 10, color: navy }}>오늘</span>}
                                 </button>
                                 {mobileMode ? (
                                     <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', justifyContent: 'center' }}>

@@ -77,7 +77,10 @@ export default function StudentsPage() {
 
   useEffect(() => { fetchAll() }, [])
   useEffect(() => {
-    if (!detailStu) { setDetailCoupons([]); return }
+    if (!detailStu) {
+      const timer = window.setTimeout(() => setDetailCoupons([]), 0)
+      return () => window.clearTimeout(timer)
+    }
     supabase.from('student_coupons').select('id,milestone,claimed_at,used,code')
       .eq('student_id', detailStu.id).order('claimed_at', { ascending: false })
       .then(({ data }) => setDetailCoupons(data ?? []))

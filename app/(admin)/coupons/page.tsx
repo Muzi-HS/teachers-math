@@ -26,7 +26,6 @@ export default function CouponsPage() {
 
   function toast(msg: string, ok = true) { setNotif({ msg, ok }); setTimeout(() => setNotif(null), 3000) }
 
-  useEffect(() => { loadRecent() }, [])
 
   async function loadRecent() {
     setLoadingRecent(true)
@@ -44,6 +43,8 @@ export default function CouponsPage() {
     })))
     setLoadingRecent(false)
   }
+
+  useEffect(() => { const timer = window.setTimeout(() => { void loadRecent() }, 0); return () => window.clearTimeout(timer) }, [])
 
   function normalizeCode(raw: string): string | null {
     const clean = raw.replace(/[^A-Za-z0-9]/g, '').toUpperCase()

@@ -1,7 +1,8 @@
 'use client'
 import { MobileModeProvider } from '@/context/MobileModeContext'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
+import { useResetMenuScroll } from '@/lib/use-reset-menu-scroll'
 import Image from 'next/image'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
@@ -37,6 +38,7 @@ function StudentLayoutContent({ children }: { children: React.ReactNode }) {
   const { student, role, loading, logout } = useAuth()
   const router   = useRouter()
   const pathname = usePathname()
+  useResetMenuScroll(pathname)
 
   const [ready, setReady] = useState(false)
   const [notifPerm, setNotifPerm] = useState<NotificationPermission | null>(null)
@@ -68,10 +70,10 @@ function StudentLayoutContent({ children }: { children: React.ReactNode }) {
     }
     loadUnread()
     return () => { cancelled = true }
-  }, [student?.studentId, student?.sessionToken, pathname])
+  }, [student, pathname])
   const initDone = useRef(false)
 
-  async function registerFCMToken(studentId: number) {
+  const registerFCMToken = useCallback(async (studentId: number) => {
     try {
       const token = await requestFCMToken()
       if (typeof Notification !== 'undefined') setNotifPerm(Notification.permission)
@@ -92,7 +94,7 @@ function StudentLayoutContent({ children }: { children: React.ReactNode }) {
     } catch (e) {
       console.error('[FCM] 학생 토큰 등록 오류:', e)
     }
-  }
+  }, [student])
 
   async function enableNotifications() {
     if (!student?.studentId || notifRequesting) return
@@ -113,10 +115,13 @@ function StudentLayoutContent({ children }: { children: React.ReactNode }) {
       return
     }
     if (initDone.current) return
-    initDone.current = true
-    if (student?.studentId) registerFCMToken(student.studentId)
-    setReady(true)
-  }, [loading, role, student]) // eslint-disable-line react-hooks/exhaustive-deps
+    const timer = window.setTimeout(() => {
+      initDone.current = true
+      setReady(true)
+      if (student?.studentId) void registerFCMToken(student.studentId)
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [loading, role, student, router, registerFCMToken])
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof Notification === 'undefined') return
@@ -148,22 +153,18 @@ function StudentLayoutContent({ children }: { children: React.ReactNode }) {
       document.removeEventListener('visibilitychange', recheck)
       window.removeEventListener('focus', recheck)
     }
-  }, [student?.studentId])  
-
-  function navigateToLink(link: string) {
-    if (link === window.location.pathname) window.location.reload()
-    else router.push(link)
-  }
+  }, [student?.studentId, registerFCMToken])
 
   useEffect(() => {
     if (typeof navigator === 'undefined' || !navigator.serviceWorker) return
     function onMessage(e: MessageEvent) {
       if (e.data?.type !== 'push-navigate' || !e.data.link) return
-      navigateToLink(e.data.link)
+      if (e.data.link === window.location.pathname) window.location.reload()
+      else router.push(e.data.link)
     }
     navigator.serviceWorker.addEventListener('message', onMessage)
     return () => navigator.serviceWorker.removeEventListener('message', onMessage)
-  }, [router]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [router])
 
   useEffect(() => {
     if (!ready) return

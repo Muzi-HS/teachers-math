@@ -121,7 +121,10 @@ export default function Sidebar() {
   }, [role, pathname])
 
   // 모바일 모드에서는 메뉴 이동 시 자동으로 드로어/편집모드를 닫는다
-  useEffect(() => { setDrawerOpen(false); setEditMode(false) }, [pathname])
+  useEffect(() => {
+    const timer = window.setTimeout(() => { setDrawerOpen(false); setEditMode(false) }, 0)
+    return () => window.clearTimeout(timer)
+  }, [pathname])
 
   const visibleNav = role
     ? NAV.filter(item =>
@@ -140,7 +143,8 @@ export default function Sidebar() {
     try { saved = JSON.parse(localStorage.getItem(NAV_ORDER_KEY) ?? '[]') } catch {}
     const savedValid = saved.filter(k => defaultOrder.includes(k))
     const merged = [...savedValid, ...defaultOrder.filter(k => !savedValid.includes(k))]
-    setNavOrderState(merged)
+    const timer = window.setTimeout(() => setNavOrderState(merged), 0)
+    return () => window.clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role])
 

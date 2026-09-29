@@ -18,10 +18,6 @@ export default function StudentCoupons() {
   const [coupons, setCoupons] = useState<Coupon[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    if (!student?.sessionToken) return
-    load(student.sessionToken)
-  }, [student?.sessionToken])
 
   async function load(token: string) {
     setLoading(true)
@@ -31,6 +27,12 @@ export default function StudentCoupons() {
     setCoupons((data ?? []) as Coupon[])
     setLoading(false)
   }
+
+  useEffect(() => {
+    if (!student?.sessionToken) return
+    const timer = window.setTimeout(() => { void load(student.sessionToken) }, 0)
+    return () => window.clearTimeout(timer)
+  }, [student?.sessionToken])
 
   const unused = coupons.filter(c => !c.used)
   const used = coupons.filter(c => c.used)

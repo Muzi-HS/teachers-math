@@ -120,9 +120,12 @@ export default function ClassesPage() {
     const cls = classes.find(c => c.id === Number(id))
     if (cls) {
       openDetailHandled.current = true
-      setDetailCls(cls)
-      setView('detail')
-      if (searchParams.get('prep') === '1') setPrepModal(true)
+      const timer = window.setTimeout(() => {
+        setDetailCls(cls)
+        setView('detail')
+        if (searchParams.get('prep') === '1') setPrepModal(true)
+      }, 0)
+      return () => window.clearTimeout(timer)
     }
   }, [classes, searchParams])
 

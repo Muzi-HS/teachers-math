@@ -18,10 +18,10 @@ export default function SeasonEffect({
 
   useEffect(() => {
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
-    setReducedMotion(mq.matches)
+    const timer = window.setTimeout(() => setReducedMotion(mq.matches), 0)
     const onChange = () => setReducedMotion(mq.matches)
     mq.addEventListener('change', onChange)
-    return () => mq.removeEventListener('change', onChange)
+    return () => { window.clearTimeout(timer); mq.removeEventListener('change', onChange) }
   }, [])
 
   if (!enabled || season === 'none' || reducedMotion) return null

@@ -66,7 +66,11 @@ function mount(path, holdClasses = false) {
     '@/lib/records': { groupCommentsByRecord: () => ({}) },
   }
   const placeholder = new Proxy({}, { get: (_, key) => key === '__esModule' ? true : () => null })
-  const context = { exports: {}, AbortController, Date, console, require: name => modules[name] ?? placeholder }
+  const context = {
+    exports: {}, AbortController, Date, console,
+    window: { setTimeout: callback => { callback(); return 1 }, clearTimeout: () => {} },
+    require: name => modules[name] ?? placeholder,
+  }
   vm.runInNewContext(ts.transpileModule(readFileSync(new URL(path, import.meta.url), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2020 },
   }).outputText, context)

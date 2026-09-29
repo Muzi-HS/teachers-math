@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { kstDateOf, kstTimeOf } from '@/lib/kst'
 import { useParentChild } from '../layout'
 import { IconChat, IconSend } from '@/components/icons'
+import { useMobileKeyboardInset } from '@/lib/use-mobile-keyboard-inset'
 
 const navy = 'var(--ui-primary)', navyDk = 'var(--ui-primary-text)'
 const bg = 'var(--ui-bg)', bd = 'var(--ui-border)'
@@ -23,9 +24,21 @@ export default function ParentInquiriesPage() {
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [err, setErr] = useState('')
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const [composing, setComposing] = useState(false)
+  const keyboardInset = useMobileKeyboardInset(composing)
+  const messagesRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
 
-  useEffect(() => { if (parent?.sessionToken) fetchMsgs(parent.sessionToken) }, [parent?.sessionToken])
+  useEffect(() => {
+    if (!parent?.sessionToken) return
+    let active = true
+    void supabase.rpc('client_inquiry_messages', { p_token: parent.sessionToken }).then(({ data }) => {
+      if (!active) return
+      setMsgs((data ?? []) as Msg[])
+      setLoading(false)
+    })
+    return () => { active = false }
+  }, [parent?.sessionToken])
 
   // 문의 탭을 열면 "선생님 답장 안 읽음" 기준 시각을 지금으로 갱신한다(하단 탭바 뱃지용) —
   // 서버 쪽 읽음 표시가 없어 로컬에 마지막으로 연 시각만 기억한다.
@@ -35,21 +48,10 @@ export default function ParentInquiriesPage() {
     window.dispatchEvent(new Event('inquiry-read'))
   }, [parent?.parentId])
 
-  async function fetchMsgs(token: string) {
-    setLoading(true)
-    const { data } = await supabase.rpc('client_inquiry_messages', { p_token: token })
-    setMsgs((data ?? []) as Msg[])
-    setLoading(false)
-  }
-
-  const didInitialScrollRef = useRef(false)
   useEffect(() => {
     if (loading) return
-    // 최초 진입 시에는 애니메이션 없이 즉시 맨 아래로 위치시켜, 로딩 후 화면이
-    // 스르륵 아래로 밀리는 것처럼 보이는 현상을 없앤다 (이후 새 메시지는 부드럽게 스크롤)
-    const isFirst = !didInitialScrollRef.current
-    didInitialScrollRef.current = true
-    bottomRef.current?.scrollIntoView({ behavior: isFirst ? 'auto' : 'smooth' })
+    const list = messagesRef.current
+    if (list) list.scrollTop = list.scrollHeight
   }, [msgs.length, loading])
 
   async function send() {
@@ -64,6 +66,7 @@ export default function ParentInquiriesPage() {
     if (error) { setErr('전송에 실패했습니다.'); return }
     setMsgs(prev => [...prev, data as Msg])
     setInput('')
+    if (inputRef.current) inputRef.current.style.height = 'auto'
 
     const childNames = children.map(c => c.name).join(', ')
     fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push-admin`, {
@@ -88,7 +91,7 @@ export default function ParentInquiriesPage() {
 
       <div style={{ background: '#fff', borderRadius: 16, border: `1px solid ${bd}`, boxShadow: '0 1px 6px rgba(0,0,0,.06)', minHeight: 300, marginBottom: 90, overflow: 'hidden' }}>
         <div style={{ padding: '12px 16px', borderBottom: `1px solid ${bd}`, fontSize: 12, fontWeight: 600, color: tx2 }}>선생님과의 대화</div>
-        <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14, minHeight: 260, maxHeight: '55vh', overflowY: 'auto' }}>
+        <div ref={messagesRef} style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14, minHeight: 260, maxHeight: composing ? 'calc(100dvh - 240px)' : '55vh', overflowY: 'auto', overscrollBehavior: 'contain' }}>
           {loading ? (
             <p style={{ textAlign: 'center', color: tx3, padding: '40px 0', fontSize: 13 }}>불러오는 중...</p>
           ) : msgs.length === 0 ? (
@@ -116,24 +119,24 @@ export default function ParentInquiriesPage() {
               </div>
             )
           })}
-          <div ref={bottomRef} />
         </div>
       </div>
 
       {/* 입력창 — 하단 탭바 위에 고정 */}
-      <div style={{ position: 'fixed', left: 0, right: 0, bottom: 'calc(62px + env(safe-area-inset-bottom))', zIndex: 90, display: 'flex', justifyContent: 'center', background: '#fff', borderTop: `1px solid ${bd}`, boxShadow: '0 -2px 10px rgba(0,0,0,.05)' }}>
+      <div className="parent-inquiry-composer" style={{ position: 'fixed', left: 0, right: 0, bottom: composing ? keyboardInset : 'calc(70px + env(safe-area-inset-bottom))', zIndex: 110, display: 'flex', justifyContent: 'center', background: '#fff', borderTop: `1px solid ${bd}`, boxShadow: '0 -2px 10px rgba(0,0,0,.05)' }}>
         <div style={{ width: '100%', maxWidth: 640, padding: '10px 16px', boxSizing: 'border-box', display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-          <textarea rows={1} aria-label="문의 메시지" placeholder="선생님께 메시지를 보내세요"
-            value={input} onChange={e => setInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
-            style={{ flex: 1, resize: 'none', padding: '9px 12px', border: `1.5px solid ${bd}`, borderRadius: 20, fontSize: 14, fontFamily: 'inherit', color: tx, outline: 'none', boxSizing: 'border-box' }} />
+          <textarea ref={inputRef} rows={1} aria-label="문의 메시지" placeholder="선생님께 메시지를 보내세요"
+            value={input} onFocus={() => { setComposing(true); requestAnimationFrame(() => { const list = messagesRef.current; if (list) list.scrollTop = list.scrollHeight }) }} onBlur={() => setComposing(false)}
+            onChange={e => { setInput(e.target.value); e.currentTarget.style.height = 'auto'; e.currentTarget.style.height = `${Math.min(e.currentTarget.scrollHeight, 128)}px` }}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && window.matchMedia('(pointer: fine)').matches) { e.preventDefault(); void send() } }}
+            style={{ flex: 1, minWidth: 0, resize: 'none', maxHeight: 128, overflowY: 'auto', padding: '9px 12px', border: `1.5px solid ${bd}`, borderRadius: 20, fontSize: 16, lineHeight: 1.45, fontFamily: 'inherit', color: tx, outline: 'none', boxSizing: 'border-box' }} />
           <button onClick={send} aria-label="메시지 보내기" disabled={sending || !input.trim()}
             style={{ flexShrink: 0, width: 40, height: 40, borderRadius: '50%', border: 'none', background: gold, color: navyDk, cursor: sending || !input.trim() ? 'not-allowed' : 'pointer', opacity: sending || !input.trim() ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <IconSend size={17} />
           </button>
         </div>
       </div>
-      {err && <p style={{ position: 'fixed', bottom: 'calc(120px + env(safe-area-inset-bottom))', left: 16, right: 16, textAlign: 'center', fontSize: 12, color: re }}>{err}</p>}
+      {err && <p style={{ position: 'fixed', bottom: composing ? keyboardInset + 76 : 'calc(145px + env(safe-area-inset-bottom))', left: 16, right: 16, zIndex: 111, textAlign: 'center', fontSize: 12, color: re }}>{err}</p>}
     </div>
   )
 }

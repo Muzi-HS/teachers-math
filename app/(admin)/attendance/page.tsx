@@ -49,18 +49,32 @@ export default function AttendancePage() {
 
   const today = logs.find(l => l.date === selDate) ?? null
 
-  useEffect(() => { fetchAll() }, [selYear, selMonth, teacher])
   useEffect(() => {
-    if (today) {
-      const s: Slot[] = today.slots?.length ? today.slots
-        : (today.clock_in ? [{in: today.clock_in.slice(0,5), out: today.clock_out?.slice(0,5)??''}] : [{in:'',out:''}])
-      setSlots(s)
-      setMemo(today.memo ?? '')
-    } else {
-      setSlots([{in:'',out:''}])
-      setMemo('')
-    }
-  }, [selDate, logs])
+    if (!teacher?.userId) return
+    const teacherId = teacher.userId
+    const from = `${selYear}-${String(selMonth).padStart(2,'0')}-01`
+    const lastDay = new Date(selYear, selMonth, 0).getDate()
+    const to = `${selYear}-${String(selMonth).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`
+    let active = true
+    void supabase.from('attendance_log').select('*').eq('teacher_id', teacherId)
+      .gte('date', from).lte('date', to).order('date', { ascending: false })
+      .then(({ data }) => { if (active) setLogs((data ?? []).map(r => ({ ...r, slots: r.slots ?? [] }))) })
+    return () => { active = false }
+  }, [selYear, selMonth, teacher?.userId])
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      if (today) {
+        const s: Slot[] = today.slots?.length ? today.slots
+          : (today.clock_in ? [{in: today.clock_in.slice(0,5), out: today.clock_out?.slice(0,5)??''}] : [{in:'',out:''}])
+        setSlots(s)
+        setMemo(today.memo ?? '')
+      } else {
+        setSlots([{in:'',out:''}])
+        setMemo('')
+      }
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [today, selDate])
 
   async function fetchAll() {
     if (!teacher) return

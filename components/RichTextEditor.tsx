@@ -15,9 +15,9 @@ type Props = {
 export default function RichTextEditor({ value, onChange, onImageUpload, placeholder, minHeight = 220 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const onChangeRef = useRef(onChange)
-  onChangeRef.current = onChange
   const onImageUploadRef = useRef(onImageUpload)
-  onImageUploadRef.current = onImageUpload
+  useEffect(() => { onChangeRef.current = onChange }, [onChange])
+  useEffect(() => { onImageUploadRef.current = onImageUpload }, [onImageUpload])
 
   useEffect(() => {
     let cancelled = false

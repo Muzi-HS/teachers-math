@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useRef } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
+import { useResetMenuScroll } from '@/lib/use-reset-menu-scroll'
 import Image from 'next/image'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
@@ -100,6 +101,8 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const { mobileMode } = useMobileMode()
   const router   = useRouter()
   const pathname = usePathname()
+  const mainRef = useRef<HTMLElement>(null)
+  useResetMenuScroll(pathname, mainRef, mobileMode)
 
   // useRef로 초기화 여부 추적 — 리렌더에 영향 없음
   const initDone = useRef(false)
@@ -115,7 +118,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
       registerAdminFCMToken(teacher.userId)
     }
     initDone.current = true
-  }, [loading, role])
+  }, [loading, role, router, teacher?.userId])
 
   // 2) 메뉴 접근 권한 체크 — pathname이 바뀔 때만 실행
   useEffect(() => {
@@ -124,19 +127,16 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     if (key && menuAccess[key] && !menuAccess[key](role as Role)) {
       router.replace('/attendance')
     }
-  }, [pathname])
+  }, [pathname, role, router])
 
   // 사용자가 백그라운드 알림을 직접 클릭한 경우에만 해당 메뉴로 이동한다.
   // 앱 사용 중 수신한 알림은 ForegroundNotification에서 입력 내용을 유지하며 표시한다.
-  function navigateToLink(link: string) {
-    if (link === window.location.pathname) window.location.reload()
-    else router.push(link)
-  }
   useEffect(() => {
     if (typeof navigator === 'undefined' || !navigator.serviceWorker) return
     function onMessage(e: MessageEvent) {
       if (e.data?.type !== 'push-navigate' || !e.data.link) return
-      navigateToLink(e.data.link)
+      if (e.data.link === window.location.pathname) window.location.reload()
+      else router.push(e.data.link)
     }
     navigator.serviceWorker.addEventListener('message', onMessage)
     return () => navigator.serviceWorker.removeEventListener('message', onMessage)
@@ -194,7 +194,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
           가로 방향은 잘리지 않게 두고, 세로는 기존처럼 main 내부 스크롤만 쓰도록 막아둔다 */}
       <div style={{ display: 'flex', flex: 1, overflowX: 'visible', overflowY: 'hidden' }}>
         {!mobileMode && <Sidebar />}
-        <main style={{ flex: 1, background: 'var(--ui-bg)', overflowY: 'auto', minHeight: 0, minWidth: 0, paddingBottom: mobileMode ? 'env(safe-area-inset-bottom)' : 0 }}>
+        <main ref={mainRef} style={{ flex: 1, background: 'var(--ui-bg)', overflowY: 'auto', minHeight: 0, minWidth: 0, paddingBottom: mobileMode ? 'env(safe-area-inset-bottom)' : 0 }}>
           {children}
         </main>
       </div>

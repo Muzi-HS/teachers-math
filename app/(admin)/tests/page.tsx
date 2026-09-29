@@ -42,7 +42,8 @@ export default function TestsPage() {
 
   useEffect(()=>{ fetchAll() },[])
 
-  useEffect(()=>{ if(tests.length>0) fetchAllStats() },[tests])
+  // Stats are refreshed when the loaded test list changes.
+  useEffect(()=>{ if(tests.length>0) fetchAllStats() },[tests]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // 목록 → 상세로 들어갈 때 히스토리 항목을 쌓아서, 뒤로가기를 누르면 페이지를 벗어나지
   // 않고 목록으로만 돌아가게 한다.

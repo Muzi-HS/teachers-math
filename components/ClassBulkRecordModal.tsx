@@ -87,7 +87,6 @@ export default function ClassBulkRecordModal({
     toast('임시저장 내용을 불러왔습니다')
   }
 
-  useEffect(() => { loadForDate(bulkDate) }, [bulkDate, classId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadForDate(date: string) {
     setLoading(true)
@@ -148,6 +147,8 @@ export default function ClassBulkRecordModal({
     setBulkChks(chks); setBulkForms(forms); setBulkShowTest(showT); setBulkRecIds(recIds); setBulkReleased(released)
     setLoading(false)
   }
+
+  useEffect(() => { const timer = window.setTimeout(() => { void loadForDate(bulkDate) }, 0); return () => window.clearTimeout(timer) }, [bulkDate, classId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function setBF<K extends keyof RecForm>(sid: number, key: K, val: RecForm[K]) {
     setBulkForms(p => ({ ...p, [sid]: { ...p[sid], [key]: val } }))

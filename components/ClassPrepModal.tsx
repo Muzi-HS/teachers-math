@@ -70,7 +70,6 @@ export default function ClassPrepModal({
 
   function toast(msg: string, ok = true) { setNotif({ msg, ok }); setTimeout(() => setNotif(null), 3000) }
 
-  useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function load() {
     setLoading(true)
@@ -115,6 +114,8 @@ export default function ClassPrepModal({
     setProgress(progInit)
     setLoading(false)
   }
+
+  useEffect(() => { const timer = window.setTimeout(() => { void load() }, 0); return () => window.clearTimeout(timer) }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const checkedStudents = students.filter(s => chks[s.id])
 

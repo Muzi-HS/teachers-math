@@ -31,12 +31,6 @@ export default function StudentRecords() {
   const [showStats, setShowStats] = useState(false)
 
 
-  useEffect(() => {
-    if (!student?.studentId || !student?.sessionToken) return
-    const controller = new AbortController()
-    fetchRecs(student.studentId, student.sessionToken, controller.signal)
-    return () => controller.abort()
-  }, [student?.studentId, student?.sessionToken])
 
   async function fetchRecs(stuId: number, token: string, signal: AbortSignal) {
     setLoading(true)
@@ -92,6 +86,13 @@ export default function StudentRecords() {
     setRecs(merged)
     setLoading(false)
   }
+
+  useEffect(() => {
+    if (!student?.studentId || !student?.sessionToken) return
+    const controller = new AbortController()
+    const timer = window.setTimeout(() => { void fetchRecs(student.studentId, student.sessionToken, controller.signal) }, 0)
+    return () => { window.clearTimeout(timer); controller.abort() }
+  }, [student?.studentId, student?.sessionToken])
 
   const chronoRecs = [...recs].reverse()
 

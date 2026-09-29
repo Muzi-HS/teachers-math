@@ -39,7 +39,6 @@ export default function DashboardPage(){
   const [pendingLoading, setPendingLoading] = useState(true)
   const [pendingError, setPendingError] = useState(false)
 
-  useEffect(()=>{ fetchAll() },[])
   useEffect(() => {
     let cancelled = false
     loadPendingClassSends().then(rows => {
@@ -84,6 +83,8 @@ export default function DashboardPage(){
     setChildrenMap(cmap)
     setLoading(false)
   }
+
+  useEffect(() => { const timer = window.setTimeout(() => { void fetchAll() }, 0); return () => window.clearTimeout(timer) }, [])
 
   // 오늘 요일에 해당하는 반만 필터링
   const todayDow = DOW[kstNow().getDay()]

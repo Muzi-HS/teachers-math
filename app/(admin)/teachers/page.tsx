@@ -162,7 +162,8 @@ export default function TeachersPage(){
   const [bulkApproving, setBulkApproving] = useState(false)
 
   useEffect(()=>{ fetchTeachers() },[])
-  useEffect(()=>{ if(tabIdx===1){ fetchAtt(); fetchSchEvts() } },[tabIdx,selYear,selMonth])
+  // Attendance and event queries are tied to the selected tab and month.
+  useEffect(()=>{ if(tabIdx===1){ fetchAtt(); fetchSchEvts() } },[tabIdx,selYear,selMonth]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function fetchTeachers(){
     setLoading(true)

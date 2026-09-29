@@ -36,7 +36,10 @@ export function MobileModeProvider({ children }: { children: ReactNode }) {
   const mobileMode = isMobileScreen || previewMobile
 
   useEffect(() => {
-    try { setMobileModeState(localStorage.getItem(STORAGE_KEY) === '1') } catch {}
+    const timer = window.setTimeout(() => {
+      try { setMobileModeState(localStorage.getItem(STORAGE_KEY) === '1') } catch {}
+    }, 0)
+    return () => window.clearTimeout(timer)
   }, [])
 
   function setMobileMode(v: boolean) {

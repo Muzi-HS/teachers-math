@@ -27,7 +27,8 @@ export default function SplashScreen() {
         !!localStorage.getItem('student_auto_login')
     } catch {}
     const isMobile = window.matchMedia('(max-width: 768px)').matches
-    setShouldShow(hasAutoLogin && isMobile)
+    const timer = window.setTimeout(() => setShouldShow(hasAutoLogin && isMobile), 0)
+    return () => window.clearTimeout(timer)
   }, [])
 
   useEffect(() => {
@@ -39,9 +40,9 @@ export default function SplashScreen() {
 
   useEffect(() => {
     if (shouldShow !== true || !minTimeDone || authLoading) return
-    setFading(true)
+    const fadeTimer = window.setTimeout(() => setFading(true), 0)
     const hideTimer = setTimeout(() => setVisible(false), 300)
-    return () => clearTimeout(hideTimer)
+    return () => { window.clearTimeout(fadeTimer); clearTimeout(hideTimer) }
   }, [shouldShow, minTimeDone, authLoading])
 
   if (shouldShow !== true || !visible) return null

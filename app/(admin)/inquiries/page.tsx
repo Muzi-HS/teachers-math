@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { kstDateOf, kstTimeOf } from '@/lib/kst'
 import { IconChat, IconPencil, IconTrash, IconArrowLeft } from '@/components/icons'
 import { useMobileMode } from '@/context/MobileModeContext'
+import { useMobileKeyboardInset } from '@/lib/use-mobile-keyboard-inset'
 
 const navy = 'var(--ui-primary)', navyDk = 'var(--ui-primary-text)', navyM = 'var(--ui-surface-2)'
 const gold = 'var(--ui-primary)'
@@ -44,6 +45,8 @@ function AdminInquiriesPageInner() {
   const [loading, setLoading] = useState(true)
   const [selParentId, setSelParentId] = useState<number | null>(null)
   const [input, setInput] = useState('')
+  const [inputFocused, setInputFocused] = useState(false)
+  const keyboardInset = useMobileKeyboardInset(inputFocused && mobileMode)
   const [sending, setSending] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editText, setEditText] = useState('')
@@ -51,7 +54,7 @@ function AdminInquiriesPageInner() {
   const [notif, setNotif] = useState<{ msg: string; ok: boolean } | null>(null)
   const [newMsgModal, setNewMsgModal] = useState(false)
   const [studentSearch, setStudentSearch] = useState('')
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const messageListRef = useRef<HTMLDivElement>(null)
 
   function toast(msg: string, ok = true) { setNotif({ msg, ok }); setTimeout(() => setNotif(null), 3000) }
 
@@ -132,7 +135,8 @@ function AdminInquiriesPageInner() {
   const threadMsgs = selParentId ? msgs.filter(m => m.parent_id === selParentId) : []
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const list = messageListRef.current
+    if (list) list.scrollTop = list.scrollHeight
   }, [threadMsgs.length, selParentId])
 
   async function openThread(parentId: number) {
@@ -198,17 +202,17 @@ function AdminInquiriesPageInner() {
     .iq-list-item.active{background:${navyM};}
     .iq-av{width:38px;height:38px;border-radius:50%;background:${navyM};display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:${navy};flex-shrink:0;}
     .iq-bubble{max-width:72%;padding:9px 13px;border-radius:14px;font-size:13px;line-height:1.55;white-space:pre-wrap;word-break:break-word;}
-    .iq-fi{width:100%;padding:9px 11px;border:1.5px solid ${bd};border-radius:8px;font-size:13px;font-family:inherit;color:${tx};outline:none;background:#fff;box-sizing:border-box;}
+    .iq-fi{width:100%;min-width:0;padding:9px 11px;border:1.5px solid ${bd};border-radius:8px;font-size:16px;font-family:inherit;color:${tx};outline:none;background:#fff;box-sizing:border-box;}
     .iq-fi:focus{border-color:${navy};}
     .iq-sbox{display:flex;align-items:center;gap:7px;padding:8px 12px;background:#fff;border:1px solid ${bd};border-radius:8px;}
-    .iq-sbox input{border:none;outline:none;font-size:13px;font-family:inherit;color:${tx};background:transparent;width:100%;}
+    .iq-sbox input{border:none;outline:none;font-size:16px;font-family:inherit;color:${tx};background:transparent;width:100%;}
   `
 
   const showList = !mobileMode || !selParentId
   const showThread = !mobileMode || !!selParentId
 
   return (
-    <div style={{ padding: mobileMode ? '16px 14px 88px' : '28px 32px', fontFamily: "'Noto Sans KR',sans-serif", height: 'calc(100dvh - 52px)', minHeight: 0, overflow: 'hidden', boxSizing: 'border-box', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ padding: mobileMode ? (inputFocused ? '16px 14px 14px' : '16px 14px 88px') : '28px 32px', fontFamily: "'Noto Sans KR',sans-serif", height: mobileMode ? `calc(100dvh - 52px - ${keyboardInset}px)` : 'calc(100dvh - 52px)', minHeight: 0, overflow: 'hidden', boxSizing: 'border-box', display: 'flex', flexDirection: 'column' }}>
       <style>{css}</style>
 
       {notif && (
@@ -300,7 +304,7 @@ function AdminInquiriesPageInner() {
                 </div>
               </div>
 
-              <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: '18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div ref={messageListRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: '18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {threadMsgs.length === 0 && (
                   <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', color: tx3 }}>
                     <p style={{ marginBottom: 8, display: 'flex', justifyContent: 'center' }}><IconChat size={28} /></p>
@@ -342,15 +346,15 @@ function AdminInquiriesPageInner() {
                     </div>
                   )
                 })}
-                <div ref={bottomRef} />
               </div>
 
-              <div style={{ padding: mobileMode ? '14px 14px 14px 64px' : 14, borderTop: `1px solid ${bd}`, display: 'flex', gap: 8, flexShrink: 0 }}>
-                <textarea className="iq-fi" rows={1} style={{ resize: 'none' }} placeholder="답변을 입력하세요 (Enter 전송, Shift+Enter 줄바꿈)"
-                  value={input} onChange={e => setInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply() } }} />
+              <div className="iq-composer" style={{ padding: 12, borderTop: `1px solid ${bd}`, display: 'flex', alignItems: 'flex-end', gap: 8, flexShrink: 0 }}>
+                <textarea className="iq-fi" rows={1} style={{ flex: 1, width: 'auto', resize: 'none', maxHeight: 128, overflowY: 'auto', lineHeight: 1.45, borderRadius: 18 }} placeholder="답변을 입력하세요"
+                  value={input} onFocus={() => { setInputFocused(true); requestAnimationFrame(() => { const list = messageListRef.current; if (list) list.scrollTop = list.scrollHeight }) }} onBlur={() => setInputFocused(false)}
+                  onChange={e => { setInput(e.target.value); e.currentTarget.style.height = 'auto'; e.currentTarget.style.height = `${Math.min(e.currentTarget.scrollHeight, 128)}px` }}
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && window.matchMedia('(pointer: fine)').matches) { e.preventDefault(); void sendReply() } }} />
                 <button onClick={sendReply} disabled={sending || !input.trim()}
-                  style={{ flexShrink: 0, padding: '0 18px', borderRadius: 8, border: 'none', background: gold, color: navyDk, fontSize: 13, fontWeight: 700, cursor: sending || !input.trim() ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: sending || !input.trim() ? 0.6 : 1 }}>
+                  style={{ flexShrink: 0, minHeight: 42, padding: '0 18px', borderRadius: 8, border: 'none', background: gold, color: navyDk, fontSize: 13, fontWeight: 700, cursor: sending || !input.trim() ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: sending || !input.trim() ? 0.6 : 1 }}>
                   전송
                 </button>
               </div>
