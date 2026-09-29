@@ -7,6 +7,8 @@ import TimeSlotInput from '@/components/TimeSlotInput'
 import * as XLSX from 'xlsx-js-style'
 import { IconX } from '@/components/icons'
 import { useMobileMode } from '@/context/MobileModeContext'
+import { usePublicHolidays } from '@/lib/use-public-holidays'
+import CompactMonthCalendar from '@/components/CompactMonthCalendar'
 import { navy, navyDk, navyM, gold, goldL, bg, bd, tx, tx2, tx3, re, rbg, gr, gbg } from '@/lib/ui-tokens'
 
 type Teacher = {
@@ -150,6 +152,7 @@ export default function TeachersPage(){
   const [loading,    setLoading]    = useState(true)
   const [selYear,    setSelYear]    = useState(kstNow().getFullYear())
   const [selMonth,   setSelMonth]   = useState(kstNow().getMonth()+1)
+  const { holidays: publicHolidays, fallback: holidayFallback } = usePublicHolidays(selYear)
   const [selTeacher, setSelTeacher] = useState<Teacher|null>(null)
   const [notif,      setNotif]      = useState<{msg:string;ok:boolean}|null>(null)
   // 수정 모달
@@ -518,6 +521,9 @@ export default function TeachersPage(){
               </div>
             </div>
             <div style={{padding:'16px 20px'}}>
+              {publicHolidays?.filter(holiday => holiday.date === calDay).map(holiday => (
+                <p key={`${holiday.date}-${holiday.name}`} style={{color:re,fontSize:12,margin:'0 0 10px'}}>{holiday.name} · 공휴일</p>
+              ))}
               {dayLogs(calDay).length===0?(
                 <p style={{color:tx3,fontSize:13,textAlign:'center',padding:'20px 0'}}>기록 없음</p>
               ):dayLogs(calDay).map(l=>{
@@ -690,6 +696,21 @@ export default function TeachersPage(){
               )}
               {/* 달력 그리드 */}
               <div style={{background:'#fff',borderRadius:12,border:`1px solid ${bd}`,padding:16,boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
+                {mobileMode && <CompactMonthCalendar year={selYear} month={selMonth - 1} selectedDate={calDay}
+                  holidays={publicHolidays} showNavigation={false} onSelectDate={setCalDay}
+                  getDayInfo={date => {
+                    const events = dayEvts(date)
+                    const logs = dayLogs(date)
+                    return {
+                      holiday: events.some(event => event.type === 'holiday'),
+                      markers: [
+                        ...events.map(event => event.type === 'holiday' ? re : navy),
+                        ...logs.map(log => log.approved ? gr : 'var(--ui-warning)'),
+                      ],
+                      description: `일정 ${events.length}건, 출근 기록 ${logs.length}건`,
+                    }
+                  }} />}
+                {!mobileMode && <>
                 <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:4,marginBottom:8}}>
                   {DOW.map((d,i)=>(
                     <div key={d} style={{textAlign:'center',fontSize:11,fontWeight:700,
@@ -711,14 +732,20 @@ export default function TeachersPage(){
                     const pending=dLogs.filter(l=>!l.approved).length
                     const dow=(fd+d-1)%7
                     const dEvts = dayEvts(ds)
+                    const publicHolidayNames = publicHolidays?.filter(holiday => holiday.date === ds).map(holiday => holiday.name) ?? []
+                    const isHoliday = publicHolidayNames.length > 0 || dEvts.some(event => event.type === 'holiday')
                     return(
-                      <div key={d} className="cd" onClick={()=>dLogs.length>0&&setCalDay(ds)}
-                        style={{cursor:dLogs.length>0?'pointer':'default',
+                      <div key={d} className="cd" onClick={()=>((dLogs.length>0 || publicHolidayNames.length>0) && setCalDay(ds))}
+                        title={publicHolidayNames.join(', ') || undefined}
+                        style={{cursor:dLogs.length>0 || publicHolidayNames.length>0?'pointer':'default',
                           ...(mobileMode?{display:'flex',flexDirection:'column',alignItems:'center',gap:2,padding:'4px 0 6px'}:{})}}>
                         <div style={{fontSize:11,fontWeight:600,marginBottom:mobileMode?0:3,
-                          color:dow===0?re:dow===6?navy:tx2}}>
+                          color:isHoliday || dow===0?re:dow===6?'#2563A6':tx2}}>
                           {d}
                         </div>
+                        {!mobileMode && publicHolidayNames.map(name => (
+                          <div key={name} style={{fontSize:9,color:re,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={name}>{name}</div>
+                        ))}
                         {mobileMode?(
                           <div style={{display:'flex',gap:2,flexWrap:'wrap',justifyContent:'center'}}>
                             {dEvts.slice(0,2).map(e=>(
@@ -761,7 +788,9 @@ export default function TeachersPage(){
                     <div key={'n'+i} className="cd om"/>
                   ))}
                 </div>
+                </>}
               </div>
+              <p style={{fontSize:11,color:tx3,margin:'8px 2px 0'}}>공휴일은 근무 여부와 별개입니다.{holidayFallback && (publicHolidays ? ' 저장된 공휴일 자료를 표시합니다.' : ' 공휴일 정보를 불러오지 못했습니다.')}</p>
             </>
           )}
 
