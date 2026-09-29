@@ -69,6 +69,7 @@ export default function LoginPanel({ open, onClose }: { open: boolean; onClose: 
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
   const pinInputRef = useRef<HTMLInputElement>(null)
+  const loginInputRef = useRef<HTMLInputElement>(null)
 
   // ESC로 닫기 + 바깥 스크롤 잠금
   useEffect(() => {
@@ -80,8 +81,12 @@ export default function LoginPanel({ open, onClose }: { open: boolean; onClose: 
   }, [open, onClose])
 
   function selectType(t: AccountType) {
-    setAccountType(t); setStep('form'); setError('')
-    setPhone(''); setPin(''); setEmail(''); setPassword('')
+    // Focus while the account button's tap is still active so iOS opens the keypad.
+    flushSync(() => {
+      setAccountType(t); setStep('form'); setError('')
+      setPhone(''); setPin(''); setEmail(''); setPassword('')
+    })
+    loginInputRef.current?.focus()
   }
   function backToSelect() {
     setAccountType(null); setStep('select'); setError(''); setShowSignup(false)
@@ -258,7 +263,7 @@ export default function LoginPanel({ open, onClose }: { open: boolean; onClose: 
                     {accountType === 'student' ? '학생 로그인' : '학부모님 로그인'}
                   </h2>
                   <label style={label} htmlFor="lpv-phone">전화번호</label>
-                  <input id="lpv-phone" type="tel" inputMode="numeric" value={phone} placeholder="01012345678"
+                  <input ref={loginInputRef} id="lpv-phone" type="tel" inputMode="numeric" autoComplete="tel" value={phone} placeholder="01012345678"
                     onChange={e => setPhone(e.target.value)} onKeyDown={e => e.key === 'Enter' && handlePhoneSubmit()} style={fi} />
                   <p style={{ fontSize: 11.5, color: 'rgba(21,74,50,.5)', marginTop: 7 }}>하이픈(-) 없이 숫자만 입력해주세요.</p>
                   {error && <p role="alert" style={{ color: '#B3261E', fontSize: 12.5, marginTop: 10 }}>{error}</p>}
@@ -299,7 +304,7 @@ export default function LoginPanel({ open, onClose }: { open: boolean; onClose: 
                   <h2 style={{ fontSize: 19, fontWeight: 800, color: deep, marginBottom: 22 }}>선생님 로그인</h2>
                   <div style={{ marginBottom: 14 }}>
                     <label style={label} htmlFor="lpv-email">이메일</label>
-                    <input id="lpv-email" type="email" value={email} onChange={e => setEmail(e.target.value)} style={fi} />
+                    <input ref={loginInputRef} id="lpv-email" type="email" autoComplete="username" value={email} onChange={e => setEmail(e.target.value)} style={fi} />
                   </div>
                   <div style={{ marginBottom: 6 }}>
                     <label style={label} htmlFor="lpv-pw">비밀번호</label>

@@ -123,6 +123,17 @@ body {
   font-family: 'Noto Sans KR', Arial, Helvetica, sans-serif;
 }
 
+@media (max-width: 900px) {
+  html:has(.admin-shell),
+  body:has(.admin-shell) { background: #fff; }
+  .admin-shell > header {
+    background: #fff !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+  }
+}
+
 /* 공용 UI 컴포넌트 상호작용 (LandingPage lp-login-btn/lp-card 참고) */
 .ui-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: var(--ui-shadow-sm); }
 .ui-btn:active:not(:disabled) { transform: translateY(0); }

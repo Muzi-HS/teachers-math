@@ -9,9 +9,17 @@ const MOBILE_QUERY = '(max-width: 900px), (max-width: 1100px) and (pointer: coar
 function subscribeToScreen(onChange: () => void) {
   const media = window.matchMedia(MOBILE_QUERY)
   media.addEventListener('change', onChange)
-  return () => media.removeEventListener('change', onChange)
+  window.addEventListener('resize', onChange)
+  return () => {
+    media.removeEventListener('change', onChange)
+    window.removeEventListener('resize', onChange)
+  }
 }
-function getScreenSnapshot() { return window.matchMedia(MOBILE_QUERY).matches }
+function getScreenSnapshot() {
+  // Installed iOS web apps can report an unexpected media-query result during
+  // launch or keyboard resizing. Keep the actual narrow viewport authoritative.
+  return window.innerWidth <= 900 || window.screen.width <= 900 || window.matchMedia(MOBILE_QUERY).matches
+}
 function getServerSnapshot() { return true }
 
 type MobileModeContextType = {
