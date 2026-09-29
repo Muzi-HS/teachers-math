@@ -10,7 +10,7 @@ const blue = '#2563A6'
 export type CalendarDayInfo = { holiday?: boolean; markers?: string[]; description?: string }
 
 export default function CompactMonthCalendar({
-  year, month, selectedDate, onSelectDate, onMoveMonth, holidays, getDayInfo, showNavigation = true,
+  year, month, selectedDate, onSelectDate, onMoveMonth, holidays, getDayInfo, showNavigation = true, showHolidayNames = false,
 }: {
   year: number
   month: number // zero-based
@@ -20,6 +20,7 @@ export default function CompactMonthCalendar({
   holidays?: PublicHoliday[] | null
   getDayInfo?: (date: string) => CalendarDayInfo
   showNavigation?: boolean
+  showHolidayNames?: boolean
 }) {
   const firstWeekday = new Date(year, month, 1).getDay()
   const daysInMonth = new Date(year, month + 1, 0).getDate()
@@ -55,7 +56,10 @@ export default function CompactMonthCalendar({
           aria-pressed={isSelected}
           title={names?.join(', ')}
           style={{ minWidth: 0, minHeight: 46, padding: '4px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', gap: 3, border: isSelected ? '1px solid var(--ui-primary)' : '1px solid transparent', borderRadius: 8, background: isSelected ? 'var(--ui-surface-2)' : 'transparent', cursor: 'pointer', fontFamily: 'inherit' }}>
-          <span style={{ width: 22, height: 22, display: 'grid', placeItems: 'center', borderRadius: '50%', background: isToday && !isSelected ? 'var(--ui-surface-2)' : 'transparent', fontSize: 13, fontWeight: isToday || isSelected || isHoliday ? 700 : 400, color }}>{day}</span>
+          <span style={{ width: '100%', minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: names?.length && showHolidayNames ? 'flex-start' : 'center', gap: 2 }}>
+            <span style={{ width: 22, height: 22, flexShrink: 0, display: 'grid', placeItems: 'center', borderRadius: '50%', background: isToday && !isSelected ? 'var(--ui-surface-2)' : 'transparent', fontSize: 13, fontWeight: isToday || isSelected || isHoliday ? 700 : 400, color }}>{day}</span>
+            {showHolidayNames && names?.length ? <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 9, color: red, textAlign: 'left' }}>{names.join(' · ')}</span> : null}
+          </span>
           <span style={{ minHeight: 4, display: 'flex', gap: 2 }}>
             {(info?.markers ?? []).slice(0, 3).map((marker, markerIndex) => <span key={markerIndex} style={{ width: 4, height: 4, borderRadius: '50%', background: marker }} />)}
           </span>

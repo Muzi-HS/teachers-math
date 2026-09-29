@@ -697,7 +697,7 @@ export default function TeachersPage(){
               {/* 달력 그리드 */}
               <div style={{background:'#fff',borderRadius:12,border:`1px solid ${bd}`,padding:16,boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
                 {mobileMode && <CompactMonthCalendar year={selYear} month={selMonth - 1} selectedDate={calDay}
-                  holidays={publicHolidays} showNavigation={false} onSelectDate={setCalDay}
+                  holidays={publicHolidays} showNavigation={false} showHolidayNames onSelectDate={setCalDay}
                   getDayInfo={date => {
                     const events = dayEvts(date)
                     const logs = dayLogs(date)
@@ -739,13 +739,10 @@ export default function TeachersPage(){
                         title={publicHolidayNames.join(', ') || undefined}
                         style={{cursor:dLogs.length>0 || publicHolidayNames.length>0?'pointer':'default',
                           ...(mobileMode?{display:'flex',flexDirection:'column',alignItems:'center',gap:2,padding:'4px 0 6px'}:{})}}>
-                        <div style={{fontSize:11,fontWeight:600,marginBottom:mobileMode?0:3,
-                          color:isHoliday || dow===0?re:dow===6?'#2563A6':tx2}}>
-                          {d}
+                        <div style={{display:'flex',alignItems:'center',gap:4,minWidth:0,marginBottom:3}}>
+                          <span style={{fontSize:11,fontWeight:600,flexShrink:0,color:isHoliday || dow===0?re:dow===6?'#2563A6':tx2}}>{d}</span>
+                          {publicHolidayNames.length>0 && <span style={{fontSize:9,color:re,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={publicHolidayNames.join(', ')}>{publicHolidayNames.join(' · ')}</span>}
                         </div>
-                        {!mobileMode && publicHolidayNames.map(name => (
-                          <div key={name} style={{fontSize:9,color:re,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={name}>{name}</div>
-                        ))}
                         {mobileMode?(
                           <div style={{display:'flex',gap:2,flexWrap:'wrap',justifyContent:'center'}}>
                             {dEvts.slice(0,2).map(e=>(
