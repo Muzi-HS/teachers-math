@@ -938,9 +938,9 @@ const Modal = React.memo(function Modal({ onClose, title, children, footer, wide
         onClick={e => e.stopPropagation()}
         style={{ background: '#fff', borderRadius: 12, width: wide ? 820 : 560, maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}
       >
-        <div style={{ padding: '18px 22px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: '#fff', zIndex: 1, borderBottom: `1px solid var(--ui-border)`, marginBottom: 0 }}>
-          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--ui-text)' }}>{title}</span>
-          <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'var(--ui-bg)', cursor: 'pointer', fontSize: 17, color: 'var(--ui-text-2)' }}>×</button>
+        <div style={{ padding: '14px 22px', minHeight: 58, boxSizing: 'border-box', display: 'flex', gap: 12, justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: '#fff', zIndex: 1, borderBottom: `1px solid var(--ui-border)` }}>
+          <span style={{ fontSize: 16, lineHeight: 1.4, fontWeight: 700, color: 'var(--ui-text)' }}>{title}</span>
+          <button type="button" onClick={onClose} aria-label="닫기" style={{ width: 32, height: 32, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, lineHeight: 1, borderRadius: '50%', border: 'none', background: 'var(--ui-bg)', cursor: 'pointer', fontSize: 20, color: 'var(--ui-text-2)' }}>×</button>
         </div>
         <div style={{ padding: '14px 22px' }}>{children}</div>
         <div style={{ padding: '0 22px 18px', display: 'flex', gap: 8, justifyContent: 'flex-end', position: 'sticky', bottom: 0, background: '#fff', borderTop: `1px solid var(--ui-border)`, paddingTop: 12 }}>{footer}</div>

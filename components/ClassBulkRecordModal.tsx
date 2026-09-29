@@ -355,9 +355,9 @@ export default function ClassBulkRecordModal({
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.42)', zIndex: 1000, display: 'flex', alignItems: mobileMode ? 'flex-end' : 'center', justifyContent: 'center', padding: mobileMode ? 0 : 16 }}>
       <style>{css}</style>
       <div className="bcr-modal" onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: mobileMode ? '16px 16px 0 0' : 12, width: mobileMode ? '100%' : (isSingleStudent ? 560 : undefined), maxWidth: '100%', maxHeight: mobileMode ? '92vh' : '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
-        <div style={{ padding: mobileMode ? '14px 16px 0' : '18px 22px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: '#fff', zIndex: 1, borderBottom: `1px solid ${bd}`, marginBottom: 0 }}>
-          <span style={{ fontSize: 15, fontWeight: 600, color: tx }}>{title ?? `${className} 수업기록 작성`}</span>
-          <button onClick={close} style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: bg, cursor: 'pointer', fontSize: 17, color: tx2 }}>×</button>
+        <div style={{ padding: mobileMode ? '12px 16px' : '14px 22px', minHeight: mobileMode ? 56 : 58, boxSizing: 'border-box', display: 'flex', gap: 12, justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: '#fff', zIndex: 1, borderBottom: `1px solid ${bd}` }}>
+          <span style={{ fontSize: 16, lineHeight: 1.4, fontWeight: 700, color: tx }}>{title ?? `${className} 수업기록 작성`}</span>
+          <button type="button" onClick={close} aria-label="닫기" style={{ width: 32, height: 32, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, lineHeight: 1, borderRadius: '50%', border: 'none', background: bg, cursor: 'pointer', fontSize: 20, color: tx2 }}>×</button>
         </div>
 
         <div style={{ padding: mobileMode ? '12px 16px' : '14px 22px' }}>
