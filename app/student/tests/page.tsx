@@ -22,6 +22,7 @@ export default function StudentTestsPage() {
   const [busy, setBusy] = useState(true)
   const [pendingSaves, setPendingSaves] = useState(0)
   const [submitting, setSubmitting] = useState(false)
+  const [reviewFilter, setReviewFilter] = useState<'all' | 'wrong'>('all')
   const activeRef = useRef<ExamState | null>(null)
   const answersRef = useRef<ExamAnswers>({})
   const revision = useRef(0)
@@ -87,6 +88,7 @@ export default function StudentTestsPage() {
   async function open(test: StudentExam) {
     if (!test.attempt && !window.confirm('답안 입력을 시작하면 2분 후 자동 제출됩니다. 시험당 한 번만 응시할 수 있습니다. 시작할까요?')) return
     setBusy(true); setError('')
+    setReviewFilter('all')
     try {
       const { data, elapsed } = await request(test.attempt ? 'status' : 'start', { testId: test.id })
       applyState(data, elapsed, true)
@@ -184,6 +186,13 @@ export default function StudentTestsPage() {
     const v = answers[q.number]
     return Array.isArray(v) ? v.length > 0 : typeof v === 'string' && v.trim().length > 0
   }).length : 0
+  const reviewRows = active?.review ? active.questions.flatMap(q => {
+    const review = active.review?.find(row => row.number === q.number)
+    if (!review) return []
+    const mine = active.attempt.answers[q.number]
+    return [{ question: q, review, mine, correct: isAnswerCorrect({ ...q, correctAnswer: review.correct_answer }, mine) }]
+  }) : []
+  const wrongCount = reviewRows.filter(row => !row.correct).length
 
   return <div className="student-exams">
     <style>{`
@@ -215,8 +224,21 @@ export default function StudentTestsPage() {
       .student-exams .exam-result-score{font-size:52px;font-weight:800;color:var(--ui-primary);margin:4px 0}
       .student-exams .exam-result-badge{display:inline-block;background:var(--ui-success-bg);color:var(--ui-success);font-size:13px;font-weight:700;padding:5px 14px;border-radius:20px;margin-bottom:10px}
       .student-exams .exam-review{text-align:left;margin-top:24px}
-      .student-exams .exam-review-item{border:1px solid var(--ui-border);border-radius:12px;padding:14px;margin-top:10px}
-      .student-exams .exam-review-item p{margin:6px 0 0;overflow-wrap:anywhere}
+      .student-exams .exam-review-controls{display:flex;gap:7px;margin:12px 0}
+      .student-exams .exam-review-controls button{padding:6px 12px}
+      .student-exams .exam-review-list{border:1px solid var(--ui-border);border-radius:10px;overflow:hidden}
+      .student-exams .exam-review-item{border-bottom:1px solid var(--ui-border);background:#fff}
+      .student-exams .exam-review-item:last-child{border-bottom:0}
+      .student-exams .exam-review-item[data-correct=false]{background:var(--ui-danger-bg)}
+      .student-exams .exam-review-item summary{display:grid;grid-template-columns:44px 46px minmax(0,1fr) 50px 12px;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;list-style:none;font-size:12px}
+      .student-exams .exam-review-item summary::-webkit-details-marker{display:none}
+      .student-exams .exam-review-item summary::after{content:'⌄';grid-column:5;grid-row:1;justify-self:end;color:var(--ui-text-3)}
+      .student-exams .exam-review-rate{text-align:right;white-space:nowrap;color:var(--ui-text-2)}
+      .student-exams .exam-review-bar{height:6px;background:var(--ui-border);border-radius:99px;overflow:hidden}
+      .student-exams .exam-review-bar span{display:block;height:100%;background:var(--ui-primary)}
+      .student-exams .exam-review-detail{padding:0 12px 12px;font-size:12px;line-height:1.6;border-top:1px solid var(--ui-border)}
+      .student-exams .exam-review-detail p{margin:7px 0 0;overflow-wrap:anywhere}
+      @media(max-width:420px){.student-exams .exam-review-item summary{grid-template-columns:38px 40px minmax(0,1fr) 42px 10px;gap:5px;padding:10px 8px}}
     `}</style>
     <h1>{active ? active.name : '시험 답안 입력'}</h1>
     {error && <p className="exam-error" role="alert">{error}</p>}
@@ -253,21 +275,28 @@ export default function StudentTestsPage() {
       {active.review && <div className="exam-review">
         <h2 style={{ fontSize: 16, margin: '0 0 8px' }}>정오표</h2>
         <p style={{ color: 'var(--ui-text-3)', margin: 0 }}>문항별 정답률은 현재까지 제출한 학생 기준이며, 이후 제출에 따라 달라집니다.</p>
-        {active.questions.map(q => {
-          const review = active.review?.find(row => row.number === q.number)
-          if (!review) return null
-          const mine = active.attempt.answers[q.number]
-          const correct = isAnswerCorrect({ ...q, correctAnswer: review.correct_answer }, mine)
-          return <div className="exam-review-item" key={q.number}>
-            <div className="exam-row">
-              <strong>{q.number}번 <span style={{ color: correct ? 'var(--ui-success)' : 'var(--ui-danger)' }}>{correct ? '정답' : '오답'}</span></strong>
-              <span style={{ fontSize: 12, color: 'var(--ui-text-2)' }}>정답률 {review.correct_rate}% ({review.correct_count}/{review.submitted_count}명)</span>
-            </div>
-            <p>내 답: {displayAnswer(mine)}</p>
-            <p>정답: {displayAnswer(review.correct_answer)}</p>
-            <p style={{ color: 'var(--ui-text-3)', fontSize: 12 }}>배점 {q.points}점</p>
-          </div>
-        })}
+        <div className="exam-review-controls">
+          <button type="button" aria-pressed={reviewFilter === 'all'} onClick={() => setReviewFilter('all')}>전체 {reviewRows.length}</button>
+          <button type="button" aria-pressed={reviewFilter === 'wrong'} onClick={() => setReviewFilter('wrong')}>오답만 {wrongCount}</button>
+        </div>
+        <div className="exam-review-list">
+          {reviewRows.filter(row => reviewFilter === 'all' || !row.correct).map(({ question, review, mine, correct }) =>
+            <details className="exam-review-item" data-correct={correct} key={question.number}>
+              <summary>
+                <strong>{question.number}번</strong>
+                <strong style={{ color: correct ? 'var(--ui-success)' : 'var(--ui-danger)' }}>{correct ? '정답' : '오답'}</strong>
+                <span className="exam-review-bar" aria-hidden="true"><span style={{ width: `${review.correct_rate}%` }} /></span>
+                <span className="exam-review-rate">{review.correct_rate}%</span>
+              </summary>
+              <div className="exam-review-detail">
+                <p>내 답: {displayAnswer(mine)}</p>
+                <p>정답: {displayAnswer(review.correct_answer)}</p>
+                <p>배점 {question.points}점 · {review.correct_count}/{review.submitted_count}명 정답</p>
+              </div>
+            </details>
+          )}
+          {reviewFilter === 'wrong' && wrongCount === 0 && <p style={{ padding: 12, margin: 0 }}>오답이 없습니다.</p>}
+        </div>
       </div>}
       <button className="exam-primary" style={{ marginTop: 10 }} onClick={() => { setActive(null); activeRef.current = null; void load() }}>시험 목록으로</button>
     </section> : <>
