@@ -61,12 +61,16 @@ test('PostgreSQL migration and exam lifecycle', async t => {
     grant usage on schema auth to authenticated;
     create table teachers(user_id uuid primary key,approved boolean,role text);
     create table students(id bigint primary key,name text,phone text,pin text);
+    create table classes(id bigint primary key,name text);
+    create table class_students(class_id bigint references classes(id),student_id bigint references students(id),primary key(class_id,student_id));
     create table tests(id bigint generated always as identity primary key,name text not null,date date not null,total integer not null);
     create table test_scores(id bigint generated always as identity primary key,test_id bigint references tests(id) on delete cascade,student_id bigint references students(id),correct integer,score integer,unique(test_id,student_id));
     create table records(id bigint primary key,student_id bigint references students(id));
     create table record_test_items(id bigint generated always as identity primary key,record_id bigint references records(id),test_id bigint references tests(id) on delete cascade,t_total integer,t_cor integer,t_score integer);
     insert into teachers values('11111111-1111-1111-1111-111111111111',true,'admin');
     insert into students values(1,'A','0101','1234'),(2,'B','0102','2345'),(3,'C','0103','3456');
+    insert into classes values(10,'First'),(20,'Second');
+    insert into class_students values(10,1),(10,2),(20,3);
     insert into records values(1,1),(2,2);
     select set_config('test.uid','11111111-1111-1111-1111-111111111111',false);
     grant select,insert,update,delete on tests,test_scores,record_test_items to anon,authenticated;
@@ -78,6 +82,9 @@ test('PostgreSQL migration and exam lifecycle', async t => {
   const reviewMigration = readFileSync(new URL('../supabase/test_review_and_late_assignees_migration.sql', import.meta.url), 'utf8')
   await db.exec(reviewMigration)
   await db.exec(reviewMigration)
+  const batchMigration = readFileSync(new URL('../supabase/test_batches_migration.sql', import.meta.url), 'utf8')
+  await db.exec(batchMigration)
+  await db.exec(batchMigration)
   const listIndexes = readFileSync(new URL('../supabase/student_test_list_indexes_migration.sql', import.meta.url), 'utf8')
   await db.exec(listIndexes)
   await db.exec(listIndexes)
@@ -174,6 +181,23 @@ test('PostgreSQL migration and exam lifecycle', async t => {
     assert.equal((await db.query('select count(*)::int as count from test_scores where test_id=$1', [id])).rows[0].count, 2)
     await assert.rejects(db.query('select student_test_review(2,$1)', [id]))
   })
+  await t.test('new rounds separate rosters while preserving cumulative attempts', async () => {
+    const id = await create()
+    const first = (await db.query('select id from test_batches where test_id=$1 and round_number=1', [id])).rows[0].id
+    await act(id, 'start', null, null, 1)
+    await act(id, 'submit', {1:[2],2:[1,3],3:'x = 2'}, 1, 1)
+    await assert.rejects(db.query('select add_auto_test_batch($1,$2,$3,$4)', [id,'Invalid',20,[2]]))
+    const second = (await db.query('select add_auto_test_batch($1,$2,$3,$4) as id', [id,'Second class',20,[3]])).rows[0].id
+    const assigned = (await db.query('select student_id,batch_id from test_assignees where test_id=$1 order by student_id', [id])).rows
+    assert.deepEqual(assigned.map(row => Number(row.batch_id)), [Number(first), Number(first), Number(second)])
+    assert.equal((await db.query('select count(*)::int as n from test_attempts where test_id=$1 and submitted_at is not null', [id])).rows[0].n, 1)
+    await assert.rejects(db.query('select add_auto_test_batch($1,$2,$3,$4)', [id,'Duplicate',20,[3]]))
+    await act(id, 'start', null, null, 3)
+    await act(id, 'submit', {1:[1],2:[1],3:'wrong'}, 1, 3)
+    const review = (await db.query('select student_test_review(1,$1) as review', [id])).rows[0].review
+    assert.equal(review[0].correct_rate, 50)
+    assert.equal((await db.query('select count(*)::int as n from test_batches where test_id=$1', [id])).rows[0].n, 2)
+  })
   await t.test('partial multi-select and different subjective answers do not earn credit; zero is preserved', async () => {
     const id = await create()
     await act(id,'start')
@@ -223,9 +247,13 @@ test('PostgreSQL migration and exam lifecycle', async t => {
       await assert.rejects(db.query('select student_test_list(1)'))
       await assert.rejects(db.query('select student_test_review(1,1)'))
       await assert.rejects(db.query('select add_auto_test_assignees(1,array[3]::bigint[])'))
+      await assert.rejects(db.query("select add_auto_test_batch(1,'Other',null,array[3]::bigint[])"))
       await assert.rejects(db.query('select finalize_expired_tests()'))
       if (role==='anon') await assert.rejects(db.query('select * from test_questions'))
-      else assert.equal((await db.query('select * from test_questions')).rows.length,0)
+      else {
+        assert.equal((await db.query('select * from test_questions')).rows.length,0)
+        assert.equal((await db.query('select * from test_batches')).rows.length,0)
+      }
       await db.exec('reset role')
     }
     await db.query("select set_config('test.uid','11111111-1111-1111-1111-111111111111',false)")

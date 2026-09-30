@@ -73,7 +73,7 @@ export default function AutoTestStatus({ test, students, onPublished, onResults 
         {test.is_published ? '학생에게 공개 중' : '비공개'}
       </span>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <button className="ats-btn on" onClick={() => setAdding(true)}>응시자 추가</button>
+        <button className="ats-btn on" onClick={() => setAdding(true)}>회차 추가</button>
         <button className={`ats-btn ${test.is_published ? 'on' : 'off'}`} disabled={busy} onClick={publish}>
           {busy ? '변경 중...' : test.is_published ? '비공개로 전환' : '학생에게 공개'}
         </button>

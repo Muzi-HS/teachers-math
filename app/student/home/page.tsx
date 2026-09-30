@@ -9,7 +9,6 @@ import { nextClassDate, formatClassDate } from '@/lib/nextClass'
 import TodayClassBanner from '@/components/TodayClassBanner'
 import StreakCouponPrompt from '@/components/StreakCouponPrompt'
 import GrowthIllustration from '@/components/streak-preview/GrowthIllustration'
-import { homeworkStatusLabel } from '@/lib/homework-status'
 import { IconCalendar, IconClipboard, IconInbox } from '@/components/icons'
 
 // 새 학생 시안(streak-preview/student-v2)의 정확한 색상을 그대로 사용한다 — 사이트 테마 토큰
@@ -161,11 +160,6 @@ export default function StudentHome() {
               </p>
             )}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 7, marginBottom: 12, padding: '9px 10px', borderRadius: 8, background: '#F6F8F4', fontSize: 11 }}>
-            <span style={{ color: tx2 }}>최근 수업기록</span>
-            <strong style={{ color: tx }}>{rec ? formatEventDate(rec.date) : '아직 없음'}</strong>
-            {rec && <span style={{ marginLeft: 'auto', color: rec.hw_rate === -2 ? re : accentText, fontWeight: 700 }}>{homeworkStatusLabel(rec.hw_rate)}</span>}
-          </div>
           <p style={{ whiteSpace: 'pre-line', fontSize: 14, lineHeight: 1.95, color: tx, margin: '0 0 4px', wordBreak: 'keep-all' }}>
             {rec?.homework || '등록된 숙제가 없습니다'}
           </p>
@@ -176,7 +170,7 @@ export default function StudentHome() {
           <button onClick={() => router.push('/student/records')} style={{
             width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: 48,
             border: 0, borderTop: `1px solid ${bd}`, background: 'none', color: linkText, fontSize: 11, fontFamily: 'inherit', cursor: 'pointer',
-          }}>관련 수업기록 보기 <span>→</span></button>
+          }}>수업기록 보기 <span>→</span></button>
         </section>
 
         <button onClick={() => router.push('/student/tests')} style={{

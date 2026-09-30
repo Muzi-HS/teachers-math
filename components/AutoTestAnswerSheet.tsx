@@ -5,6 +5,8 @@ import { ExamAttempt, GradedQuestion, isAnswerCorrect } from '@/lib/auto-grading
 
 type QuestionRow = { number: number; points: number; kind: 'choice' | 'text'; correct_answer: number[] | string }
 type Student = { id: number; name: string; school?: string }
+type TestBatch = { id: number; round_number: number; name: string }
+type Assignee = { student_id: number; batch_id: number | null }
 
 const navy = 'var(--ui-primary)', gold = 'var(--ui-primary)', bd = 'var(--ui-border)', bg = 'var(--ui-bg)'
 const tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)', gr = 'var(--ui-success)', gbg = 'var(--ui-success-bg)', re = 'var(--ui-danger)', rbg = 'var(--ui-danger-bg)'
@@ -16,7 +18,9 @@ function fmtAnswer(kind: 'choice' | 'text', value: string | number[] | undefined
 
 export default function AutoTestAnswerSheet({ testId, students }: { testId: number; students: Student[] }) {
   const [questions, setQuestions] = useState<QuestionRow[]>([])
-  const [assigneeIds, setAssigneeIds] = useState<number[]>([])
+  const [assignees, setAssignees] = useState<Assignee[]>([])
+  const [batches, setBatches] = useState<TestBatch[]>([])
+  const [batchId, setBatchId] = useState<number | null>(null)
   const [attempts, setAttempts] = useState<ExamAttempt[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -26,16 +30,18 @@ export default function AutoTestAnswerSheet({ testId, students }: { testId: numb
     let cancelled = false
     async function load(showLoading: boolean) {
       if (showLoading) setLoading(true)
-      const [q, s, a] = await Promise.all([
+      const [q, s, a, b] = await Promise.all([
         supabase.from('test_questions').select('number,points,kind,correct_answer').eq('test_id', testId).order('number'),
-        supabase.from('test_assignees').select('student_id').eq('test_id', testId),
+        supabase.from('test_assignees').select('student_id,batch_id').eq('test_id', testId),
         supabase.from('test_attempts').select('*').eq('test_id', testId),
+        supabase.from('test_batches').select('id,round_number,name').eq('test_id', testId).order('round_number'),
       ])
       if (cancelled) return
-      if (q.error || s.error || a.error) { setError('정오표 데이터를 불러오지 못했습니다.'); setLoading(false); return }
+      if (q.error || s.error || a.error || b.error) { setError('회차별 정오표를 불러오지 못했습니다. test_batches_migration.sql 적용 여부를 확인해 주세요.'); setLoading(false); return }
       setError('')
       setQuestions(q.data ?? [])
-      setAssigneeIds((s.data ?? []).map(row => row.student_id))
+      setAssignees(s.data ?? [])
+      setBatches(b.data ?? [])
       setAttempts(a.data ?? [])
       setLoading(false)
     }
@@ -45,14 +51,23 @@ export default function AutoTestAnswerSheet({ testId, students }: { testId: numb
   }, [testId])
 
   const gradedQuestions: GradedQuestion[] = questions.map(q => ({ number: q.number, points: q.points, kind: q.kind, correctAnswer: q.correct_answer }))
-  const submitted = attempts.filter(a => a.submitted_at)
+  const batchByStudent = new Map(assignees.map(row => [row.student_id, row.batch_id]))
+  function batchSummary(targetBatchId: number | null) {
+    const rows = attempts.filter(a => a.submitted_at && (targetBatchId === null || batchByStudent.get(a.student_id) === targetBatchId))
+    const correct = rows.reduce((sum, attempt) => sum + gradedQuestions.filter(q => isAnswerCorrect(q, attempt.answers[String(q.number)])).length, 0)
+    const possible = rows.length * gradedQuestions.length
+    return possible ? `${Math.round(correct / possible * 100)}%` : '제출 전'
+  }
+  const batchStudentIds = new Set(assignees.filter(row => batchId === null || row.batch_id === batchId).map(row => row.student_id))
+  const submitted = attempts.filter(a => a.submitted_at && batchStudentIds.has(a.student_id))
+  const cumulativeSubmitted = attempts.filter(a => a.submitted_at)
   const questionStats = gradedQuestions.map(q => {
     const correct = submitted.filter(a => isAnswerCorrect(q, a.answers[String(q.number)])).length
     return { ...q, total: submitted.length, correct, pct: submitted.length > 0 ? Math.round(correct / submitted.length * 100) : 0 }
   })
 
   const attemptByStudent = new Map(attempts.map(a => [a.student_id, a]))
-  const roster = assigneeIds
+  const roster = [...batchStudentIds]
     .map(id => students.find(s => s.id === id) ?? { id, name: `학생 ${id}` })
     .sort((a, b) => a.name.localeCompare(b.name, 'ko'))
   const selectedStudent = selected != null ? roster.find(s => s.id === selected) : null
@@ -65,8 +80,19 @@ export default function AutoTestAnswerSheet({ testId, students }: { testId: numb
     <style>{css}</style>
 
     <div className="ans-head">
+      <h3>회차별 결과</h3>
+      <span className="ans-badge">누적 제출 {cumulativeSubmitted.length}명</span>
+    </div>
+    <div className="ans-roster" role="group" aria-label="결과 회차 선택">
+      <button type="button" className="ans-chip" data-active={batchId === null} onClick={() => { setBatchId(null); setSelected(null) }}>전체 누적 · {batchSummary(null)}</button>
+      {batches.map(batch => <button type="button" key={batch.id} className="ans-chip" data-active={batchId === batch.id} onClick={() => { setBatchId(batch.id); setSelected(null) }}>
+        {batch.round_number}회차 · {batch.name} · {batchSummary(batch.id)}
+      </button>)}
+    </div>
+
+    <div className="ans-head">
       <h3>문항별 정답률</h3>
-      <span className="ans-badge">제출 {submitted.length}명 기준</span>
+      <span className="ans-badge">{batchId === null ? '누적' : '선택 회차'} 제출 {submitted.length}명 기준</span>
     </div>
     {submitted.length === 0 ? (
       <p className="ans-empty">아직 채점된 제출이 없습니다.</p>
