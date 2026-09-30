@@ -6,7 +6,8 @@ export type ExamAttempt = {
   submitted_at: string | null; answers: ExamAnswers; revision: number
   cor: number | null; score: number | null; earned_points: number | null; total_points: number | null
 }
-export type ExamState = { server_now: string; name: string; attempt: ExamAttempt; questions: ExamQuestion[] }
+export type ExamReviewQuestion = { number: number; correct_answer: number[] | string; correct_count: number; submitted_count: number; correct_rate: number }
+export type ExamState = { server_now: string; name: string; attempt: ExamAttempt; questions: ExamQuestion[]; review?: ExamReviewQuestion[]; review_error?: string }
 export type StudentExam = { id: number; name: string; date: string; total: number; is_published: boolean; attempt: ExamAttempt | null }
 export function toggleChoice(current: number[], value: number, multiple = true) {
   return current.includes(value) ? current.filter(x => x !== value) : (multiple ? [...current, value].sort((a,b) => a-b) : [value])

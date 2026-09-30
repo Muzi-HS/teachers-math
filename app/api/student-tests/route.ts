@@ -58,6 +58,16 @@ export async function POST(req: NextRequest) {
       p_answers: answers ?? null, p_revision: revision ?? null,
     })
     if (error) return response({ error: error.code === 'P0001' ? error.message : '시험 처리에 실패했습니다. 다시 시도하세요.' }, 409)
+    if (data?.attempt?.submitted_at) {
+      const { data: review, error: reviewError } = await db.rpc('student_test_review', {
+        p_student_id: studentId, p_test_id: testId,
+      })
+      if (reviewError) {
+        console.error('[student-tests review]', reviewError)
+        return response({ ...data, review_error: '채점은 완료됐지만 정오표를 불러오지 못했습니다. 잠시 후 결과 보기를 다시 눌러 주세요.' })
+      }
+      return response({ ...data, review })
+    }
     return response(data)
   } catch (error) { return errorResponse(error) }
 }

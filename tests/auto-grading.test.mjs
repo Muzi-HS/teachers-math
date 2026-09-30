@@ -75,6 +75,9 @@ test('PostgreSQL migration and exam lifecycle', async t => {
   const migration = readFileSync(new URL('../supabase/auto_grading_migration.sql', import.meta.url), 'utf8')
   await db.exec(migration)
   await db.exec(migration) // SQL Editor reruns must remain safe.
+  const reviewMigration = readFileSync(new URL('../supabase/test_review_and_late_assignees_migration.sql', import.meta.url), 'utf8')
+  await db.exec(reviewMigration)
+  await db.exec(reviewMigration)
   const listIndexes = readFileSync(new URL('../supabase/student_test_list_indexes_migration.sql', import.meta.url), 'utf8')
   await db.exec(listIndexes)
   await db.exec(listIndexes)
@@ -150,6 +153,27 @@ test('PostgreSQL migration and exam lifecycle', async t => {
     const item = (await db.query('select * from record_test_items where test_id=$1',[id])).rows[0]
     assert.equal(item.t_score,100); assert.equal(item.t_cor,3); assert.equal(item.t_total,3)
   })
+  await t.test('late assignees retain earlier scores and review rates include both classes', async () => {
+    const id = await create()
+    await assert.rejects(db.query('select student_test_review(1,$1)', [id]))
+    await act(id, 'start', null, null, 1)
+    await assert.rejects(db.query('select student_test_review(1,$1)', [id]))
+    await act(id, 'submit', {1:[2], 2:[3,1], 3:'x = 2'}, 1, 1)
+    const firstReview = (await db.query('select student_test_review(1,$1) as review', [id])).rows[0].review
+    assert.equal(firstReview[0].correct_rate, 100)
+    assert.deepEqual(firstReview[1].correct_answer, [1,3])
+    assert.equal((await db.query('select add_auto_test_assignees($1,$2) as added', [id,[2,3]])).rows[0].added, 1)
+    assert.equal((await db.query('select add_auto_test_assignees($1,$2) as added', [id,[3]])).rows[0].added, 0)
+    assert.equal((await act(id, 'start', null, null, 3)).attempt.student_id, 3)
+    await act(id, 'submit', {1:[2], 2:[1], 3:'wrong'}, 1, 3)
+    const review = (await db.query('select student_test_review(1,$1) as review', [id])).rows[0].review
+    assert.equal(review[0].correct_rate, 100)
+    assert.equal(review[1].correct_rate, 50)
+    assert.equal(review[2].correct_rate, 50)
+    assert.equal(review[1].submitted_count, 2)
+    assert.equal((await db.query('select count(*)::int as count from test_scores where test_id=$1', [id])).rows[0].count, 2)
+    await assert.rejects(db.query('select student_test_review(2,$1)', [id]))
+  })
   await t.test('partial multi-select and different subjective answers do not earn credit; zero is preserved', async () => {
     const id = await create()
     await act(id,'start')
@@ -197,6 +221,8 @@ test('PostgreSQL migration and exam lifecycle', async t => {
     for (const role of ['anon','authenticated']) {
       await db.exec(`set role ${role}; select set_config('test.uid','',false);`)
       await assert.rejects(db.query('select student_test_list(1)'))
+      await assert.rejects(db.query('select student_test_review(1,1)'))
+      await assert.rejects(db.query('select add_auto_test_assignees(1,array[3]::bigint[])'))
       await assert.rejects(db.query('select finalize_expired_tests()'))
       if (role==='anon') await assert.rejects(db.query('select * from test_questions'))
       else assert.equal((await db.query('select * from test_questions')).rows.length,0)

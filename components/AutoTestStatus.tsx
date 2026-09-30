@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { ExamAttempt } from '@/lib/auto-grading'
 import { EditableTest } from './TestEditorModal'
+import AddTestAssigneesModal from './AddTestAssigneesModal'
 
 const navy = 'var(--ui-primary)', gold = 'var(--ui-primary)', bd = 'var(--ui-border)', bg = 'var(--ui-bg)'
 const tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)', gr = 'var(--ui-success)', gbg = 'var(--ui-success-bg)', re = 'var(--ui-danger)'
@@ -15,6 +16,7 @@ export default function AutoTestStatus({ test, students, onPublished, onResults 
   const [attempts, setAttempts] = useState<ExamAttempt[]>([])
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [adding, setAdding] = useState(false)
   const callback = useRef(onResults)
   useEffect(() => { callback.current = onResults }, [onResults])
   useEffect(() => {
@@ -70,9 +72,12 @@ export default function AutoTestStatus({ test, students, onPublished, onResults 
         <span className="ats-dot" style={{ background: test.is_published ? gr : tx3 }} />
         {test.is_published ? '학생에게 공개 중' : '비공개'}
       </span>
-      <button className={`ats-btn ${test.is_published ? 'on' : 'off'}`} disabled={busy} onClick={publish}>
-        {busy ? '변경 중...' : test.is_published ? '비공개로 전환' : '학생에게 공개'}
-      </button>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button className="ats-btn on" onClick={() => setAdding(true)}>응시자 추가</button>
+        <button className={`ats-btn ${test.is_published ? 'on' : 'off'}`} disabled={busy} onClick={publish}>
+          {busy ? '변경 중...' : test.is_published ? '비공개로 전환' : '학생에게 공개'}
+        </button>
+      </div>
     </div>
 
     <div className="ats-stats">
@@ -97,5 +102,8 @@ export default function AutoTestStatus({ test, students, onPublished, onResults 
         {label} · {a?.submitted_at ? `${a.score}점` : a ? '응시 중' : '미응시'}
       </span>
     })}</div>
+    {adding && <AddTestAssigneesModal testId={test.id} students={students} assignedIds={ids} onClose={() => setAdding(false)} onSaved={added => {
+      setIds(current => [...new Set([...current, ...added])]); setAdding(false)
+    }} />}
   </section>
 }

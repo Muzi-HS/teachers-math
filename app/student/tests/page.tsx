@@ -2,7 +2,12 @@
 /* eslint-disable react-hooks/purity -- Clock reads only run in event/response handlers and timer callbacks, never during render. */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
-import { ExamAnswers, ExamState, StudentExam, remainingSeconds, toggleChoice } from '@/lib/auto-grading'
+import { ExamAnswers, ExamState, StudentExam, isAnswerCorrect, remainingSeconds, toggleChoice } from '@/lib/auto-grading'
+
+function displayAnswer(value: string | number[] | undefined) {
+  if (Array.isArray(value)) return value.length ? value.join(', ') : '미응답'
+  return value?.trim() || '미응답'
+}
 
 export default function StudentTestsPage() {
   const { student } = useAuth()
@@ -209,6 +214,9 @@ export default function StudentTestsPage() {
       .student-exams .exam-result{text-align:center;padding:30px 20px}
       .student-exams .exam-result-score{font-size:52px;font-weight:800;color:var(--ui-primary);margin:4px 0}
       .student-exams .exam-result-badge{display:inline-block;background:var(--ui-success-bg);color:var(--ui-success);font-size:13px;font-weight:700;padding:5px 14px;border-radius:20px;margin-bottom:10px}
+      .student-exams .exam-review{text-align:left;margin-top:24px}
+      .student-exams .exam-review-item{border:1px solid var(--ui-border);border-radius:12px;padding:14px;margin-top:10px}
+      .student-exams .exam-review-item p{margin:6px 0 0;overflow-wrap:anywhere}
     `}</style>
     <h1>{active ? active.name : '시험 답안 입력'}</h1>
     {error && <p className="exam-error" role="alert">{error}</p>}
@@ -241,6 +249,26 @@ export default function StudentTestsPage() {
       <p className="exam-result-score">{active.attempt.score}점</p>
       <p style={{ color: 'var(--ui-text-2)' }}>정답 {active.attempt.cor}/{active.questions.length}개 · 획득 배점 {active.attempt.earned_points}/{active.attempt.total_points}점</p>
       <p style={{ color: 'var(--ui-text-3)', fontSize: 12 }}>점수는 100점 만점으로 환산되어 저장되었습니다.</p>
+      {active.review_error && <p className="exam-error" role="alert">{active.review_error}</p>}
+      {active.review && <div className="exam-review">
+        <h2 style={{ fontSize: 16, margin: '0 0 8px' }}>정오표</h2>
+        <p style={{ color: 'var(--ui-text-3)', margin: 0 }}>문항별 정답률은 현재까지 제출한 학생 기준이며, 이후 제출에 따라 달라집니다.</p>
+        {active.questions.map(q => {
+          const review = active.review?.find(row => row.number === q.number)
+          if (!review) return null
+          const mine = active.attempt.answers[q.number]
+          const correct = isAnswerCorrect({ ...q, correctAnswer: review.correct_answer }, mine)
+          return <div className="exam-review-item" key={q.number}>
+            <div className="exam-row">
+              <strong>{q.number}번 <span style={{ color: correct ? 'var(--ui-success)' : 'var(--ui-danger)' }}>{correct ? '정답' : '오답'}</span></strong>
+              <span style={{ fontSize: 12, color: 'var(--ui-text-2)' }}>정답률 {review.correct_rate}% ({review.correct_count}/{review.submitted_count}명)</span>
+            </div>
+            <p>내 답: {displayAnswer(mine)}</p>
+            <p>정답: {displayAnswer(review.correct_answer)}</p>
+            <p style={{ color: 'var(--ui-text-3)', fontSize: 12 }}>배점 {q.points}점</p>
+          </div>
+        })}
+      </div>}
       <button className="exam-primary" style={{ marginTop: 10 }} onClick={() => { setActive(null); activeRef.current = null; void load() }}>시험 목록으로</button>
     </section> : <>
       <div className="exam-clock">
