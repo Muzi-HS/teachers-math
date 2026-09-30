@@ -226,19 +226,15 @@ export default function StudentTestsPage() {
       .student-exams .exam-review{text-align:left;margin-top:24px}
       .student-exams .exam-review-controls{display:flex;gap:7px;margin:12px 0}
       .student-exams .exam-review-controls button{padding:6px 12px}
-      .student-exams .exam-review-list{border:1px solid var(--ui-border);border-radius:10px;overflow:hidden}
-      .student-exams .exam-review-item{border-bottom:1px solid var(--ui-border);background:#fff}
-      .student-exams .exam-review-item:last-child{border-bottom:0}
-      .student-exams .exam-review-item[data-correct=false]{background:var(--ui-danger-bg)}
-      .student-exams .exam-review-item summary{display:grid;grid-template-columns:44px 46px minmax(0,1fr) 50px 12px;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;list-style:none;font-size:12px}
-      .student-exams .exam-review-item summary::-webkit-details-marker{display:none}
-      .student-exams .exam-review-item summary::after{content:'⌄';grid-column:5;grid-row:1;justify-self:end;color:var(--ui-text-3)}
-      .student-exams .exam-review-rate{text-align:right;white-space:nowrap;color:var(--ui-text-2)}
-      .student-exams .exam-review-bar{height:6px;background:var(--ui-border);border-radius:99px;overflow:hidden}
-      .student-exams .exam-review-bar span{display:block;height:100%;background:var(--ui-primary)}
-      .student-exams .exam-review-detail{padding:0 12px 12px;font-size:12px;line-height:1.6;border-top:1px solid var(--ui-border)}
-      .student-exams .exam-review-detail p{margin:7px 0 0;overflow-wrap:anywhere}
-      @media(max-width:420px){.student-exams .exam-review-item summary{grid-template-columns:38px 40px minmax(0,1fr) 42px 10px;gap:5px;padding:10px 8px}}
+      .student-exams .exam-review-table{width:100%;table-layout:fixed;border-collapse:separate;border-spacing:0;border:1px solid var(--ui-border);border-radius:10px;overflow:hidden;font-size:12px;line-height:1.5}
+      .student-exams .exam-review-table th,.student-exams .exam-review-table td{padding:10px 7px;border-bottom:1px solid var(--ui-border);text-align:left;vertical-align:top;overflow-wrap:anywhere;white-space:pre-wrap}
+      .student-exams .exam-review-table th{background:var(--ui-surface-2,#f6f8f6);font-weight:700}
+      .student-exams .exam-review-table tbody tr:last-child td{border-bottom:0}
+      .student-exams .exam-review-table tbody tr[data-correct=false]{background:var(--ui-danger-bg)}
+      .student-exams .exam-review-table .exam-review-result{font-weight:700}
+      .student-exams .exam-review-table tr[data-correct=true] .exam-review-result{color:var(--ui-success)}
+      .student-exams .exam-review-table tr[data-correct=false] .exam-review-result{color:var(--ui-danger)}
+      @media(max-width:420px){.student-exams .exam-review-table{font-size:11px}.student-exams .exam-review-table th,.student-exams .exam-review-table td{padding:9px 4px}}
     `}</style>
     <h1>{active ? active.name : '시험 답안 입력'}</h1>
     {error && <p className="exam-error" role="alert">{error}</p>}
@@ -279,24 +275,22 @@ export default function StudentTestsPage() {
           <button type="button" aria-pressed={reviewFilter === 'all'} onClick={() => setReviewFilter('all')}>전체 {reviewRows.length}</button>
           <button type="button" aria-pressed={reviewFilter === 'wrong'} onClick={() => setReviewFilter('wrong')}>오답만 {wrongCount}</button>
         </div>
-        <div className="exam-review-list">
-          {reviewRows.filter(row => reviewFilter === 'all' || !row.correct).map(({ question, review, mine, correct }) =>
-            <details className="exam-review-item" data-correct={correct} key={question.number}>
-              <summary>
-                <strong>{question.number}번</strong>
-                <strong style={{ color: correct ? 'var(--ui-success)' : 'var(--ui-danger)' }}>{correct ? '정답' : '오답'}</strong>
-                <span className="exam-review-bar" aria-hidden="true"><span style={{ width: `${review.correct_rate}%` }} /></span>
-                <span className="exam-review-rate">{review.correct_rate}%</span>
-              </summary>
-              <div className="exam-review-detail">
-                <p>내 답: {displayAnswer(mine)}</p>
-                <p>정답: {displayAnswer(review.correct_answer)}</p>
-                <p>배점 {question.points}점 · {review.correct_count}/{review.submitted_count}명 정답</p>
-              </div>
-            </details>
-          )}
-          {reviewFilter === 'wrong' && wrongCount === 0 && <p style={{ padding: 12, margin: 0 }}>오답이 없습니다.</p>}
-        </div>
+        {reviewFilter === 'wrong' && wrongCount === 0 ? <p>오답이 없습니다.</p> :
+          <table className="exam-review-table">
+            <colgroup><col style={{ width: '15%' }} /><col style={{ width: '23%' }} /><col style={{ width: '23%' }} /><col style={{ width: '21%' }} /><col style={{ width: '18%' }} /></colgroup>
+            <thead><tr><th scope="col">문제 번호</th><th scope="col">정답</th><th scope="col">내가 쓴 답</th><th scope="col">정답 여부</th><th scope="col">정답률</th></tr></thead>
+            <tbody>
+              {reviewRows.filter(row => reviewFilter === 'all' || !row.correct).map(({ question, review, mine, correct }) =>
+                <tr data-correct={correct} key={question.number}>
+                  <td>{question.number}번</td>
+                  <td>{displayAnswer(review.correct_answer)}</td>
+                  <td>{displayAnswer(mine)}</td>
+                  <td className="exam-review-result">{correct ? '정답' : '오답'}</td>
+                  <td>{review.correct_rate}%</td>
+                </tr>
+              )}
+            </tbody>
+          </table>}
       </div>}
       <button className="exam-primary" style={{ marginTop: 10 }} onClick={() => { setActive(null); activeRef.current = null; void load() }}>시험 목록으로</button>
     </section> : <>
