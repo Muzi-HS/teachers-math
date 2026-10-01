@@ -8,9 +8,10 @@ import { useMobileMode } from '@/context/MobileModeContext'
 import { useAuth } from '@/context/AuthContext'
 import { useDraftProtection } from '@/components/ui/useDraftProtection'
 import DraftNotice from '@/components/ui/DraftNotice'
+import RecordTestPicker, { RecordTestOption } from '@/components/RecordTestPicker'
 
 type Student = { id: number; name: string; school?: string }
-type Test = { id: number; name: string; date: string; total: number }
+type Test = RecordTestOption
 type TestItem = { testId: number | null; tTotal: number; tCor: number; tScore: number | null; autoGraded?: boolean; scoreLoading?: boolean; lookupToken?: number; hasSavedScore?: boolean }
 type RecForm = {
   student_id: number; content: string; homework: string
@@ -524,10 +525,7 @@ export default function ClassBulkRecordModal({
                         <div key={idx} style={{ background: bg, borderRadius: 8, padding: 10, marginBottom: 6, position: 'relative' }}>
                           <button className="bcr-bdng" style={{ position: 'absolute', top: 6, right: 6, padding: '2px 7px' }} onClick={() => removeBulkTestItem(sid, idx)}><IconX size={10} /></button>
                           <div className="bcr-fg" style={{ marginBottom: 6 }}>
-                            <select className="bcr-fsel bcr-fi-sm" value={item.testId || ''} onChange={e => setBulkTestItem(sid, idx, 'testId', parseInt(e.target.value) || null)}>
-                              <option value="">테스트 선택</option>
-                              {tests.map(t => <option key={t.id} value={t.id}>{t.name} ({t.date}, {t.total}문항)</option>)}
-                            </select>
+                            <RecordTestPicker tests={tests} value={item.testId} onChange={id => setBulkTestItem(sid, idx, 'testId', id)} />
                           </div>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
                             <div className="bcr-fg"><label className="bcr-lb" style={{ fontSize: 10 }}>총 문제 수</label><input type="number" className="bcr-fi bcr-fi-sm" value={item.tTotal || ''} readOnly placeholder="자동입력" /></div>

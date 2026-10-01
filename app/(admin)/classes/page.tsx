@@ -17,7 +17,7 @@ type Class = { id: number; name: string; days: string; time: string; mode?: stri
 type ClassStaff = { user_id: string; name: string; role: 'teacher' | 'assistant' }
 type ClassAssignment = { class_id: number; teacher_user_id: string }
 type Student = { id: number; name: string; birth_year: number; school: string; parent_phone?: string }
-type Test = { id: number; name: string; date: string; total: number }
+type Test = { id: number; name: string; date: string; total: number; is_archived?: boolean }
 type TestItem = { testId: number | null; tTotal: number; tCor: number; tScore: number }
 type RecForm = {
   student_id: number; content: string; homework: string
@@ -159,7 +159,7 @@ export default function ClassesPage() {
       supabase.from('students').select('id,name,birth_year,school,parent_phone').order('name'),
       supabase.from('class_students').select('class_id,student_id'),
       supabase.from('records').select('student_id,class_id').eq('is_draft', false),
-      supabase.from('tests').select('id,name,date,total').order('date', { ascending: false }),
+      supabase.from('tests').select('id,name,date,total,is_archived').order('date', { ascending: false }),
     ])
     const visibleClasses = role === 'admin' ? (c ?? []) : (c ?? []).filter(item => allowedClassIds.has(item.id))
     const visibleClassIds = new Set(visibleClasses.map(item => item.id))

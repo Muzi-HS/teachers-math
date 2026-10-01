@@ -10,7 +10,7 @@ import TestEditorModal from '@/components/TestEditorModal'
 import AutoTestStatus from '@/components/AutoTestStatus'
 import AutoTestAnswerSheet from '@/components/AutoTestAnswerSheet'
 
-type Test = { id:number; name:string; date:string; total:number; auto_grading?:boolean; is_published?:boolean }
+type Test = { id:number; name:string; date:string; total:number; auto_grading?:boolean; is_published?:boolean; is_archived?:boolean }
 type ScoreRow = {
   id:number; test_id:number; student_id:number; cor:number; score:number
   students?:{ name:string; school:string }|null
@@ -36,6 +36,7 @@ export default function TestsPage() {
   const [curTest,   setCurTest]   = useState<Test|null>(null)
   const [loading,   setLoading]   = useState(true)
   const [search,    setSearch]    = useState('')
+  const [showArchived, setShowArchived] = useState(false)
   const [addModal,  setAddModal]  = useState(false)
   const [editId,    setEditId]    = useState<number|null>(null)
   const [editSc,    setEditSc]    = useState<{row:ScoreRow;cor:string;score:string}|null>(null)
@@ -187,6 +188,17 @@ export default function TestsPage() {
     toast(t.name+' 삭제됨',false)
     await fetchAll()
   }
+  async function toggleArchive(t:Test, e:React.MouseEvent) {
+    e.stopPropagation()
+    const archived = !t.is_archived
+    const { error } = await supabase.rpc('set_test_archived', { p_test_id: t.id, p_archived: archived })
+    if (error) return toast('보관 상태 변경 실패: ' + error.message, false)
+    setTests(current => current.map(test => test.id === t.id
+      ? { ...test, is_archived: archived, is_published: archived && test.auto_grading ? false : test.is_published }
+      : test))
+    if (curTest?.id === t.id) setCurTest(current => current ? { ...current, is_archived: archived, is_published: archived && current.auto_grading ? false : current.is_published } : null)
+    toast(archived ? '시험을 보관했습니다.' : '시험을 다시 사용합니다.')
+  }
 
   function openEditSc(sc: ScoreRow) {
     if (curTest?.auto_grading) return
@@ -234,7 +246,7 @@ export default function TestsPage() {
   function prevCal(){ if(calMonth===0){setCalYear(y=>y-1);setCalMonth(11)}else setCalMonth(m=>m-1); setSelDate(null) }
   function nextCal(){ if(calMonth===11){setCalYear(y=>y+1);setCalMonth(0)}else setCalMonth(m=>m+1); setSelDate(null) }
 
-  const testDateSet = new Set(tests.map(t=>t.date))
+  const testDateSet = new Set(tests.filter(t=>!!t.is_archived===showArchived).map(t=>t.date))
   const firstDow    = new Date(calYear, calMonth, 1).getDay()
   const daysInMonth = new Date(calYear, calMonth+1, 0).getDate()
   const calCells: (number|null)[] = [...Array(firstDow).fill(null), ...Array.from({length:daysInMonth},(_,i)=>i+1)]
@@ -242,6 +254,7 @@ export default function TestsPage() {
   const DOW = ['일','월','화','수','목','금','토']
 
   const filtered = tests.filter(t=>{
+    if (!!t.is_archived !== showArchived) return false
     const nameMatch = !search || t.name.includes(search)
     const dateMatch = !selDate || t.date===selDate
     return nameMatch && dateMatch
@@ -374,6 +387,10 @@ export default function TestsPage() {
               {selDate&&<button onClick={()=>setSelDate(null)} style={{fontSize:12,color:tx2,background:'none',border:`1px solid ${bd}`,borderRadius:8,padding:'6px 12px',cursor:'pointer',fontFamily:'inherit',flexShrink:0}}>전체 보기</button>}
               <span style={{fontSize:12,color:tx3,flexShrink:0}}>{filtered.length}개</span>
             </div>
+            <div style={{display:'flex',gap:7,marginBottom:12}} role="group" aria-label="시험 보관 상태">
+              <button className="bout" style={!showArchived?{borderColor:navy,color:navy,background:navyM}:undefined} onClick={()=>{setShowArchived(false);setSelDate(null)}}>사용 중</button>
+              <button className="bout" style={showArchived?{borderColor:navy,color:navy,background:navyM}:undefined} onClick={()=>{setShowArchived(true);setSelDate(null)}}>보관됨</button>
+            </div>
 
             {loading?(
               <p style={{color:tx3,fontSize:13}}>불러오는 중...</p>
@@ -389,7 +406,7 @@ export default function TestsPage() {
                 {filtered.length===0?(
                   <div style={{padding:'50px 0',textAlign:'center',color:tx3}}>
                     <p style={{marginBottom:8,display:'flex',justifyContent:'center'}}><IconClipboard size={28} /></p>
-                    <p style={{fontSize:14}}>{selDate?'이 날짜에 테스트가 없습니다':'등록된 테스트가 없습니다'}</p>
+                    <p style={{fontSize:14}}>{selDate?'이 날짜에 테스트가 없습니다':showArchived?'보관된 테스트가 없습니다':'등록된 테스트가 없습니다'}</p>
                   </div>
                 ):filtered.map((t,idx)=>{
                   const stat=testStats[t.id]
@@ -419,6 +436,7 @@ export default function TestsPage() {
                       {canManageTests&&(
                         <div style={{display:'flex',gap:5,flexShrink:0}} onClick={e=>e.stopPropagation()}>
                           <button className="bout" onClick={e=>openEdit(t,e)}>편집</button>
+                          <button className="bout" onClick={e=>{void toggleArchive(t,e)}}>{t.is_archived?'복원':'보관'}</button>
                           <button className="bdng" onClick={e=>delTest(t,e)}>삭제</button>
                         </div>
                       )}

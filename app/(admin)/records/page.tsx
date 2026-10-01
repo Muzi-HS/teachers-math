@@ -13,7 +13,7 @@ import AdminTestResultCard from '@/components/AdminTestResultCard'
 
 type Student = { id: number; name: string; parent_phone: string }
 type Class_ = { id: number; name: string }
-type Test = { id: number; name: string; date: string; total: number }
+type Test = { id: number; name: string; date: string; total: number; is_archived?: boolean }
 type Rec = {
   id: number; student_id: number; date: string; class_id: number | null
   content: string; homework: string
@@ -128,7 +128,7 @@ export default function RecordsPage() {
       supabase.from('students').select('id,name,parent_phone').order('name'),
       supabase.from('classes').select('id,name').order('name'),
       supabase.from('class_students').select('student_id,class_id').order('class_id'),
-      supabase.from('tests').select('id,name,date,total').order('date', { ascending: false }),
+      supabase.from('tests').select('id,name,date,total,is_archived').order('date', { ascending: false }),
     ])
     const visibleClasses = role === 'admin' ? (c ?? []) : (c ?? []).filter(item => allowedIds.has(item.id))
     const visibleClassIds = new Set(visibleClasses.map(item => item.id))
