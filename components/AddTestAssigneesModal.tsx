@@ -76,7 +76,7 @@ export default function AddTestAssigneesModal({ testId, students, assignedIds, o
     <section className="add-exam-modal" role="dialog" aria-modal="true" aria-label="새 회차 만들기" onClick={event => event.stopPropagation()}>
       <header><strong>새 회차 만들기</strong><button type="button" onClick={onClose} aria-label="닫기">×</button></header>
       <div className="add-exam-body">
-        <p style={{ fontSize: 12, color: 'var(--ui-text-2)', lineHeight: 1.6, margin: 0 }}>새 회차의 대상 학생을 선택하세요. 기존 응시 결과는 유지되고, 공개 중인 시험은 새 학생에게 바로 보입니다.</p>
+        <p style={{ fontSize: 12, color: 'var(--ui-text-2)', lineHeight: 1.6, margin: 0 }}>새 회차의 대상 학생을 선택하세요. 기존 응시 결과는 유지됩니다. 새 회차의 답안 입력은 선생님이 별도로 열 때 시작됩니다.</p>
         {loading ? <p>불러오는 중...</p> : <>
           <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginTop: 14 }}>회차 이름
             <input value={batchName} maxLength={100} onChange={event => setBatchName(event.target.value)} placeholder="예: 월금A-2" style={{ display: 'block', width: '100%', boxSizing: 'border-box', padding: 10, marginTop: 5, fontSize: 16, border: '1px solid var(--ui-border)', borderRadius: 8 }} />

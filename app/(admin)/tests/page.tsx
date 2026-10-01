@@ -193,10 +193,8 @@ export default function TestsPage() {
     const archived = !t.is_archived
     const { error } = await supabase.rpc('set_test_archived', { p_test_id: t.id, p_archived: archived })
     if (error) return toast('보관 상태 변경 실패: ' + error.message, false)
-    setTests(current => current.map(test => test.id === t.id
-      ? { ...test, is_archived: archived, is_published: archived && test.auto_grading ? false : test.is_published }
-      : test))
-    if (curTest?.id === t.id) setCurTest(current => current ? { ...current, is_archived: archived, is_published: archived && current.auto_grading ? false : current.is_published } : null)
+    setTests(current => current.map(test => test.id === t.id ? { ...test, is_archived: archived } : test))
+    if (curTest?.id === t.id) setCurTest(current => current ? { ...current, is_archived: archived } : null)
     toast(archived ? '시험을 보관했습니다.' : '시험을 다시 사용합니다.')
   }
 
@@ -388,8 +386,8 @@ export default function TestsPage() {
               <span style={{fontSize:12,color:tx3,flexShrink:0}}>{filtered.length}개</span>
             </div>
             <div style={{display:'flex',gap:7,marginBottom:12}} role="group" aria-label="시험 보관 상태">
-              <button className="bout" style={!showArchived?{borderColor:navy,color:navy,background:navyM}:undefined} onClick={()=>{setShowArchived(false);setSelDate(null)}}>사용 중</button>
-              <button className="bout" style={showArchived?{borderColor:navy,color:navy,background:navyM}:undefined} onClick={()=>{setShowArchived(true);setSelDate(null)}}>보관됨</button>
+              <button className="bout" style={!showArchived?{borderColor:navy,color:navy,background:navyM}:undefined} onClick={()=>{setShowArchived(false);setSelDate(null);setSearch('')}}>사용 중</button>
+              <button className="bout" style={showArchived?{borderColor:navy,color:navy,background:navyM}:undefined} onClick={()=>{setShowArchived(true);setSelDate(null);setSearch('')}}>보관됨</button>
             </div>
 
             {loading?(
@@ -422,7 +420,7 @@ export default function TestsPage() {
                         <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke={navy} strokeWidth={2}><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2"/></svg>
                       </div>
                       <div style={{flex:1}}>
-                        <p style={{fontSize:13,fontWeight:600,color:tx,margin:0}}>{t.name} {t.auto_grading && <span style={{fontSize:11,color:gr}}>자동채점 · {t.is_published?'공개':'비공개'}</span>}</p>
+                        <p style={{fontSize:13,fontWeight:600,color:tx,margin:0}}>{t.name} {t.auto_grading && <span style={{fontSize:11,color:gr}}>자동채점</span>}</p>
                         <p style={{fontSize:11,color:tx3,margin:0}}>{t.date} · {t.total}문항 · 응시 {stat?.cnt??0}명</p>
                       </div>
                       {hasData?(
@@ -478,10 +476,8 @@ export default function TestsPage() {
           <div/>
         </div>
 
-        {curTest.auto_grading && <AutoTestStatus test={curTest} students={students} onPublished={value => {
-          setCurTest(t => t ? {...t,is_published:value} : t)
-          setTests(ts => ts.map(t => t.id===curTest.id ? {...t,is_published:value} : t))
-        }} onResults={() => { void fetchScores(curTest.id); void fetchAllStats() }} />}
+        {curTest.auto_grading && <AutoTestStatus test={curTest} students={students}
+          onResults={() => { void fetchScores(curTest.id); void fetchAllStats() }} />}
 
         {curTest.auto_grading && <AutoTestAnswerSheet testId={curTest.id} students={students}
           batchId={selectedBatchId} onBatchChange={setSelectedBatchId} onAssigneesLoaded={setBatchAssignees} />}

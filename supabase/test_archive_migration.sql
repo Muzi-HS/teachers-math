@@ -12,9 +12,7 @@ BEGIN
   IF p_archived IS NULL THEN
     RAISE EXCEPTION '보관 상태를 지정하세요.';
   END IF;
-  UPDATE public.tests SET is_archived = p_archived,
-    is_published = CASE WHEN p_archived AND auto_grading THEN false ELSE is_published END
-  WHERE id = p_test_id;
+  UPDATE public.tests SET is_archived = p_archived WHERE id = p_test_id;
   IF NOT FOUND THEN RAISE EXCEPTION '시험을 찾을 수 없습니다.'; END IF;
 END;
 $$;

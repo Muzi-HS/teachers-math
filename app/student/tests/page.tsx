@@ -245,21 +245,21 @@ export default function StudentTestsPage() {
       </label>
       <button className="exam-primary" disabled={busy || pin.length !== 4} onClick={verify} style={{ marginTop: 14, width: '100%' }}>PIN 확인</button>
     </section> : !active ? <>
-      <div className="exam-row"><p style={{ margin: 0 }}>공개된 시험의 답안을 입력하세요. 시작 후 2분이 지나면 자동 제출됩니다.</p><button disabled={busy} onClick={load}>새로고침</button></div>
+      <div className="exam-row"><p style={{ margin: 0 }}>선생님이 답안 입력을 연 회차에 응시할 수 있습니다. 시작 후 2분이 지나면 자동 제출됩니다.</p><button disabled={busy} onClick={load}>새로고침</button></div>
       {busy && <p>불러오는 중...</p>}
-      {!busy && !tests.length && !error && <section className="exam-card" style={{ textAlign: 'center', color: 'var(--ui-text-3)' }}>공개된 시험이 없습니다.</section>}
+      {!busy && !tests.length && !error && <section className="exam-card" style={{ textAlign: 'center', color: 'var(--ui-text-3)' }}>배정된 시험이 없습니다.</section>}
       {tests.map(test => {
         const done = test.attempt?.submitted_at
         const started = !!test.attempt && !done
         return <div className="exam-list-card" key={test.id}>
           <div>
             <strong style={{ fontSize: 14.5 }}>{test.name}</strong>
-            <p style={{ margin: '3px 0 0', color: 'var(--ui-text-2)', fontSize: 12.5 }}>{test.date} · {test.total}문항</p>
+            <p style={{ margin: '3px 0 0', color: 'var(--ui-text-2)', fontSize: 12.5 }}>{test.batch_name} · {test.date} · {test.total}문항</p>
             <span className="exam-badge" style={done ? { background: 'var(--ui-success-bg)', color: 'var(--ui-success)' } : started ? { background: 'var(--ui-warning-bg)', color: 'var(--ui-warning)' } : { background: 'var(--ui-bg)', color: 'var(--ui-text-3)' }}>
-              {done ? `제출 완료 · ${test.attempt!.score}점` : started ? '응시 시작됨' : '미응시'}
+              {done ? `제출 완료 · ${test.attempt!.score}점` : started ? '응시 시작됨' : test.answer_entry_open ? '답안 입력 가능' : '답안 입력 대기'}
             </span>
           </div>
-          <button className="exam-primary" disabled={busy} onClick={() => open(test)}>{done ? '결과 보기' : started ? '이어서 입력' : '답안 입력'}</button>
+          <button className="exam-primary" disabled={busy || (!test.answer_entry_open && !test.attempt)} onClick={() => open(test)}>{done ? '결과 보기' : started ? '이어서 입력' : test.answer_entry_open ? '답안 입력' : '입력 대기'}</button>
         </div>
       })}
     </> : finished ? <section className="exam-card exam-result">

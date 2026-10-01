@@ -54,16 +54,17 @@ export default function TestEditorModal({ test, students, onClose, onSaved }: {
         if (cancelled) return
         setClasses(c.data ?? []); setMembers(m.data ?? [])
         if (test?.auto_grading) {
-          const [q, s, a] = await Promise.all([
+          const [q, s, a, b] = await Promise.all([
             supabase.from('test_questions').select('*').eq('test_id', test.id).order('number'),
             supabase.from('test_assignees').select('student_id').eq('test_id', test.id),
             supabase.from('test_attempts').select('id', { count: 'exact', head: true }).eq('test_id', test.id),
+            supabase.from('test_batches').select('id', { count: 'exact', head: true }).eq('test_id', test.id),
           ])
-          if (q.error || s.error || a.error) throw new Error('시험 설정을 불러오지 못했습니다. 다시 열어 주세요.')
+          if (q.error || s.error || a.error || b.error) throw new Error('시험 설정을 불러오지 못했습니다. 다시 열어 주세요.')
           if (cancelled) return
           editedPoints.current = new Set((q.data ?? []).map((_, index) => index))
           setQuestions((q.data ?? []).map(row => ({ points: row.points, choices: row.kind === 'choice' ? row.correct_answer : [], text: row.kind === 'text' ? row.correct_answer : '' })))
-          setSelected((s.data ?? []).map(row => row.student_id)); setLocked((a.count ?? 0) > 0)
+          setSelected((s.data ?? []).map(row => row.student_id)); setLocked((a.count ?? 0) > 0 || (b.count ?? 0) > 1)
         }
       } catch (e) {
         if (!cancelled) { setError(e instanceof Error ? e.message : '불러오기 실패'); setLoadError(true) }
@@ -197,7 +198,7 @@ export default function TestEditorModal({ test, students, onClose, onSaved }: {
         <button className="exam-close" onClick={onClose} disabled={saving} aria-label="닫기">×</button>
       </header>
       {error && <p role="alert" className="exam-error">{error}</p>}
-      {locked && <p className="exam-locked">응시가 시작된 시험은 내용을 변경할 수 없습니다. 재시험이나 문항 변경이 필요하면 새 시험을 만들어 주세요. 공개 여부는 시험 상세 화면에서 바꿀 수 있습니다.</p>}
+      {locked && <p className="exam-locked">응시가 시작됐거나 회차가 추가된 시험은 내용을 변경할 수 없습니다. 문항을 바꾸려면 새 시험을 만들어 주세요. 새 응시 회차는 시험 상세 화면에서 추가할 수 있습니다.</p>}
       <fieldset disabled={loading || saving || locked || loadError}>
         {loading ? <p style={{ color: tx3, fontSize: 13 }}>시험 설정을 불러오는 중...</p> : <>
           <label className="exam-field">시험명<input value={name} onChange={e => setName(e.target.value)} placeholder="예) 2학년 1학기 중간 단원평가" /></label>
@@ -300,7 +301,7 @@ export default function TestEditorModal({ test, students, onClose, onSaved }: {
 
             <div className="exam-publish-note">
               <span style={{ display: 'flex' }}><IconLock size={14} /></span>
-              <span>학생 공개는 여기서 하지 않습니다. 저장 후 <strong>테스트 상세 화면의 &lsquo;학생에게 공개&rsquo; 버튼</strong>을 눌러야 대상 학생이 답안을 입력할 수 있습니다.</span>
+              <span>시험을 저장한 뒤 테스트 상세 화면에서 해당 회차의 <strong>&lsquo;답안 입력 열기&rsquo;</strong>를 눌러 주세요. 학생은 직접 답안을 입력하며 시작 후 2분이 지나면 자동 제출됩니다.</span>
             </div>
           </>}
         </>}

@@ -12,11 +12,10 @@ export default function RecordTestPicker({ tests, value, onChange }: {
   const [year, setYear] = useState('')
   const [month, setMonth] = useState('')
   const [recentOnly, setRecentOnly] = useState(true)
-  const [showArchived, setShowArchived] = useState(false)
   const selected = tests.find(test => test.id === value)
-  const years = [...new Set(tests.map(test => test.date.slice(0, 4)))].sort((a, b) => b.localeCompare(a))
+  const years = [...new Set(tests.filter(test => !test.is_archived).map(test => test.date.slice(0, 4)))].sort((a, b) => b.localeCompare(a))
   const filtered = tests
-    .filter(test => (showArchived || !test.is_archived || test.id === value)
+    .filter(test => !test.is_archived
       && (!search || test.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()))
       && (!year || test.date.startsWith(year))
       && (!month || test.date.slice(5, 7) === month))
@@ -53,7 +52,6 @@ export default function RecordTestPicker({ tests, value, onChange }: {
         <select aria-label="시험 연도" value={year} onChange={event => { setYear(event.target.value); setRecentOnly(false) }}><option value="">모든 연도</option>{years.map(value => <option key={value} value={value}>{value}년</option>)}</select>
         <select aria-label="시험 월" value={month} onChange={event => { setMonth(event.target.value); setRecentOnly(false) }}><option value="">모든 월</option>{Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, '0')).map(value => <option key={value} value={value}>{Number(value)}월</option>)}</select>
         <button type="button" aria-pressed={recentOnly} onClick={() => { setRecentOnly(!recentOnly); setYear(''); setMonth('') }}>최근 8개</button>
-        <label><input type="checkbox" checked={showArchived} onChange={event => setShowArchived(event.target.checked)} />보관된 시험</label>
       </div>
       <div className="record-test-picker-list" role="listbox" aria-label="테스트 목록">
         {value !== null && <button type="button" role="option" aria-selected={false} onClick={() => { onChange(null); setOpen(false) }}>선택 해제</button>}
