@@ -85,6 +85,9 @@ test('PostgreSQL migration and exam lifecycle', async t => {
   const batchMigration = readFileSync(new URL('../supabase/test_batches_migration.sql', import.meta.url), 'utf8')
   await db.exec(batchMigration)
   await db.exec(batchMigration)
+  const renameMigration = readFileSync(new URL('../supabase/test_batch_rename_migration.sql', import.meta.url), 'utf8')
+  await db.exec(renameMigration)
+  await db.exec(renameMigration)
   const listIndexes = readFileSync(new URL('../supabase/student_test_list_indexes_migration.sql', import.meta.url), 'utf8')
   await db.exec(listIndexes)
   await db.exec(listIndexes)
@@ -188,6 +191,9 @@ test('PostgreSQL migration and exam lifecycle', async t => {
     await act(id, 'submit', {1:[2],2:[1,3],3:'x = 2'}, 1, 1)
     await assert.rejects(db.query('select add_auto_test_batch($1,$2,$3,$4)', [id,'Invalid',20,[2]]))
     const second = (await db.query('select add_auto_test_batch($1,$2,$3,$4) as id', [id,'Second class',20,[3]])).rows[0].id
+    await db.query('select rename_auto_test_batch($1,$2,$3)', [id, second, 'Evening class'])
+    assert.equal((await db.query('select name from test_batches where id=$1', [second])).rows[0].name, 'Evening class')
+    await assert.rejects(db.query('select rename_auto_test_batch($1,$2,$3)', [id, second, '   ']))
     const assigned = (await db.query('select student_id,batch_id from test_assignees where test_id=$1 order by student_id', [id])).rows
     assert.deepEqual(assigned.map(row => Number(row.batch_id)), [Number(first), Number(first), Number(second)])
     assert.equal((await db.query('select count(*)::int as n from test_attempts where test_id=$1 and submitted_at is not null', [id])).rows[0].n, 1)
@@ -248,6 +254,7 @@ test('PostgreSQL migration and exam lifecycle', async t => {
       await assert.rejects(db.query('select student_test_review(1,1)'))
       await assert.rejects(db.query('select add_auto_test_assignees(1,array[3]::bigint[])'))
       await assert.rejects(db.query("select add_auto_test_batch(1,'Other',null,array[3]::bigint[])"))
+      await assert.rejects(db.query("select rename_auto_test_batch(1,1,'Other')"))
       await assert.rejects(db.query('select finalize_expired_tests()'))
       if (role==='anon') await assert.rejects(db.query('select * from test_questions'))
       else {

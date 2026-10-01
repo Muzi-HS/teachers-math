@@ -25,6 +25,10 @@ export default function AutoTestAnswerSheet({ testId, students }: { testId: numb
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [selected, setSelected] = useState<number | null>(null)
+  const [editingBatchId, setEditingBatchId] = useState<number | null>(null)
+  const [batchNameDraft, setBatchNameDraft] = useState('')
+  const [renaming, setRenaming] = useState(false)
+  const [renameError, setRenameError] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -72,6 +76,19 @@ export default function AutoTestAnswerSheet({ testId, students }: { testId: numb
     .sort((a, b) => a.name.localeCompare(b.name, 'ko'))
   const selectedStudent = selected != null ? roster.find(s => s.id === selected) : null
   const selectedAttempt = selected != null ? attemptByStudent.get(selected) : undefined
+  const currentBatch = batches.find(batch => batch.id === batchId)
+
+  async function renameBatch() {
+    if (editingBatchId === null || !batchNameDraft.trim() || renaming) return
+    setRenaming(true); setRenameError('')
+    const { error: saveError } = await supabase.rpc('rename_auto_test_batch', {
+      p_test_id: testId, p_batch_id: editingBatchId, p_name: batchNameDraft.trim(),
+    })
+    setRenaming(false)
+    if (saveError) { setRenameError(saveError.message); return }
+    setBatches(current => current.map(batch => batch.id === editingBatchId ? { ...batch, name: batchNameDraft.trim() } : batch))
+    setEditingBatchId(null)
+  }
 
   if (loading) return <section className="ans-card"><style>{css}</style><p style={{ color: tx3, fontSize: 13, margin: 0 }}>정오표를 불러오는 중...</p></section>
   if (error) return <section className="ans-card"><style>{css}</style><p role="alert" style={{ color: re, fontSize: 13, margin: 0 }}>{error}</p></section>
@@ -81,16 +98,30 @@ export default function AutoTestAnswerSheet({ testId, students }: { testId: numb
 
     <div className="ans-head">
       <h3>회차별 결과</h3>
-      <span className="ans-badge">누적 제출 {cumulativeSubmitted.length}명</span>
     </div>
-    <div className="ans-roster" role="group" aria-label="결과 회차 선택">
-      <button type="button" className="ans-chip" data-active={batchId === null} onClick={() => { setBatchId(null); setSelected(null) }}>전체 누적 · {batchSummary(null)}</button>
-      {batches.map(batch => <button type="button" key={batch.id} className="ans-chip" data-active={batchId === batch.id} onClick={() => { setBatchId(batch.id); setSelected(null) }}>
-        {batch.round_number}회차 · {batch.name} · {batchSummary(batch.id)}
+    <div className="ans-summary" aria-label="전체 누적 결과">
+      <div><span>전체 문항 정답률</span><strong>{batchSummary(null)}</strong></div>
+      <div><span>누적 제출</span><strong>{cumulativeSubmitted.length}명</strong></div>
+    </div>
+    <div className="ans-rounds" role="group" aria-label="결과 회차 선택">
+      <button type="button" className="ans-chip" data-active={batchId === null} aria-pressed={batchId === null} onClick={() => { setBatchId(null); setSelected(null); setEditingBatchId(null) }}>전체 누적</button>
+      {batches.map(batch => <button type="button" key={batch.id} className="ans-chip" data-active={batchId === batch.id} aria-pressed={batchId === batch.id} onClick={() => { setBatchId(batch.id); setSelected(null); setEditingBatchId(null) }}>
+        {batch.round_number}회차 · {batch.name}
       </button>)}
     </div>
+    <div className="ans-selection">
+      <span>{currentBatch ? `${currentBatch.round_number}회차 · ${currentBatch.name}` : '전체 누적'} <b>{batchSummary(batchId)}</b></span>
+      {currentBatch && <button type="button" className="ans-rename-button" onClick={() => { setEditingBatchId(currentBatch.id); setBatchNameDraft(currentBatch.name); setRenameError('') }}>이름 수정</button>}
+    </div>
+    {editingBatchId !== null && <form className="ans-rename" onSubmit={event => { event.preventDefault(); void renameBatch() }}>
+      <label htmlFor="ans-batch-name">회차 이름</label>
+      <input id="ans-batch-name" value={batchNameDraft} maxLength={100} onChange={event => setBatchNameDraft(event.target.value)} autoFocus />
+      <button type="submit" disabled={renaming || !batchNameDraft.trim()}>{renaming ? '저장 중...' : '저장'}</button>
+      <button type="button" onClick={() => setEditingBatchId(null)}>취소</button>
+      {renameError && <p role="alert">{renameError}</p>}
+    </form>}
 
-    <div className="ans-head">
+    <div className="ans-head ans-results-head">
       <h3>문항별 정답률</h3>
       <span className="ans-badge">{batchId === null ? '누적' : '선택 회차'} 제출 {submitted.length}명 기준</span>
     </div>
@@ -167,6 +198,20 @@ const css = `
   .ans-card{background:#fff;border:1px solid ${bd};border-radius:14px;padding:18px 20px;margin-bottom:18px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
   .ans-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
   .ans-head h3{font-size:14px;font-weight:700;margin:0;color:${tx}}
+  .ans-summary{display:flex;gap:10px;margin-top:14px}
+  .ans-summary>div{flex:1;min-width:0;padding:12px 15px;background:var(--ui-accent-bg);border:1px solid ${bd};border-radius:11px}
+  .ans-summary span{display:block;font-size:11px;color:${tx2};margin-bottom:3px}
+  .ans-summary strong{font-size:20px;color:${navy}}
+  .ans-rounds{display:flex;flex-wrap:wrap;gap:8px;margin-top:17px}
+  .ans-selection{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:13px;font-size:12px;color:${tx2}}
+  .ans-selection b{color:${navy};margin-left:5px}
+  .ans-rename-button{border:0;background:transparent;color:${navy};font:inherit;font-weight:700;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+  .ans-rename{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:12px;padding:12px;background:${bg};border-radius:9px;font-size:12px}
+  .ans-rename input{flex:1;min-width:140px;padding:8px;border:1px solid ${bd};border-radius:7px;font:inherit;font-size:16px}
+  .ans-rename button{padding:8px 10px;border:1px solid ${bd};border-radius:7px;background:#fff;color:${navy};font:inherit;cursor:pointer}
+  .ans-rename button:disabled{opacity:.5;cursor:default}
+  .ans-rename p{width:100%;margin:0;color:${re}}
+  .ans-results-head{margin-top:28px;padding-top:22px;border-top:1px solid ${bd}}
   .ans-badge{font-size:12px;font-weight:700;color:${navy};background:var(--ui-accent-bg);padding:3px 10px;border-radius:20px}
   .ans-empty{font-size:13px;color:${tx3};margin:10px 0 0}
   .ans-qstats{display:flex;flex-direction:column;gap:8px;margin-top:12px}
