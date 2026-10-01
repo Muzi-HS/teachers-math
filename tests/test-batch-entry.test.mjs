@@ -17,7 +17,8 @@ test('rounds open independently and submitted results survive archive', async t 
     CREATE TABLE class_students(class_id bigint REFERENCES classes(id), student_id bigint REFERENCES students(id), PRIMARY KEY(class_id, student_id));
     CREATE TABLE tests(id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, name text NOT NULL, date date NOT NULL, total integer NOT NULL);
     CREATE TABLE test_scores(id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, test_id bigint REFERENCES tests(id), student_id bigint REFERENCES students(id), correct integer, score integer, UNIQUE(test_id, student_id));
-    CREATE TABLE records(id bigint PRIMARY KEY, student_id bigint REFERENCES students(id));
+    CREATE TABLE records(id bigint PRIMARY KEY, student_id bigint REFERENCES students(id), date date,
+      is_draft boolean NOT NULL DEFAULT false, released_to_parent boolean NOT NULL DEFAULT true);
     CREATE TABLE record_test_items(id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, record_id bigint REFERENCES records(id), test_id bigint REFERENCES tests(id), t_total integer, t_cor integer, t_score integer);
     INSERT INTO teachers VALUES ('11111111-1111-1111-1111-111111111111', true, 'admin');
     INSERT INTO students VALUES (1, 'A', '0101', '1234'), (2, 'B', '0102', '2345');
@@ -64,6 +65,15 @@ test('rounds open independently and submitted results survive archive', async t 
   assert.equal((await db.query('SELECT answer_entry_open FROM test_batches WHERE id=$1', [secondBatch])).rows[0].answer_entry_open, false)
   await db.query('SELECT set_test_archived($1,true)', [testId])
   assert.equal((await db.query('SELECT student_test_list(1) AS data')).rows[0].data[0].attempt.score, 100)
+  const manualId = Number((await db.query("INSERT INTO tests(name,date,total,auto_grading) VALUES ('Paper test','2026-10-02',10,false) RETURNING id")).rows[0].id)
+  await db.query("INSERT INTO records(id,student_id,date) VALUES (11,1,'2026-10-02'), (12,2,'2026-10-02')")
+  await db.query('INSERT INTO record_test_items(record_id,test_id,t_total,t_cor,t_score) VALUES (11,$1,10,8,80),(12,$1,10,6,60)', [manualId])
+  await db.query('SELECT set_test_archived($1,true)', [manualId])
+  await db.query('UPDATE records SET released_to_parent=false WHERE id=12')
+  const studentOne = (await db.query('SELECT student_test_list(1) AS data')).rows[0].data
+  assert.equal(studentOne.find(row => row.id === manualId).manual_score, 80)
+  assert.equal(studentOne.find(row => row.id === manualId).kind, 'manual')
+  assert.equal((await db.query('SELECT student_test_list(2) AS data')).rows[0].data.some(row => row.id === manualId), false)
   await db.query('SELECT open_test_batch_entry($1,$2)', [testId, secondBatch])
   assert.equal((await db.query('SELECT answer_entry_open FROM test_batches WHERE id=$1', [secondBatch])).rows[0].answer_entry_open, true)
   assert.equal((await db.query("SELECT student_test_action(2,$1,'start') AS data", [testId])).rows[0].data.attempt.student_id, 2)

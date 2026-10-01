@@ -249,6 +249,14 @@ export default function StudentTestsPage() {
       {busy && <p>불러오는 중...</p>}
       {!busy && !tests.length && !error && <section className="exam-card" style={{ textAlign: 'center', color: 'var(--ui-text-3)' }}>배정된 시험이 없습니다.</section>}
       {tests.map(test => {
+        if (test.kind === 'manual') return <div className="exam-list-card" key={test.id}>
+          <div>
+            <strong style={{ fontSize: 14.5 }}>{test.name}</strong>
+            <p style={{ margin: '3px 0 0', color: 'var(--ui-text-2)', fontSize: 12.5 }}>{test.record_date ?? test.date} · {test.manual_total ?? test.total}문항</p>
+            <span className="exam-badge" style={{ background: 'var(--ui-success-bg)', color: 'var(--ui-success)' }}>수업기록 성적 · 정답 {test.manual_correct ?? 0}/{test.manual_total ?? test.total}개</span>
+          </div>
+          <strong style={{ fontSize: 20, color: 'var(--ui-primary)', whiteSpace: 'nowrap' }}>{test.manual_score ?? 0}점</strong>
+        </div>
         const done = test.attempt?.submitted_at
         const started = !!test.attempt && !done
         return <div className="exam-list-card" key={test.id}>

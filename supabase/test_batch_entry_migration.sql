@@ -67,19 +67,38 @@ BEGIN
     WHERE student_id = p_student_id AND submitted_at IS NULL AND deadline_at <= clock_timestamp() LOOP
     PERFORM public.finalize_test_attempt(pending.id);
   END LOOP;
-  SELECT COALESCE(jsonb_agg(jsonb_build_object(
-    'id', t.id, 'name', t.name, 'date', t.date, 'total', t.total,
-    'is_published', t.is_published,
-    'answer_entry_open', b.answer_entry_open,
-    'batch_name', b.name,
-    'attempt', CASE WHEN a.id IS NULL THEN NULL ELSE to_jsonb(a) END
-  ) ORDER BY t.date DESC, t.id DESC), '[]'::jsonb)
-  INTO result
-  FROM public.tests t
-  JOIN public.test_assignees s ON s.test_id = t.id AND s.student_id = p_student_id
-  JOIN public.test_batches b ON b.id = s.batch_id AND b.test_id = t.id
-  LEFT JOIN public.test_attempts a ON a.test_id = t.id AND a.student_id = p_student_id
-  WHERE t.auto_grading;
+  SELECT COALESCE(jsonb_agg(entry.data ORDER BY entry.test_date DESC, entry.test_id DESC), '[]'::jsonb)
+  INTO result FROM (
+    SELECT t.id AS test_id, t.date AS test_date, jsonb_build_object(
+      'id', t.id, 'name', t.name, 'date', t.date, 'total', t.total,
+      'kind', 'auto', 'answer_entry_open', b.answer_entry_open,
+      'batch_name', b.name,
+      'attempt', CASE WHEN a.id IS NULL THEN NULL ELSE to_jsonb(a) END
+    ) AS data
+    FROM public.tests t
+    JOIN public.test_assignees s ON s.test_id = t.id AND s.student_id = p_student_id
+    JOIN public.test_batches b ON b.id = s.batch_id AND b.test_id = t.id
+    LEFT JOIN public.test_attempts a ON a.test_id = t.id AND a.student_id = p_student_id
+    WHERE t.auto_grading
+    UNION ALL
+    SELECT t.id, t.date, jsonb_build_object(
+      'id', t.id, 'name', t.name, 'date', t.date, 'total', t.total,
+      'kind', 'manual', 'manual_score', COALESCE(item.t_score,
+        CASE WHEN item.t_total > 0 THEN round(item.t_cor::numeric * 100 / item.t_total)::integer ELSE 0 END),
+      'manual_correct', item.t_cor, 'manual_total', item.t_total,
+      'record_date', item.record_date
+    )
+    FROM public.tests t
+    JOIN LATERAL (
+      SELECT rti.t_score, rti.t_cor, rti.t_total, r.date AS record_date
+      FROM public.record_test_items rti
+      JOIN public.records r ON r.id = rti.record_id
+      WHERE rti.test_id = t.id AND r.student_id = p_student_id
+        AND r.is_draft = false AND r.released_to_parent = true
+      ORDER BY r.date DESC, r.id DESC, rti.id DESC LIMIT 1
+    ) item ON true
+    WHERE t.auto_grading = false
+  ) entry;
   RETURN result;
 END;
 $$;
