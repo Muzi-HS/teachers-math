@@ -20,7 +20,7 @@ CREATE POLICY test_batches_staff_read ON public.test_batches
 
 ALTER TABLE public.test_assignees ADD COLUMN IF NOT EXISTS batch_id bigint;
 INSERT INTO public.test_batches(test_id, round_number, name)
-SELECT DISTINCT a.test_id, 1, '1회차'
+SELECT DISTINCT a.test_id, 1, '기본 응시'
 FROM public.test_assignees a
 ON CONFLICT (test_id, round_number) DO NOTHING;
 UPDATE public.test_assignees a SET batch_id = b.id
@@ -34,7 +34,7 @@ RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_t
 BEGIN
   IF NEW.batch_id IS NULL THEN
     INSERT INTO public.test_batches(test_id, round_number, name)
-    VALUES (NEW.test_id, 1, '1회차')
+    VALUES (NEW.test_id, 1, '기본 응시')
     ON CONFLICT (test_id, round_number) DO NOTHING;
     SELECT id INTO NEW.batch_id FROM public.test_batches
     WHERE test_id = NEW.test_id AND round_number = 1;

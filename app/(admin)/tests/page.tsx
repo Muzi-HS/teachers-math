@@ -16,6 +16,7 @@ type ScoreRow = {
   students?:{ name:string; school:string }|null
 }
 type Student = { id:number; name:string; school:string }
+type TestAssignee = { student_id:number; batch_id:number|null }
 
 const navy='var(--ui-primary)', navyDk='var(--ui-primary-text)', navyM='var(--ui-surface-2)'
 const gold='var(--ui-primary)', goldL='var(--ui-primary-hover)'
@@ -29,6 +30,8 @@ export default function TestsPage() {
   const [view,      setView]      = useState<'list'|'detail'>('list')
   const [tests,     setTests]     = useState<Test[]>([])
   const [scores,    setScores]    = useState<ScoreRow[]>([])
+  const [selectedBatchId, setSelectedBatchId] = useState<number|null>(null)
+  const [batchAssignees, setBatchAssignees] = useState<TestAssignee[]>([])
   const [students,  setStudents]  = useState<Student[]>([])
   const [curTest,   setCurTest]   = useState<Test|null>(null)
   const [loading,   setLoading]   = useState(true)
@@ -147,6 +150,8 @@ export default function TestsPage() {
 
   async function openDetail(t:Test) {
     setCurTest(t)
+    setSelectedBatchId(null)
+    setBatchAssignees([])
     await fetchScores(t.id)
     window.history.pushState({ testView: 'detail' }, '')
     setView('detail')
@@ -242,16 +247,19 @@ export default function TestsPage() {
     return nameMatch && dateMatch
   })
 
-  const avg = scores.length ? Math.round(scores.reduce((a,b)=>a+b.score,0)/scores.length) : null
-  const max = scores.length ? Math.max(...scores.map(x=>x.score)) : null
-  const min = scores.length ? Math.min(...scores.map(x=>x.score)) : null
+  const visibleScores = curTest?.auto_grading && selectedBatchId !== null
+    ? scores.filter(score => batchAssignees.some(row => row.student_id === score.student_id && row.batch_id === selectedBatchId))
+    : scores
+  const avg = visibleScores.length ? Math.round(visibleScores.reduce((a,b)=>a+b.score,0)/visibleScores.length) : null
+  const max = visibleScores.length ? Math.max(...visibleScores.map(x=>x.score)) : null
+  const min = visibleScores.length ? Math.min(...visibleScores.map(x=>x.score)) : null
 
   function buildFreqTable(scoreList: number[]) {
-    const bins = Array(11).fill(0)
-    for(const s of scoreList) bins[Math.min(10, s>=100?10:Math.floor(s/10))]++
+    const bins = Array(10).fill(0)
+    for(const s of scoreList) bins[Math.min(9, Math.max(0, Math.floor(s/10)))]++
     const n = scoreList.length
     return bins.map((cnt, i) => ({
-      range: i===10 ? '90 ~ 100' : `${i*10} ~ ${i*10+9}`,
+      range: i===9 ? '90 ~ 100' : `${i*10} ~ ${i*10+9}`,
       cnt,
       rel: n>0 ? Math.round(cnt/n*100) : 0,
     })).reverse()
@@ -447,7 +455,7 @@ export default function TestsPage() {
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:mobileMode?14:20}}>
           <div>
             <h1 style={{fontSize:mobileMode?17:21,fontWeight:700,color:tx}}>{curTest.name}</h1>
-            <p style={{fontSize:12,color:tx2,marginTop:4}}>{curTest.date} · 총 {curTest.total}문항 · 응시 {scores.length}명</p>
+            <p style={{fontSize:12,color:tx2,marginTop:4}}>{curTest.date} · 총 {curTest.total}문항 · 누적 응시 {scores.length}명</p>
           </div>
           <div/>
         </div>
@@ -457,17 +465,18 @@ export default function TestsPage() {
           setTests(ts => ts.map(t => t.id===curTest.id ? {...t,is_published:value} : t))
         }} onResults={() => { void fetchScores(curTest.id); void fetchAllStats() }} />}
 
-        {curTest.auto_grading && <AutoTestAnswerSheet testId={curTest.id} students={students} />}
+        {curTest.auto_grading && <AutoTestAnswerSheet testId={curTest.id} students={students}
+          batchId={selectedBatchId} onBatchChange={setSelectedBatchId} onAssigneesLoaded={setBatchAssignees} />}
 
-        {scores.length===0?(
+        {visibleScores.length===0?(
           <div style={{background:'#fff',borderRadius:12,border:`1px solid ${bd}`,padding:'60px 0',textAlign:'center',color:tx3}}>
-            <p style={{fontSize:15,fontWeight:600,color:tx,marginBottom:8}}>아직 입력된 성적이 없어요</p>
+            <p style={{fontSize:15,fontWeight:600,color:tx,marginBottom:8}}>{selectedBatchId === null ? '아직 입력된 성적이 없어요' : '선택한 회차에 제출된 성적이 없어요'}</p>
             <p style={{fontSize:13,color:tx3}}>{curTest.auto_grading?'학생이 답안을 제출하면 채점 결과가 자동 집계됩니다.':'테스트 결과 입력을 위해서 수업기록에서 작성을 해주세요'}</p>
           </div>
         ):null}
 
-        {scores.length>0&&(()=>{
-          const freqRows = buildFreqTable(scores.map(s=>s.score))
+        {visibleScores.length>0&&(()=>{
+          const freqRows = buildFreqTable(visibleScores.map(s=>s.score))
           return(
             <div style={{display:'grid',gridTemplateColumns:mobileMode?'1fr':'1fr 1fr',gap:16}}>
 
@@ -490,7 +499,7 @@ export default function TestsPage() {
                 </div>
 
                 {/* 도수분포표 */}
-                <p style={{fontSize:11,fontWeight:600,color:tx3,marginBottom:10,letterSpacing:'.5px',display:'flex',alignItems:'center',gap:5}}><IconBarChart size={11} /> 도수분포표</p>
+                <p style={{fontSize:11,fontWeight:600,color:tx3,marginBottom:10,letterSpacing:'.5px',display:'flex',alignItems:'center',gap:5}}><IconBarChart size={11} /> {selectedBatchId === null ? '전체 누적' : '선택 회차'} 도수분포표</p>
                 <div style={{border:`1px solid ${bd}`,borderRadius:8,overflow:'hidden'}}>
                   <div style={{display:'grid',gridTemplateColumns:'88px 48px 56px 1fr',background:bg,padding:'6px 12px',borderBottom:`1px solid ${bd}`}}>
                     <span style={{fontSize:10,fontWeight:600,color:tx3}}>계급 (점)</span>
@@ -499,7 +508,7 @@ export default function TestsPage() {
                     <span/>
                   </div>
                   {freqRows.map((row, i) => {
-                    const barPct = scores.length>0 ? (row.cnt/scores.length)*100 : 0
+                    const barPct = visibleScores.length>0 ? (row.cnt/visibleScores.length)*100 : 0
                     return (
                       <div key={i} style={{display:'grid',gridTemplateColumns:'88px 48px 56px 1fr',alignItems:'center',padding:'5px 12px',borderBottom:i<freqRows.length-1?`1px solid ${bg}`:'none'}}>
                         <span style={{fontSize:12,color:tx}}>{row.range}</span>
@@ -513,7 +522,7 @@ export default function TestsPage() {
                   })}
                   <div style={{display:'grid',gridTemplateColumns:'88px 48px 56px 1fr',padding:'6px 12px',background:bg,borderTop:`1px solid ${bd}`}}>
                     <span style={{fontSize:11,fontWeight:700,color:tx}}>합계</span>
-                    <span style={{fontSize:11,fontWeight:700,color:tx,textAlign:'center'}}>{scores.length}</span>
+                    <span style={{fontSize:11,fontWeight:700,color:tx,textAlign:'center'}}>{visibleScores.length}</span>
                     <span style={{fontSize:11,fontWeight:700,color:tx,textAlign:'center'}}>100%</span>
                     <span/>
                   </div>
@@ -523,8 +532,8 @@ export default function TestsPage() {
               {/* 오른쪽: 순위 목록 */}
               <div style={{background:'#fff',borderRadius:12,border:`1px solid ${bd}`,overflow:'hidden',boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
                 <div style={{padding:'12px 16px',borderBottom:`1px solid ${bd}`,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                  <span style={{fontSize:13,fontWeight:700,color:tx,display:'flex',alignItems:'center',gap:5}}><IconTrophy size={13} /> 학생 순위</span>
-                  <span style={{fontSize:12,color:tx3,fontWeight:400}}>{scores.length}명</span>
+                  <span style={{fontSize:13,fontWeight:700,color:tx,display:'flex',alignItems:'center',gap:5}}><IconTrophy size={13} /> {selectedBatchId === null ? '전체 누적' : '선택 회차'} 학생 순위</span>
+                  <span style={{fontSize:12,color:tx3,fontWeight:400}}>{visibleScores.length}명</span>
                 </div>
                 {/* 헤더 */}
                 <div style={{display:'flex',alignItems:'center',gap:10,padding:'8px 16px',background:bg,borderBottom:`1px solid ${bd}`,fontSize:10,fontWeight:600,color:tx3}}>
@@ -536,9 +545,9 @@ export default function TestsPage() {
                   {canManageTests&&!curTest.auto_grading&&<div style={{width:80,textAlign:'right'}}>관리</div>}
                 </div>
                 <div style={{overflowY:'auto',maxHeight:380}}>
-                {scores.map((sc,i)=>{
+                {visibleScores.map((sc,i)=>{
                   const pct=curTest.total>0?Math.round(sc.cor/curTest.total*100):0
-                  const rank=scores.filter(x=>x.score>sc.score).length+1
+                  const rank=visibleScores.filter(x=>x.score>sc.score).length+1
                   const rankStyle:{background:string;color:string}=
                     rank===1?{background:'linear-gradient(135deg,#FFD700,#FFA500)',color:'#5a3a00'}
                     :rank===2?{background:'linear-gradient(135deg,#C0C0C0,#A8A8A8)',color:'#3a3a3a'}

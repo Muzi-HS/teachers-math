@@ -16,11 +16,18 @@ function fmtAnswer(kind: 'choice' | 'text', value: string | number[] | undefined
   return typeof value === 'string' && value.trim() ? value : '(미입력)'
 }
 
-export default function AutoTestAnswerSheet({ testId, students }: { testId: number; students: Student[] }) {
+function displayBatchName(batch: TestBatch) {
+  return batch.round_number === 1 && batch.name === '1회차' ? '기본 응시' : batch.name
+}
+
+export default function AutoTestAnswerSheet({ testId, students, batchId, onBatchChange, onAssigneesLoaded }: {
+  testId: number; students: Student[]; batchId: number | null
+  onBatchChange: (id: number | null) => void
+  onAssigneesLoaded: (rows: Assignee[]) => void
+}) {
   const [questions, setQuestions] = useState<QuestionRow[]>([])
   const [assignees, setAssignees] = useState<Assignee[]>([])
   const [batches, setBatches] = useState<TestBatch[]>([])
-  const [batchId, setBatchId] = useState<number | null>(null)
   const [attempts, setAttempts] = useState<ExamAttempt[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -45,6 +52,7 @@ export default function AutoTestAnswerSheet({ testId, students }: { testId: numb
       setError('')
       setQuestions(q.data ?? [])
       setAssignees(s.data ?? [])
+      onAssigneesLoaded(s.data ?? [])
       setBatches(b.data ?? [])
       setAttempts(a.data ?? [])
       setLoading(false)
@@ -52,7 +60,7 @@ export default function AutoTestAnswerSheet({ testId, students }: { testId: numb
     void load(true)
     const timer = setInterval(() => { void load(false) }, 10000)
     return () => { cancelled = true; clearInterval(timer) }
-  }, [testId])
+  }, [testId, onAssigneesLoaded])
 
   const gradedQuestions: GradedQuestion[] = questions.map(q => ({ number: q.number, points: q.points, kind: q.kind, correctAnswer: q.correct_answer }))
   const batchByStudent = new Map(assignees.map(row => [row.student_id, row.batch_id]))
@@ -104,14 +112,14 @@ export default function AutoTestAnswerSheet({ testId, students }: { testId: numb
       <div><span>누적 제출</span><strong>{cumulativeSubmitted.length}명</strong></div>
     </div>
     <div className="ans-rounds" role="group" aria-label="결과 회차 선택">
-      <button type="button" className="ans-chip" data-active={batchId === null} aria-pressed={batchId === null} onClick={() => { setBatchId(null); setSelected(null); setEditingBatchId(null) }}>전체 누적</button>
-      {batches.map(batch => <button type="button" key={batch.id} className="ans-chip" data-active={batchId === batch.id} aria-pressed={batchId === batch.id} onClick={() => { setBatchId(batch.id); setSelected(null); setEditingBatchId(null) }}>
-        {batch.round_number}회차 · {batch.name}
+      <button type="button" className="ans-chip" data-active={batchId === null} aria-pressed={batchId === null} onClick={() => { onBatchChange(null); setSelected(null); setEditingBatchId(null) }}>전체 누적</button>
+      {batches.map(batch => <button type="button" key={batch.id} className="ans-chip" data-active={batchId === batch.id} aria-pressed={batchId === batch.id} onClick={() => { onBatchChange(batch.id); setSelected(null); setEditingBatchId(null) }}>
+        {displayBatchName(batch)}
       </button>)}
     </div>
     <div className="ans-selection">
-      <span>{currentBatch ? `${currentBatch.round_number}회차 · ${currentBatch.name}` : '전체 누적'} <b>{batchSummary(batchId)}</b></span>
-      {currentBatch && <button type="button" className="ans-rename-button" onClick={() => { setEditingBatchId(currentBatch.id); setBatchNameDraft(currentBatch.name); setRenameError('') }}>이름 수정</button>}
+      <span>{currentBatch ? displayBatchName(currentBatch) : '전체 누적'} <b>{batchSummary(batchId)}</b></span>
+      {currentBatch && <button type="button" className="ans-rename-button" onClick={() => { setEditingBatchId(currentBatch.id); setBatchNameDraft(displayBatchName(currentBatch)); setRenameError('') }}>이름 수정</button>}
     </div>
     {editingBatchId !== null && <form className="ans-rename" onSubmit={event => { event.preventDefault(); void renameBatch() }}>
       <label htmlFor="ans-batch-name">회차 이름</label>

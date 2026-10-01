@@ -79,7 +79,7 @@ export default function AddTestAssigneesModal({ testId, students, assignedIds, o
         <p style={{ fontSize: 12, color: 'var(--ui-text-2)', lineHeight: 1.6, margin: 0 }}>새 회차의 대상 학생을 선택하세요. 기존 응시 결과는 유지되고, 공개 중인 시험은 새 학생에게 바로 보입니다.</p>
         {loading ? <p>불러오는 중...</p> : <>
           <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginTop: 14 }}>회차 이름
-            <input value={batchName} maxLength={100} onChange={event => setBatchName(event.target.value)} placeholder="예: 2회차 · 월금A-2" style={{ display: 'block', width: '100%', boxSizing: 'border-box', padding: 10, marginTop: 5, border: '1px solid var(--ui-border)', borderRadius: 8, fontSize: 16 }} />
+            <input value={batchName} maxLength={100} onChange={event => setBatchName(event.target.value)} placeholder="예: 월금A-2" style={{ display: 'block', width: '100%', boxSizing: 'border-box', padding: 10, marginTop: 5, fontSize: 16, border: '1px solid var(--ui-border)', borderRadius: 8 }} />
           </label>
           <div className="add-exam-classes">{classes.map(cls => {
             const ids = members.filter(row => row.class_id === cls.id && !assigned.has(row.student_id)).map(row => row.student_id)
