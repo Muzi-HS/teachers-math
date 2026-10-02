@@ -8,6 +8,7 @@ import { IconClock, IconLock } from '@/components/icons'
 import { useMobileMode } from '@/context/MobileModeContext'
 import { usePublicHolidays } from '@/lib/use-public-holidays'
 import CompactMonthCalendar from '@/components/CompactMonthCalendar'
+import AdminScheduleCalendar from './AdminScheduleCalendar'
 
 type Evt = {
     id: number
@@ -77,6 +78,7 @@ const DOW = ['일', '월', '화', '수', '목', '금', '토']
 
 export default function SchedulePage() {
     const { teacher, role } = useAuth()
+    const [scheduleTab, setScheduleTab] = useState<'academy' | 'admin'>('academy')
     const { mobileMode } = useMobileMode()
     const [evts, setEvts] = useState<Evt[]>([])
     const [loading, setLoading] = useState(true)
@@ -304,6 +306,16 @@ export default function SchedulePage() {
     const listTitle = selectedDate ? `${Number(selectedDate.slice(5, 7))}월 ${Number(selectedDate.slice(8))}일` : `${mo + 1}월 전체`
     const classNameById = Object.fromEntries(classesList.map(c => [c.id, c.name]))
 
+    if (role === 'admin' && scheduleTab === 'admin') return (
+        <div style={{ padding: mobileMode ? '16px 12px 88px' : 28 }}>
+            <nav aria-label="일정 구분" style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+                <button onClick={() => setScheduleTab('academy')} style={{ padding: '10px 16px', borderRadius: 8, border: '1px solid var(--ui-border)', background: 'var(--ui-surface)', color: 'var(--ui-text)' }}>학원 일정</button>
+                <button aria-current="page" style={{ padding: '10px 16px', borderRadius: 8, border: 0, background: navy, color: navyDk }}>관리자 · 내부용</button>
+            </nav>
+            <AdminScheduleCalendar />
+        </div>
+    )
+
     return (
         <div className="schedule-page" style={{ padding: mobileMode ? '16px 14px 88px' : '28px 32px', fontFamily: "'Noto Sans KR',sans-serif" }}>
             <style>{`
@@ -359,6 +371,10 @@ export default function SchedulePage() {
                 </div>
             )}
 
+            {role === 'admin' && <nav aria-label="일정 구분" style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+                <button className="bgold" aria-current="page">학원 일정</button>
+                <button className="bout" onClick={() => setScheduleTab('admin')}>관리자 · 내부용</button>
+            </nav>}
             {/* 헤더 */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: mobileMode ? 14 : 20, flexWrap: 'wrap', gap: 10 }}>
                 <div>
