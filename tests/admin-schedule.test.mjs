@@ -51,6 +51,60 @@ function holidayRoute(key, fetch) {
   return year => context.exports.GET({ nextUrl: new URL(`https://example.test/api/public-holidays?year=${year}`) })
 }
 
+test('internal calendar keeps month-first layout and filters the existing list through today/week/date controls', () => {
+  let cursor = 0
+  const states = []
+  const sample = (id, title, start_date, end_date = start_date) => ({ id, title, start_date, end_date, start_time: null, end_time: null, category: '업무', owner: '', location: '', memo: '', completed: false })
+  const fixtures = [sample(1, '오늘 회의', '2026-10-02'), sample(2, '다음 주 준비', '2026-10-06'), sample(3, '지난 달부터 이어지는 일정', '2026-09-30', '2026-10-03')]
+  const jsx = (type, props) => ({ type, props })
+  const context = {
+    exports: {}, Date,
+    require: name => {
+      if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx, Fragment: 'fragment' }
+      if (name === 'react') return {
+        useState: initial => {
+          const i = cursor++
+          if (!(i in states)) states[i] = i === 3 ? fixtures : i === 4 ? false : initial
+          return [states[i], value => { states[i] = typeof value === 'function' ? value(states[i]) : value }]
+        },
+        useRef: () => ({ current: null }), useCallback: fn => fn, useEffect: () => {},
+      }
+      if (name.includes('use-mobile')) return { useMobileMode: () => ({ mobileMode: false }) }
+      if (name.includes('MobileModeContext')) return { useMobileMode: () => ({ mobileMode: false }) }
+      if (name.includes('use-public-holidays')) return { usePublicHolidays: () => ({ holidays: [], fallback: false }) }
+      if (name.includes('/kst')) return { kstDateStr: () => '2026-10-02' }
+      return {}
+    },
+  }
+  vm.runInNewContext(ts.transpileModule(readFileSync(new URL('../app/(admin)/schedule/AdminScheduleCalendar.tsx', import.meta.url), 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2020 },
+  }).outputText, context)
+  const render = () => { cursor = 0; return context.exports.default() }
+  const nodes = root => !root || typeof root !== 'object' ? [] : Array.isArray(root) ? root.flatMap(nodes) : [root, ...nodes(root.props?.children)]
+  const textOf = node => typeof node === 'string' || typeof node === 'number' ? String(node) : Array.isArray(node) ? node.map(textOf).join('') : node?.props ? textOf(node.props.children) : ''
+  const button = (root, prefix) => nodes(root).find(node => node.type === 'button' && textOf(node).startsWith(prefix))
+  const titles = root => nodes(root).filter(node => node.props?.className === 'internal-event').map(node => textOf(node))
+  let root = render()
+  assert.equal(titles(root).length, 3)
+  assert.equal(nodes(root).filter(node => node.props?.className?.split(' ').includes('cd')).length, 35)
+  assert.ok(textOf(root).includes('10월 전체 일정 목록'))
+  button(root, '오늘 ·').props.onClick()
+  root = render()
+  assert.equal(titles(root).length, 2)
+  button(root, '이번 주 ·').props.onClick()
+  root = render()
+  assert.equal(titles(root).length, 2)
+  nodes(root).find(node => node.props?.['aria-label']?.startsWith('10월 6일')).props.onClick()
+  root = render()
+  assert.equal(titles(root).length, 1)
+  assert.ok(titles(root)[0].includes('다음 주 준비'))
+  button(root, '월 전체 보기').props.onClick()
+  root = render()
+  assert.equal(titles(root).length, 3)
+  assert.equal(nodes(root).filter(node => node.type === 'button' && textOf(node) === '수정').length, 3)
+  assert.equal(nodes(root).filter(node => node.type === 'button' && textOf(node) === '삭제').length, 3)
+})
+
 test('holiday route validates year, keeps key on server and handles upstream failures', async () => {
   assert.equal((await holidayRoute(undefined, () => assert.fail('no fetch'))('bad')).status, 400)
   assert.equal((await holidayRoute(undefined, () => assert.fail('no fetch'))('2026')).status, 503)
