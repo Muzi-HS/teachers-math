@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { kstDateStr } from '@/lib/kst'
 import { usePublicHolidays } from '@/lib/use-public-holidays'
+import ScheduleUpcoming from '@/components/ScheduleUpcoming'
 import CompactMonthCalendar from '@/components/CompactMonthCalendar'
 import { useMobileMode } from '@/context/MobileModeContext'
 
@@ -30,7 +31,6 @@ export default function AdminScheduleCalendar() {
   const today = kstDateStr()
   const [month, setMonth] = useState(today.slice(0, 7))
   const [selected, setSelected] = useState<string | null>(null)
-  const [weekView, setWeekView] = useState(false)
   const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -96,7 +96,7 @@ export default function AdminScheduleCalendar() {
       const result = editId === null ? await supabase.from('admin_schedule_events').insert(payload).select('id').single()
         : await supabase.from('admin_schedule_events').update(payload).eq('id', editId).select('id').single()
       if (result.error) throw result.error
-      setSelected(draft.start_date); setMonth(draft.start_date.slice(0, 7)); setWeekView(false)
+      setSelected(draft.start_date); setMonth(draft.start_date.slice(0, 7))
       setDraft(null); setNotice('일정을 저장했습니다.')
       if (draft.start_date.slice(0, 7) === month) await load()
     } catch { setFormError('저장하지 못했습니다. 연결 상태와 관리자 권한을 확인해주세요.') }
@@ -117,17 +117,16 @@ export default function AdminScheduleCalendar() {
     Number(a.completed) - Number(b.completed) || (a.start_time ?? '').localeCompare(b.start_time ?? ''))
   const monthEnd = new Date(Date.UTC(year, mo + 1, 0)).toISOString().slice(0, 10)
   const monthEvents = visible.filter(event => event.start_date <= monthEnd && event.end_date >= month + '-01')
-  const weekEvents = visible.filter(event => event.start_date <= weekEnd && event.end_date >= weekStart)
-  const items = weekView ? weekEvents : selected ? dayEvents(selected) : monthEvents
-  const listTitle = weekView ? '이번 주' : selected ? `${Number(selected.slice(5, 7))}월 ${Number(selected.slice(8))}일` : `${mo + 1}월 전체`
+  const items = selected ? dayEvents(selected) : monthEvents
+  const listTitle = selected ? `${Number(selected.slice(5, 7))}월 ${Number(selected.slice(8))}일` : `${mo + 1}월 전체`
   const firstDay = new Date(Date.UTC(year, mo, 1)).getUTCDay()
   const days = Number(monthEnd.slice(8))
   const previousDays = new Date(Date.UTC(year, mo, 0)).getUTCDate()
   const trailing = (7 - (firstDay + days) % 7) % 7
-  function selectDate(date: string) { setSelected(date); setWeekView(false) }
+  function selectDate(date: string) { setSelected(date) }
   function moveMonth(delta: number) {
     const date = new Date(Date.UTC(year, mo + delta, 1))
-    setMonth(date.toISOString().slice(0, 7)); setSelected(null); setWeekView(false)
+    setMonth(date.toISOString().slice(0, 7)); setSelected(null)
   }
   function list(items: Event[], empty: string) {
     return loading ? <p>일정을 불러오는 중…</p> : error ? <p>일정 조회에 실패했습니다.</p> : items.length ? items.map(event =>
@@ -167,12 +166,6 @@ export default function AdminScheduleCalendar() {
         <span style={{ fontSize: 16, fontWeight: 700 }}>{year}년 {mo + 1}월</span>
         <button className="bnav" aria-label="다음 달" onClick={() => moveMonth(1)}>{mobileMode ? '›' : '▶'}</button>
       </div>
-      <div className="calendar-tools" style={{ marginBottom: 14 }}>
-        <button className="bout" aria-pressed={!weekView && selected === today} onClick={() => { setMonth(today.slice(0, 7)); selectDate(today) }}>오늘{!loading && !error && ` · ${dayEvents(today).length}건`}</button>
-        <button className="bout" aria-pressed={weekView} onClick={() => { setMonth(today.slice(0, 7)); setSelected(null); setWeekView(true) }}>이번 주{!loading && !error && ` · ${weekEvents.length}건`}</button>
-        <button className="bout" aria-pressed={!weekView && selected === null} onClick={() => { setSelected(null); setWeekView(false) }}>월 전체 보기</button>
-        <span style={{ fontSize: 12, color: 'var(--ui-text-2)' }} aria-live="polite">{listTitle}{selected ? ' 선택됨' : ''}</span>
-      </div>
       {mobileMode ? <CompactMonthCalendar year={year} month={mo} selectedDate={selected} holidays={holidays} showNavigation={false}
         onSelectDate={selectDate} getDayInfo={date => ({ markers: dayEvents(date).map(event => event.completed ? 'var(--ui-text-3)' : 'var(--ui-primary)'), description: `일정 ${dayEvents(date).length}건` })} /> : <>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,minmax(0,1fr))', gap: 3, marginBottom: 3 }}>
@@ -185,10 +178,10 @@ export default function AdminScheduleCalendar() {
             const dayItems = dayEvents(date)
             const holiday = holidays?.filter(h => h.date === date).map(h => h.name).join(' · ')
             const dow = (firstDay + i) % 7
-            return <div key={date} className={`cd${date === today ? ' tod' : ''}${holiday ? ' hol' : ''}${selected === date ? ' selected' : ''}`} onClick={() => selectDate(date)}>
+            return <div key={date} className={`cd${date === today ? ' tod' : ''}${selected === date ? ' selected' : ''}`} onClick={() => selectDate(date)}>
               <button className="day-select" aria-pressed={selected === date} aria-label={`${mo + 1}월 ${i + 1}일${holiday ? ', ' + holiday : ''}, 일정 ${dayItems.length}건`} onClick={() => selectDate(date)} style={{ justifyContent: 'flex-start', gap: 4 }}>
                 <span style={{ fontSize: 12, fontWeight: date === today || holiday ? 700 : 500, color: holiday || dow === 0 ? 'var(--ui-danger)' : dow === 6 ? '#2563A6' : 'var(--ui-text)', width: 20, height: 20, lineHeight: '20px', textAlign: 'center', flexShrink: 0 }}>{i + 1}</span>
-                {holiday ? <span title={holiday} style={{ fontSize: 10, color: 'var(--ui-danger)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{holiday}</span> : date === today && <span style={{ fontSize: 10, color: 'var(--ui-primary)' }}>오늘</span>}
+                {holiday ? <span title={holiday} style={{ fontSize: 10, color: 'var(--ui-text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{holiday}</span> : date === today && <span style={{ fontSize: 10, color: 'var(--ui-primary)' }}>오늘</span>}
               </button>
               {dayItems.slice(0, 3).map(event => <button key={event.id} className="ce normal" onClick={e => { e.stopPropagation(); selectDate(date) }} title={event.title} style={{ opacity: event.completed ? .6 : 1 }}><span style={{ textDecoration: event.completed ? 'line-through' : undefined }}>{event.start_time ? event.start_time.slice(0, 5) + ' ' : ''}{event.title}</span></button>)}
               {dayItems.length > 3 && <button className="calendar-more" onClick={() => selectDate(date)}>+{dayItems.length - 3}건 더보기</button>}
@@ -198,9 +191,9 @@ export default function AdminScheduleCalendar() {
         </div>
       </>}
     </article>
+    <ScheduleUpcoming source="admin" refreshToken={events} />
     <article className="internal-card">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 14 }}><h2>{listTitle} 일정 목록</h2><label style={{ fontSize: 12, color: 'var(--ui-text-2)' }}>분류 <select className="bsm" aria-label="일정 분류" value={filter} onChange={e => setFilter(e.target.value)}>{['전체', ...categories].map(c => <option key={c}>{c}</option>)}</select></label></div>
-      {weekView && <p style={{ fontSize: 12, color: 'var(--ui-text-3)', marginBottom: 10 }}>{weekStart.slice(5)} ~ {weekEnd.slice(5)}</p>}
       {list(items, `${listTitle}에 일정이 없습니다`)}
     </article>
     {draft && <dialog ref={dialogRef} className="internal-dialog" aria-labelledby="internal-dialog-title" onCancel={e => { e.preventDefault(); close() }}>

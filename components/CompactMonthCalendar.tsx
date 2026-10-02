@@ -55,10 +55,10 @@ export default function CompactMonthCalendar({
           aria-label={`${month + 1}월 ${day}일${names?.length ? `, ${names.join(', ')}` : ''}${info?.description ? `, ${info.description}` : ''}`}
           aria-pressed={isSelected}
           title={names?.join(', ')}
-          style={{ minWidth: 0, minHeight: 46, padding: '4px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', gap: 3, border: isSelected ? '1px solid var(--ui-primary)' : '1px solid transparent', borderRadius: 8, background: isSelected ? 'var(--ui-surface-2)' : 'transparent', cursor: 'pointer', fontFamily: 'inherit' }}>
+          style={{ minWidth: 0, minHeight: 46, padding: '4px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', gap: 3, border: isSelected ? '1px solid var(--ui-primary)' : '1px solid transparent', borderRadius: 8, background: info?.holiday ? 'var(--ui-danger-bg)' : isSelected ? 'var(--ui-surface-2)' : 'transparent', cursor: 'pointer', fontFamily: 'inherit' }}>
           <span style={{ width: '100%', minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: names?.length && showHolidayNames ? 'flex-start' : 'center', gap: 2 }}>
             <span style={{ width: 22, height: 22, flexShrink: 0, display: 'grid', placeItems: 'center', borderRadius: '50%', background: isToday && !isSelected ? 'var(--ui-surface-2)' : 'transparent', fontSize: 13, fontWeight: isToday || isSelected || isHoliday ? 700 : 400, color }}>{day}</span>
-            {showHolidayNames && names?.length ? <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 9, color: red, textAlign: 'left' }}>{names.join(' · ')}</span> : null}
+            {showHolidayNames && names?.length ? <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 9, color: 'var(--ui-text-3)', textAlign: 'left' }}>{names.join(' · ')}</span> : null}
           </span>
           <span style={{ minHeight: 4, display: 'flex', gap: 2 }}>
             {(info?.markers ?? []).slice(0, 3).map((marker, markerIndex) => <span key={markerIndex} style={{ width: 4, height: 4, borderRadius: '50%', background: marker }} />)}

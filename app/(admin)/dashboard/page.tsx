@@ -8,6 +8,7 @@ import { IconCalendar, IconChat, IconCheck, IconClock } from '@/components/icons
 import { isUnreadParentComment } from '@/lib/records'
 import { useMobileMode } from '@/context/MobileModeContext'
 import { loadPendingClassSends, ClassBulkSendStatus } from '@/lib/class-bulk-sends'
+import ScheduleUpcoming from '@/components/ScheduleUpcoming'
 import Card from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import PageHeader from '@/components/ui/PageHeader'
@@ -219,6 +220,11 @@ export default function DashboardPage(){
           )
         })}
       </Card>
+
+      <div className="dashboard-schedule-grid">
+        <ScheduleUpcoming source="academy" dashboard />
+        <ScheduleUpcoming source="admin" dashboard />
+      </div>
 
       {/* 미발송 반 목록 */}
       <Card style={{ marginBottom: 16 }}>

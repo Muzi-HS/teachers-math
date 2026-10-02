@@ -9,6 +9,7 @@ import { useMobileMode } from '@/context/MobileModeContext'
 import { usePublicHolidays } from '@/lib/use-public-holidays'
 import CompactMonthCalendar from '@/components/CompactMonthCalendar'
 import AdminScheduleCalendar from './AdminScheduleCalendar'
+import ScheduleUpcoming from '@/components/ScheduleUpcoming'
 
 type Evt = {
     id: number
@@ -96,6 +97,13 @@ export default function SchedulePage() {
     const [selectedDate, setSelectedDate] = useState<string | null>(null)
     const [loadError, setLoadError] = useState(false)
     const loadVersion = useRef(0)
+
+    useEffect(() => {
+        if (role === 'admin' && new URLSearchParams(window.location.search).get('tab') === 'admin') {
+            const timer = window.setTimeout(() => setScheduleTab('admin'), 0)
+            return () => window.clearTimeout(timer)
+        }
+    }, [role])
 
     useEffect(() => {
         let active = true
@@ -315,14 +323,14 @@ export default function SchedulePage() {
         .schedule-page .cd.tod{border-color:${navy};background:${navyM};}
         .schedule-page .cd.om{opacity:.4;cursor:default;}
         .schedule-page .cd.om:hover{background:#fff;}
-        .schedule-page .cd.hol{background:rgba(222,53,11,.05);}
+        .schedule-page .cd.hol{background:var(--ui-danger-bg);}
         ${mobileMode ? `
         /* 학부모 학원일정 캘린더와 동일하게 — 흰 박스/테두리 없는 플랫한 셀 디자인 */
         .schedule-page .cd{background:none;border:none;border-radius:8px;}
         .schedule-page .cd:hover{background:var(--ui-hover);}
         .schedule-page .cd.tod{border-color:transparent;}
         .schedule-page .cd.om:hover{background:none;}
-        .schedule-page .cd.hol{background:none;}
+        .schedule-page .cd.hol{background:var(--ui-danger-bg);}
         .schedule-page .bnav{border:none;background:none;color:${tx2};font-size:18px;padding:4px 10px;}
         .schedule-page .bnav:hover{color:${navy};}
         ` : ''}
@@ -334,7 +342,6 @@ export default function SchedulePage() {
         .schedule-page .day-select{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:28px;background:none;border:0;border-radius:4px;color:inherit;font:inherit;text-align:left;cursor:pointer;margin-bottom:3px;}
         .schedule-page .day-select:focus-visible{outline-offset:-2px;}
         .schedule-page .calendar-more{display:block;width:100%;border:0;background:none;color:var(--ui-primary);font-size:11px;padding:4px 0;text-align:left;cursor:pointer;}
-        .schedule-page .calendar-tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
         @media(max-width:700px){.schedule-page{padding:16px 12px 88px !important;}.schedule-page .ce{font-size:10px;padding:2px;gap:2px;}.schedule-page .ce > svg{width:10px;height:10px;}}
         .schedule-page .ce.normal{background:${navyM};color:${navy};}
         .schedule-page .ce.holiday{background:rgba(222,53,11,.15);color:${re};}
@@ -351,6 +358,9 @@ export default function SchedulePage() {
         .schedule-page .fi:focus{border-color:${navy};}
         .schedule-page .rr{display:flex;gap:16px;margin-top:6px;}
         .schedule-page .rr label{display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;}
+        .schedule-tabs{display:flex;border-bottom:1px solid var(--ui-border);gap:4px;margin-bottom:22px;}
+        .schedule-tabs button{border:0;border-bottom:2px solid transparent;background:none;color:var(--ui-text-2);font:inherit;font-size:13px;padding:12px 20px;cursor:pointer;}
+        .schedule-tabs button[aria-selected=true]{color:var(--ui-primary);border-bottom-color:var(--ui-primary);font-weight:700;}
         .schedule-page .lb{display:block;font-size:12px;font-weight:500;color:${tx2};margin-bottom:5px;}
       `}</style>
 
@@ -361,10 +371,16 @@ export default function SchedulePage() {
                 </div>
             )}
 
-            {role === 'admin' && <nav aria-label="일정 구분" style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-                <button className={scheduleTab === 'academy' ? 'bgold' : 'bout'} aria-current={scheduleTab === 'academy' ? 'page' : undefined} onClick={() => setScheduleTab('academy')}>학원 일정</button>
-                <button className={scheduleTab === 'admin' ? 'bgold' : 'bout'} aria-current={scheduleTab === 'admin' ? 'page' : undefined} onClick={() => setScheduleTab('admin')}>관리자 · 내부용</button>
-            </nav>}
+            {role === 'admin' && <div className="schedule-tabs" role="tablist" aria-label="일정 구분">
+                {(['academy', 'admin'] as const).map(tab => <button key={tab} id={`schedule-tab-${tab}`} role="tab" tabIndex={scheduleTab === tab ? 0 : -1} aria-selected={scheduleTab === tab} aria-controls="schedule-panel" onClick={() => setScheduleTab(tab)} onKeyDown={event => {
+                    if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
+                        event.preventDefault()
+                        const next = event.key === 'Home' ? 'academy' : event.key === 'End' ? 'admin' : tab === 'academy' ? 'admin' : 'academy'
+                        setScheduleTab(next); document.getElementById(`schedule-tab-${next}`)?.focus()
+                    }
+                }}>{tab === 'academy' ? '학원일정' : '학원일정 · 내부용'}</button>)}
+            </div>}
+            <div id="schedule-panel" role={role === 'admin' ? 'tabpanel' : undefined} aria-labelledby={role === 'admin' ? `schedule-tab-${scheduleTab}` : undefined}>
             {role === 'admin' && scheduleTab === 'admin' ? <AdminScheduleCalendar /> : <>
             {/* 헤더 */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: mobileMode ? 14 : 20, flexWrap: 'wrap', gap: 10 }}>
@@ -391,12 +407,6 @@ export default function SchedulePage() {
                     <span style={{ fontSize: 16, fontWeight: 700, color: tx }}>{yr}년 {mo + 1}월</span>
                     <button className="bnav" aria-label="다음 달" onClick={() => moveMo(1)}>{mobileMode ? '›' : '▶'}</button>
                 </div>
-                <div className="calendar-tools" style={{ marginBottom: 14 }}>
-                    <button className="bout" onClick={() => { const now = kstNow(); if (yr !== now.getFullYear() || mo !== now.getMonth()) { setLoading(true); setLoadError(false) }; setYr(now.getFullYear()); setMo(now.getMonth()); setSelectedDate(kstDateStr()) }}>오늘</button>
-                    <button className="bout" aria-pressed={selectedDate === null} onClick={() => setSelectedDate(null)}>월 전체 보기</button>
-                    <span style={{ fontSize: 12, color: tx2 }} aria-live="polite">{listTitle}{selectedDate ? ' 선택됨' : ''}</span>
-                </div>
-
                 {mobileMode && <CompactMonthCalendar year={yr} month={mo} selectedDate={selectedDate}
                     holidays={publicHolidays} showNavigation={false} onSelectDate={setSelectedDate}
                     getDayInfo={date => {
@@ -436,10 +446,11 @@ export default function SchedulePage() {
                         const isTod = ds === kstDateStr()
                         const de = dayEvts(ds)
                         const publicHoliday = publicHolidays?.find(h => h.date === ds)
-                        const isHol = !!publicHoliday || de.some(e => e.type === 'holiday')
+                        const isClosed = de.some(e => e.type === 'holiday')
+                        const isHol = !!publicHoliday || isClosed
                         let cls = 'cd'
                         if (isTod) cls += ' tod'
-                        if (isHol) cls += ' hol'
+                        if (isClosed) cls += ' hol'
                         if (selectedDate === ds) cls += ' selected'
                         const nc = dow === 0 ? re : dow === 6 ? saturday : tx
                         const dNotices = dayNotices(ds)
@@ -453,7 +464,7 @@ export default function SchedulePage() {
                                     width: 20, height: 20, lineHeight: '20px', textAlign: 'center',
                                     borderRadius: '50%', background: 'transparent', flexShrink: 0,
                                 }}>{day}</span>
-                                {publicHoliday && <span title={publicHoliday.name} style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10, color: re, lineHeight: '14px' }}>{publicHoliday.name}</span>}
+                                {publicHoliday && <span title={publicHoliday.name} style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10, color: tx3, lineHeight: '14px' }}>{publicHoliday.name}</span>}
                                 {isTod && !mobileMode && !publicHoliday && <span style={{ fontSize: 10, color: navy }}>오늘</span>}
                                 </button>
                                 {mobileMode ? (
@@ -497,6 +508,8 @@ export default function SchedulePage() {
                 </div>
                 </>}
             </div>
+
+            <ScheduleUpcoming source="academy" refreshToken={evts} />
 
             {/* 이번달 목록 */}
             <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: mobileMode ? 14 : 22, boxShadow: '0 1px 4px rgba(0,0,0,.06)' }}>
@@ -702,6 +715,7 @@ export default function SchedulePage() {
                 </div>
             )}
             </>}
+            </div>
         </div>
     )
 }
