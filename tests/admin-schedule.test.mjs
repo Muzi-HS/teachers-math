@@ -19,7 +19,17 @@ test('internal calendar CRUD is restricted to approved administrators by actual 
     INSERT INTO teachers VALUES ('${ids[0]}','admin',true), ('${ids[1]}','teacher',true),
       ('${ids[2]}','assistant',true), ('${ids[3]}','admin',false);`)
   const migration = readFileSync(new URL('../supabase/admin_schedule_migration.sql', import.meta.url), 'utf8')
+  await db.exec(`CREATE TABLE admin_schedule_events (
+    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, title text NOT NULL,
+    start_date date NOT NULL, end_date date NOT NULL, start_time time, end_time time,
+    category text NOT NULL DEFAULT '업무' CHECK (category IN ('업무','회의','상담','준비','기타')),
+    owner text NOT NULL DEFAULT '', location text NOT NULL DEFAULT '', memo text NOT NULL DEFAULT '', completed boolean NOT NULL DEFAULT false,
+    CHECK (length(trim(title)) BETWEEN 1 AND 120), CHECK (end_date >= start_date),
+    CHECK ((start_time IS NULL AND end_time IS NULL) OR (start_time IS NOT NULL AND (end_time IS NULL OR end_date > start_date OR end_time > start_time)))
+  ); INSERT INTO admin_schedule_events(title,start_date,end_date,category) VALUES ('기존 일정','2026-10-01','2026-10-01','회의');`)
   await db.exec(migration)
+  assert.equal((await db.query('SELECT category FROM admin_schedule_events')).rows[0].category, '보라')
+  await db.exec('DELETE FROM admin_schedule_events; ALTER SEQUENCE admin_schedule_events_id_seq RESTART WITH 1;')
   await db.exec(migration)
   await db.query("SELECT set_config('test.uid', $1, false)", [ids[0]])
   await db.exec('SET ROLE authenticated')
@@ -73,6 +83,13 @@ test('internal calendar keeps month-first layout and date selection without redu
       if (name.includes('MobileModeContext')) return { useMobileMode: () => ({ mobileMode: false }) }
       if (name.includes('use-public-holidays')) return { usePublicHolidays: () => ({ holidays: [], fallback: false }) }
       if (name.includes('/kst')) return { kstDateStr: () => '2026-10-02' }
+      if (name.includes('schedule-colors')) {
+        const module = { exports: {} }
+        vm.runInNewContext(ts.transpileModule(readFileSync(new URL('../lib/schedule-colors.ts', import.meta.url), 'utf8'), {
+          compilerOptions: { module: ts.ModuleKind.CommonJS },
+        }).outputText, module)
+        return module.exports
+      }
       return {}
     },
   }

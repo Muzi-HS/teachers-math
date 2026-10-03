@@ -35,8 +35,6 @@ const NAV = [
   { key: 'stats', href: '/stats', label: '통계',
     icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M18 20V10M12 20V4M6 20v-6"/></svg> },
   { key: 'divider2', href: '', label: '', icon: null },
-  { key: 'coupons', href: '/coupons', label: '쿠폰처리',
-    icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M9 5H4a1 1 0 00-1 1v3a2 2 0 010 4v3a1 1 0 001 1h5m0-12h11a1 1 0 011 1v3a2 2 0 000 4v3a1 1 0 01-1 1H9m0-12v12"/></svg> },
   { key: 'consultations', href: '/consultations', label: '상담신청',
     icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> },
   { key: 'app-qr', href: '/app-qr', label: '앱설치',
