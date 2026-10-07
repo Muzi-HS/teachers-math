@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { ExamAttempt, GradedQuestion, isAnswerCorrect } from '@/lib/auto-grading'
 
-type QuestionRow = { number: number; points: number; kind: 'choice' | 'text'; correct_answer: number[] | string }
+type QuestionRow = { number: number; points: number; kind: 'choice' | 'text'; correct_answer: number[] | string; award_all?: boolean }
 type Student = { id: number; name: string; school?: string }
 type TestBatch = { id: number; round_number: number; name: string }
 type Assignee = { student_id: number; batch_id: number | null }
@@ -42,7 +42,7 @@ export default function AutoTestAnswerSheet({ testId, students, batchId, onBatch
     async function load(showLoading: boolean) {
       if (showLoading) setLoading(true)
       const [q, s, a, b] = await Promise.all([
-        supabase.from('test_questions').select('number,points,kind,correct_answer').eq('test_id', testId).order('number'),
+        supabase.from('test_questions').select('*').eq('test_id', testId).order('number'),
         supabase.from('test_assignees').select('student_id,batch_id').eq('test_id', testId),
         supabase.from('test_attempts').select('*').eq('test_id', testId),
         supabase.from('test_batches').select('id,round_number,name').eq('test_id', testId).order('round_number'),
@@ -62,7 +62,7 @@ export default function AutoTestAnswerSheet({ testId, students, batchId, onBatch
     return () => { cancelled = true; clearInterval(timer) }
   }, [testId, onAssigneesLoaded])
 
-  const gradedQuestions: GradedQuestion[] = questions.map(q => ({ number: q.number, points: q.points, kind: q.kind, correctAnswer: q.correct_answer }))
+  const gradedQuestions: GradedQuestion[] = questions.map(q => ({ number: q.number, points: q.points, kind: q.kind, correctAnswer: q.correct_answer, awardAll: q.award_all }))
   const batchByStudent = new Map(assignees.map(row => [row.student_id, row.batch_id]))
   function batchSummary(targetBatchId: number | null) {
     const rows = attempts.filter(a => a.submitted_at && (targetBatchId === null || batchByStudent.get(a.student_id) === targetBatchId))
@@ -187,7 +187,7 @@ export default function AutoTestAnswerSheet({ testId, students, batchId, onBatch
                     return <div className="ans-table-row" key={q.number} data-ok={ok}>
                       <span>{q.number}번</span>
                       <span>{fmtAnswer(q.kind, selectedAttempt.answers[String(q.number)])}</span>
-                      <span>{fmtAnswer(q.kind, q.correctAnswer)}</span>
+                      <span>{q.awardAll ? '모두 정답 처리' : fmtAnswer(q.kind, q.correctAnswer)}</span>
                       <span className="ans-result" data-ok={ok}>{ok ? '정답' : '오답'}</span>
                       <span>{q.points}점</span>
                     </div>

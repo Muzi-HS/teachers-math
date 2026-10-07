@@ -45,6 +45,9 @@ test('isAnswerCorrect mirrors server-side grading: unordered multi-select and tr
   assert.equal(isAnswerCorrect(choice, [1]), false)
   assert.equal(isAnswerCorrect(choice, [1, 2]), false)
   assert.equal(isAnswerCorrect(choice, undefined), false)
+  assert.equal(isAnswerCorrect({ ...choice, awardAll: true }, undefined), true)
+  assert.equal(isAnswerCorrect({ ...choice, awardAll: true }, [5]), true)
+  assert.equal(isAnswerCorrect(choice, [3, 1, 1]), true)
   const text = { number: 2, points: 10, kind: 'text', correctAnswer: 'x = 2' }
   assert.equal(isAnswerCorrect(text, '  x = 2  '), true)
   assert.equal(isAnswerCorrect(text, 'x=2'), false)
@@ -92,6 +95,9 @@ test('PostgreSQL migration and exam lifecycle', async t => {
   await db.exec(listIndexes)
   await db.exec(listIndexes)
   const questions = [{ points: 20, choices: [2], text: '' }, { points: 30, choices: [1, 3], text: '' }, { points: 50, choices: [], text: 'x = 2' }]
+  const correctionMigration = readFileSync(new URL('../supabase/test_grading_correction_migration.sql', import.meta.url), 'utf8')
+  await db.exec(correctionMigration)
+  await db.exec(correctionMigration)
   async function create(published = true, qs = questions) {
     const { rows } = await db.query('select save_auto_test(null,$1,$2,$3,true,$4,$5,$6) as id', ['Test','2026-09-22',qs.length,published,JSON.stringify(qs),[1,2]])
     return Number(rows[0].id)
@@ -276,6 +282,56 @@ test('PostgreSQL migration and exam lifecycle', async t => {
     await db.query('insert into test_scores(test_id,student_id,correct,score) values($1,1,8,80)',[manual])
     await db.exec('reset role')
     assert.equal((await db.query('select score from test_scores where test_id=$1',[manual])).rows[0].score,80)
+  })
+  await t.test('grading corrections preserve answers, recalculate linked scores, affect later submissions and can be undone', async () => {
+    const id = await create()
+    await act(id,'start')
+    await act(id,'submit',{'2':[5]},1)
+    await db.query('insert into record_test_items(record_id,test_id) values(1,$1)', [id])
+    const original = (await db.query('select * from test_attempts where test_id=$1 and student_id=1',[id])).rows[0]
+    const snapshot = (await db.query('select get_test_correction_data($1) as data',[id])).rows[0].data
+    const qs = snapshot.questions.map(q => ({ ...q, points: q.number === 1 ? 10 : q.number === 3 ? 60 : 30,
+      award_all: q.number !== 2, correct_answer: q.number === 2 ? [5] : q.correct_answer }))
+    const { rows } = await db.query('select apply_test_correction($1,$2,$3,$4) as id',[id,JSON.stringify(qs),'Key and full-credit correction',snapshot.version])
+    const corrected = (await db.query('select * from test_attempts where test_id=$1 and student_id=1',[id])).rows[0]
+    assert.equal(corrected.score,100)
+    assert.equal(corrected.cor,3)
+    assert.deepEqual(corrected.answers,original.answers)
+    assert.deepEqual(corrected.submitted_at,original.submitted_at)
+    assert.equal((await db.query('select t_score from record_test_items where test_id=$1',[id])).rows[0].t_score,100)
+    await assert.rejects(db.query('select apply_test_correction($1,$2,$3,$4)',[id,JSON.stringify(qs),'Stale edit',snapshot.version]))
+    await act(id,'start',null,null,2)
+    await act(id,'submit',{},1,2)
+    assert.equal((await db.query('select score from test_attempts where test_id=$1 and student_id=2',[id])).rows[0].score,70)
+    const review = (await db.query('select student_test_review(1,$1) as r',[id])).rows[0].r
+    assert.equal(review[0].award_all,true)
+    assert.equal(review[0].correct_rate,100)
+    await db.query('select undo_test_correction($1)',[rows[0].id])
+    assert.equal((await db.query('select t_score from record_test_items where test_id=$1',[id])).rows[0].t_score,0)
+    assert.equal((await db.query('select score from test_attempts where test_id=$1 and student_id=2',[id])).rows[0].score,0)
+    await assert.rejects(db.query('select undo_test_correction($1)',[rows[0].id]))
+    const restored = (await db.query('select get_test_correction_data($1) as data',[id])).rows[0].data
+    const invalid = restored.questions.map(q => ({ ...q,points:q.number===2?0:q.points,award_all:true }))
+    await assert.rejects(db.query('select apply_test_correction($1,$2,$3,$4)',[id,JSON.stringify(invalid),'Invalid points',restored.version]))
+    assert.deepEqual((await db.query('select get_test_correction_data($1) as data',[id])).rows[0].data.questions,restored.questions)
+    await db.query("select set_config('test.uid','',false)")
+    await db.exec('set role authenticated')
+    await assert.rejects(db.query('select get_test_correction_data($1)',[id]))
+    await assert.rejects(db.query('select apply_test_correction($1,$2,$3,$4)',[id,JSON.stringify(qs),'Forbidden',restored.version]))
+    await assert.rejects(db.query('select recalculate_test_results($1)',[id]))
+    await db.exec('reset role')
+    await db.query("select set_config('test.uid','11111111-1111-1111-1111-111111111111',false)")
+  })
+  await t.test('one-block Yushin correction works twice without any temporary table', async () => {
+    const qs=Array.from({length:6},()=>({points:10,choices:[1],text:''}))
+    const id=await create(true,qs)
+    await db.query('update tests set name=$1 where id=$2',['공통수학2 2학기 1차 테스트(유신고 기출)',id])
+    await act(id,'start'); await act(id,'submit',{},1)
+    const correction=readFileSync(new URL('../supabase/yushin_test_questions_3_6_correction.sql',import.meta.url),'utf8')
+    await db.exec(correction); await db.exec(correction)
+    const attempt=(await db.query('select * from test_attempts where test_id=$1',[id])).rows[0]
+    assert.equal(attempt.cor,2); assert.equal(attempt.score,33); assert.deepEqual(attempt.answers,{})
+    assert.equal((await db.query('select count(*)::int n from test_grading_corrections where test_id=$1',[id])).rows[0].n,1)
   })
   await t.test('PIN verification locks repeated failures and unlocks after the cooldown', async () => {
     for (let i=0;i<5;i++) assert.equal((await db.query("select verify_test_student(1,'9999') as ok")).rows[0].ok,false)

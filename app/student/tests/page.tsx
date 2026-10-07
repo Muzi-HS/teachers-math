@@ -190,7 +190,7 @@ export default function StudentTestsPage() {
     const review = active.review?.find(row => row.number === q.number)
     if (!review) return []
     const mine = active.attempt.answers[q.number]
-    return [{ question: q, review, mine, correct: isAnswerCorrect({ ...q, correctAnswer: review.correct_answer }, mine) }]
+    return [{ question: q, review, mine, correct: isAnswerCorrect({ ...q, correctAnswer: review.correct_answer, awardAll: review.award_all }, mine) }]
   }) : []
   const wrongCount = reviewRows.filter(row => !row.correct).length
 
@@ -291,7 +291,7 @@ export default function StudentTestsPage() {
               {reviewRows.filter(row => reviewFilter === 'all' || !row.correct).map(({ question, review, mine, correct }) =>
                 <tr data-correct={correct} key={question.number}>
                   <td>{question.number}번</td>
-                  <td>{displayAnswer(review.correct_answer)}</td>
+                  <td>{review.award_all ? '모두 정답 처리' : displayAnswer(review.correct_answer)}</td>
                   <td>{displayAnswer(mine)}</td>
                   <td className="exam-review-result">{correct ? '정답' : '오답'}</td>
                   <td>{review.correct_rate}%</td>

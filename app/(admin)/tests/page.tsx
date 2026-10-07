@@ -9,6 +9,7 @@ import { useMobileMode } from '@/context/MobileModeContext'
 import TestEditorModal from '@/components/TestEditorModal'
 import AutoTestStatus from '@/components/AutoTestStatus'
 import AutoTestAnswerSheet from '@/components/AutoTestAnswerSheet'
+import TestGradingCorrectionModal from '@/components/TestGradingCorrectionModal'
 
 type Test = { id:number; name:string; date:string; total:number; auto_grading?:boolean; is_published?:boolean; is_archived?:boolean }
 type ScoreRow = {
@@ -41,6 +42,8 @@ export default function TestsPage() {
   const [editId,    setEditId]    = useState<number|null>(null)
   const [editSc,    setEditSc]    = useState<{row:ScoreRow;cor:string;score:string}|null>(null)
   const [saving,    setSaving]    = useState(false)
+  const [correctionModal, setCorrectionModal] = useState(false)
+  const [correctionRevision, setCorrectionRevision] = useState(0)
   const [notif,     setNotif]     = useState<{msg:string;ok:boolean}|null>(null)
   const [testStats, setTestStats] = useState<Record<number,{cnt:number; avg:number; max:number; min:number; dist:number[]}>>({})
 
@@ -473,13 +476,13 @@ export default function TestsPage() {
             <h1 style={{fontSize:mobileMode?17:21,fontWeight:700,color:tx}}>{curTest.name}</h1>
             <p style={{fontSize:12,color:tx2,marginTop:4}}>{curTest.date} · 총 {curTest.total}문항 · 누적 응시 {scores.length}명</p>
           </div>
-          <div/>
+          <div>{curTest.auto_grading && canManageTests && <button className="bout" onClick={() => setCorrectionModal(true)}>채점 정정</button>}</div>
         </div>
 
         {curTest.auto_grading && <AutoTestStatus test={curTest} students={students}
           onResults={() => { void fetchScores(curTest.id); void fetchAllStats() }} />}
 
-        {curTest.auto_grading && <AutoTestAnswerSheet testId={curTest.id} students={students}
+        {curTest.auto_grading && <AutoTestAnswerSheet key={`${curTest.id}:${correctionRevision}`} testId={curTest.id} students={students}
           batchId={selectedBatchId} onBatchChange={setSelectedBatchId} onAssigneesLoaded={setBatchAssignees} />}
 
         {visibleScores.length===0?(
@@ -597,6 +600,7 @@ export default function TestsPage() {
       </>}
 
       {/* ════ 테스트 추가/수정 모달 ════ */}
+      {correctionModal && curTest && <TestGradingCorrectionModal test={curTest} students={students} onClose={() => setCorrectionModal(false)} onSaved={() => { setCorrectionRevision(value => value + 1); void fetchScores(curTest.id); void fetchAllStats(); toast('채점 정정을 반영했습니다.') }} />}
       {addModal && <TestEditorModal
         test={editId ? tests.find(t => t.id === editId) ?? null : null}
         students={students} onClose={() => setAddModal(false)} onSaved={onTestSaved}

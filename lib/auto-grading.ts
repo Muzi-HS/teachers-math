@@ -6,7 +6,7 @@ export type ExamAttempt = {
   submitted_at: string | null; answers: ExamAnswers; revision: number
   cor: number | null; score: number | null; earned_points: number | null; total_points: number | null
 }
-export type ExamReviewQuestion = { number: number; correct_answer: number[] | string; correct_count: number; submitted_count: number; correct_rate: number }
+export type ExamReviewQuestion = { number: number; correct_answer: number[] | string; award_all?: boolean; correct_count: number; submitted_count: number; correct_rate: number }
 export type ExamState = { server_now: string; name: string; attempt: ExamAttempt; questions: ExamQuestion[]; review?: ExamReviewQuestion[]; review_error?: string }
 export type StudentExam = {
   id: number; name: string; date: string; total: number
@@ -21,12 +21,13 @@ export function remainingSeconds(deadline: number, now: number) {
   return Math.max(0, Math.ceil((deadline - now) / 1000))
 }
 
-export type GradedQuestion = { number: number; points: number; kind: 'choice' | 'text'; correctAnswer: number[] | string }
+export type GradedQuestion = { number: number; points: number; kind: 'choice' | 'text'; correctAnswer: number[] | string; awardAll?: boolean }
 // finalize_test_attempt()의 채점 로직과 동일한 기준(정확한 조합 일치 / 공백 제외 완전 일치)을 클라이언트에서 재현한다.
 export function isAnswerCorrect(q: GradedQuestion, submitted: string | number[] | undefined) {
+  if (q.awardAll) return true
   if (q.kind === 'choice') {
     if (!Array.isArray(submitted) || !Array.isArray(q.correctAnswer)) return false
-    const a = [...submitted].sort((x, y) => x - y)
+    const a = [...new Set(submitted)].sort((x, y) => x - y)
     const b = [...q.correctAnswer].sort((x, y) => x - y)
     return a.length === b.length && a.every((v, i) => v === b[i])
   }
