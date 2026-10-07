@@ -61,13 +61,14 @@ export default function HomeworkRanking() {
   const percent = (value: number | null) => value === null ? '—' : `${value.toFixed(1)}%`
   return <section className="homework-ranking">
     <style>{`
-      .homework-ranking{background:var(--ui-surface);border:1px solid var(--ui-border);border-radius:14px;padding:22px;min-width:0}
+      .homework-ranking{background:var(--ui-surface);border:1px solid var(--ui-border);border-radius:12px;padding:22px;min-width:0;box-shadow:0 1px 4px rgba(0,0,0,.06)}
       .ranking-filters{display:flex;gap:14px;flex-wrap:wrap;margin:20px 0}.ranking-filters label{font-size:12px;color:var(--ui-text-2);display:flex;flex-direction:column;gap:6px}
       .ranking-filters input,.ranking-filters select{padding:9px 12px;border:1px solid var(--ui-border);border-radius:8px;background:var(--ui-surface);color:var(--ui-text);font:inherit;min-width:120px}
-      .ranking-table{width:100%;border-collapse:collapse;font-size:13px;white-space:nowrap}.ranking-table th{background:var(--ui-surface-2);font-weight:500;color:var(--ui-text-2);text-align:left;font-size:12px}.ranking-table th,.ranking-table td{padding:14px 12px;border-bottom:1px solid var(--ui-border)}
-      .ranking-table td:nth-child(n+5),.ranking-table th:nth-child(n+5){text-align:right;font-variant-numeric:tabular-nums}.ranking-table tbody tr:hover{background:var(--ui-bg)}
-      .ranking-number{display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:30px;border-radius:9px;font-weight:700}.ranking-top{color:var(--ui-primary);background:var(--ui-surface-2)}
-      @media(max-width:700px){.homework-ranking{padding:16px}.ranking-filters{gap:10px}.ranking-filters label{flex:1;min-width:125px}.ranking-table th,.ranking-table td{padding:12px 9px}}
+      .ranking-table{width:100%;border-collapse:collapse;font-size:13px;white-space:nowrap}.ranking-table th{background:var(--ui-bg);font-weight:600;color:var(--ui-text-3);text-align:left;font-size:11px;letter-spacing:.5px;padding:9px 12px}.ranking-table td{padding:11px 12px}.ranking-table th,.ranking-table td{border-bottom:1px solid var(--ui-border)}.ranking-table tr:last-child td{border-bottom:0}
+      .ranking-table td:nth-child(n+5),.ranking-table th:nth-child(n+5){text-align:right;font-variant-numeric:tabular-nums}.ranking-table tbody tr:hover{background:var(--ui-surface-2)}
+      .ranking-class-badge{display:inline-flex;padding:2px 8px;border-radius:20px;background:var(--ui-success-bg);color:var(--ui-success);font-size:11px;font-weight:500;white-space:normal}
+      .ranking-number{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:28px;border-radius:8px;font-size:12px;font-weight:700}.ranking-top{color:var(--ui-primary);background:var(--ui-surface-2)}
+      @media(max-width:700px){.homework-ranking{padding:16px}.ranking-filters{gap:10px}.ranking-filters label{flex:1;min-width:125px}.ranking-table th,.ranking-table td{padding:10px 9px}}
     `}</style>
     <h2 style={{ fontSize: 16, fontWeight: 700 }}>월별 숙제 이행률 순위</h2>
     <p style={{ fontSize: 12, color: 'var(--ui-text-2)', marginTop: 6 }}>평균 숙제 이행률 → 수업일수 → 평균 숙제 정답률 순으로 정렬합니다.</p>
@@ -80,7 +81,7 @@ export default function HomeworkRanking() {
     {loading ? <p role="status" style={{ padding: '40px 0', textAlign: 'center' }}>순위를 불러오는 중…</p> : error ? <p role="alert">{error} <button className="bout" onClick={() => setRetry(v => v + 1)}>다시 시도</button></p> : <>
       <p style={{ fontSize: 12, color: 'var(--ui-text-3)', marginBottom: 12 }}>{month.replace('-', '년 ')}월 · {rows.length}명</p>
       <div style={{ overflowX: 'auto' }}><table className="ranking-table"><thead><tr><th scope="col">순위</th><th scope="col">이름</th><th scope="col">반</th><th scope="col">학교</th><th scope="col">평균 숙제 이행률</th><th scope="col">수업일수</th><th scope="col">평균 숙제 정답률</th></tr></thead><tbody>
-        {ranked.map(row => <tr key={row.id}><td><span className={`ranking-number${row.rank <= 3 ? ' ranking-top' : ''}`}>{row.rank}</span></td><td style={{ fontWeight: 600 }}>{row.name}</td><td style={{ whiteSpace: 'normal', minWidth: 100, maxWidth: 220 }}>{classNames[row.id] || '미배정'}</td><td>{row.school || '미등록'}<small style={{ display: 'block', color: 'var(--ui-text-3)', marginTop: 3 }}>{row.school_type ?? ''}{studentGrade(row, Number(month.slice(0, 4))) ? ` · ${studentGrade(row, Number(month.slice(0, 4)))}학년` : ''}</small></td><td style={{ fontWeight: 700, color: 'var(--ui-primary)' }}>{percent(row.rate)}</td><td>{row.days}일</td><td>{percent(row.correct)}</td></tr>)}
+        {ranked.map(row => <tr key={row.id}><td><span className={`ranking-number${row.rank <= 3 ? ' ranking-top' : ''}`}>{row.rank}</span></td><td style={{ fontWeight: 600 }}>{row.name}</td><td style={{ whiteSpace: 'normal', minWidth: 100, maxWidth: 220 }}><span className="ranking-class-badge">{classNames[row.id] || '미배정'}</span></td><td>{row.school || '미등록'}<small style={{ display: 'block', color: 'var(--ui-text-3)', marginTop: 3 }}>{row.school_type ?? ''}{studentGrade(row, Number(month.slice(0, 4))) ? ` · ${studentGrade(row, Number(month.slice(0, 4)))}학년` : ''}</small></td><td style={{ fontWeight: 700, color: 'var(--ui-primary)' }}>{percent(row.rate)}</td><td>{row.days}일</td><td>{percent(row.correct)}</td></tr>)}
         {!rows.length && <tr><td colSpan={7} style={{ textAlign: 'center', padding: '48px 12px', color: 'var(--ui-text-3)' }}>해당 조건의 숙제 이행률 기록이 없습니다.</td></tr>}
       </tbody></table></div>
     </>}
