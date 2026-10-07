@@ -35,11 +35,11 @@ export default function AnalyticsView() {
   const previousHolidays = usePublicHolidays(year - 1)
   const holidayDates = new Set([...(currentHolidays.holidays ?? []), ...(previousHolidays.holidays ?? [])].map(item => item.date))
   function visitTick({ x = 0, y = 0, payload }: XAxisTickContentProps) {
-    const label = String(payload?.value ?? '')
+    const label = String(payload?.value ?? '').replace(/[./]/g, '-')
     const fullDate = `${label > today.slice(5) ? year - 1 : year}-${label}`
     const weekday = new Date(`${fullDate}T00:00:00Z`).getUTCDay()
-    const color = holidayDates.has(fullDate) || weekday === 0 ? 'var(--ui-danger)' : weekday === 6 ? '#2563eb' : tx3
-    return <g transform={`translate(${x},${y})`}><text textAnchor="middle" fontSize={10} fill={tx3} y={12}>{label}</text><text textAnchor="middle" fontSize={10} fill={color} y={28}>{['일', '월', '화', '수', '목', '금', '토'][weekday]}</text></g>
+    const color = holidayDates.has(fullDate) || weekday === 0 ? '#dc2626' : weekday === 6 ? '#2563eb' : tx3
+    return <g transform={`translate(${x},${y})`}><text textAnchor="middle" fontSize={10} style={{ fill: color }} y={12}>{label}</text><text textAnchor="middle" fontSize={10} style={{ fill: color }} y={28}>{['일', '월', '화', '수', '목', '금', '토'][weekday]}</text></g>
   }
   const { mobileMode } = useMobileMode()
   const [loading, setLoading] = useState(true)
@@ -102,7 +102,7 @@ export default function AnalyticsView() {
 
           <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: 18, marginBottom: 12, boxShadow: '0 1px 4px rgba(0,0,0,.06)' }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: tx, marginBottom: 4 }}>최근 12개월 방문량 · 상담 신청량</div>
-            <p style={{ fontSize: 11.5, color: tx3, margin: '0 0 12px' }}>월별 홈페이지 방문 수(막대)와 상담 신청 수(선)를 함께 볼 수 있습니다</p>
+            <p style={{ fontSize: 11.5, color: tx3, margin: '0 0 12px' }}>왼쪽 축은 방문 수(막대), 오른쪽 축은 상담 신청 수(선)입니다</p>
             {totalVisits === 0 && consultTotal === 0 ? (
               <p style={{ fontSize: 13, color: tx3, textAlign: 'center', padding: '30px 0' }}>아직 기록된 데이터가 없습니다</p>
             ) : (
@@ -110,11 +110,12 @@ export default function AnalyticsView() {
                 <ComposedChart data={monthlyChartData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={bd} />
                   <XAxis dataKey="month" tick={{ fontSize: 10, fill: tx3 }} axisLine={{ stroke: bd }} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: tx3 }} axisLine={{ stroke: bd }} />
+                  <YAxis yAxisId="visits" allowDecimals={false} tick={{ fontSize: 10, fill: navy }} axisLine={{ stroke: bd }} width={50} label={{ value: '방문 (회)', angle: -90, position: 'insideLeft', style: { fill: navy, fontSize: 10 } }} />
+                  <YAxis yAxisId="consults" orientation="right" allowDecimals={false} domain={[0, 'auto']} tick={{ fontSize: 10, fill: accent }} axisLine={{ stroke: bd }} width={50} label={{ value: '상담 (건)', angle: 90, position: 'insideRight', style: { fill: accent, fontSize: 10 } }} />
                   <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: `1px solid ${bd}` }} />
                   <Legend wrapperStyle={{ fontSize: 12 }} formatter={(v: string) => v === 'visits' ? '방문' : '상담 신청'} />
-                  <Bar dataKey="visits" name="visits" fill={navy} radius={[4, 4, 0, 0]} barSize={16} />
-                  <Line type="monotone" dataKey="consults" name="consults" stroke={accent} strokeWidth={2.5} dot={{ r: 3, fill: accent }} />
+                  <Bar yAxisId="visits" dataKey="visits" name="visits" fill={navy} radius={[4, 4, 0, 0]} barSize={16} />
+                  <Line yAxisId="consults" type="monotone" dataKey="consults" name="consults" stroke={accent} strokeWidth={2.5} dot={{ r: 3, fill: accent }} />
                 </ComposedChart>
               </ResponsiveContainer>
             )}
@@ -126,9 +127,9 @@ export default function AnalyticsView() {
               <p style={{ fontSize: 13, color: tx3, textAlign: 'center', padding: '30px 0' }}>아직 기록된 방문이 없습니다</p>
             ) : (
               <ResponsiveContainer width="100%" height={220}>
-                <LineChart data={dailyChartData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                <LineChart data={dailyChartData} margin={{ top: 10, right: 24, left: 0, bottom: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={bd} />
-                  <XAxis dataKey="date" tick={visitTick} height={48} interval={mobileMode ? 'preserveStartEnd' : 0} minTickGap={4} axisLine={{ stroke: bd }} />
+                  <XAxis dataKey="date" tick={visitTick} height={48} padding={{ left: 18, right: 22 }} interval={mobileMode ? 'preserveStartEnd' : 0} minTickGap={4} axisLine={{ stroke: bd }} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: tx3 }} axisLine={{ stroke: bd }} />
                   <Tooltip formatter={(v: unknown) => `${v}회`} contentStyle={{ fontSize: 12, borderRadius: 8, border: `1px solid ${bd}` }} />
                   <Line type="monotone" dataKey="count" stroke={navy} strokeWidth={2.5} dot={{ r: 3, fill: navy }} />
