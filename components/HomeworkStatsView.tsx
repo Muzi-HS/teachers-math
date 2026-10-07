@@ -22,14 +22,20 @@ function rateColor(v: number) { return v >= 80 ? 'var(--ui-success)' : v >= 60 ?
 // 무관하게 전체 기록 기준 역대 최장 기록을 그대로 보여준다.
 // showMilestone: 5/10/15/20/25/30일 성장(스트릭) 마일스톤 카드 노출 여부 — 이 마일스톤은
 // 학생 전용 동기부여/쿠폰 시스템과 연결돼 있어 학부모 화면에서는 숨긴다(평균 지표·그래프는 유지).
-export default function HomeworkStatsView({ recs, studentId, showMilestone = true, growthOnly = false }: { recs: StatRec[]; studentId?: number; showMilestone?: boolean; growthOnly?: boolean }) {
+export default function HomeworkStatsView({ recs, studentId, sessionToken, showMilestone = true, growthOnly = false }: { recs: StatRec[]; studentId?: number; sessionToken?: string; showMilestone?: boolean; growthOnly?: boolean }) {
   const [lastClaimedDate, setLastClaimedDate] = useState<string | null>(null)
 
   useEffect(() => {
     if (!studentId) return
+    if (sessionToken) {
+      let active = true
+      supabase.rpc('client_streak_progress', { p_token: sessionToken })
+        .then(({ data }) => { if (active) setLastClaimedDate((data as { lastClaimedDate: string | null } | null)?.lastClaimedDate ?? null) })
+      return () => { active = false }
+    }
     supabase.from('student_streak_state').select('last_claimed_date').eq('student_id', studentId).maybeSingle()
       .then(({ data }) => setLastClaimedDate(data?.last_claimed_date ?? null))
-  }, [studentId])
+  }, [studentId, sessionToken])
 
   // recs는 최신순(date desc)으로 넘어온다 — 그래프/스트릭은 시간순으로 계산해야 하므로 뒤집는다
   const chrono = [...recs].reverse()

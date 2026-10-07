@@ -28,6 +28,6 @@ export default function StudentGrowthPage() {
   return <div>
     <button onClick={() => router.push('/student/home')} style={{ border: 0, background: 'none', padding: '0 0 16px', color: '#456650', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>← 홈으로</button>
     {loading ? <p style={{ textAlign: 'center', color: '#768478', padding: '40px 0' }}>불러오는 중...</p> :
-      <HomeworkStatsView recs={records} studentId={student?.studentId} growthOnly />}
+      <HomeworkStatsView recs={records} studentId={student?.studentId} sessionToken={student?.sessionToken} growthOnly />}
   </div>
 }

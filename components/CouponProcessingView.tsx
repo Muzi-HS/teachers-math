@@ -1,141 +1,64 @@
-'use client'
-import { useEffect, useState } from 'react'
+﻿'use client'
+import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useMobileMode } from '@/context/MobileModeContext'
-import { IconCoupon } from '@/components/icons'
 
-const bg = 'var(--ui-bg)', bd = 'var(--ui-border)'
-const tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)'
-const re = 'var(--ui-danger)', gr = 'var(--ui-success)', gbg = 'var(--ui-success-bg)'
+type Coupon = { id: number; code: string; milestone: number; claimed_at: string; used: boolean; used_at: string | null; student_id: number; studentName: string }
 
-type FoundCoupon = { id: number; code: string; milestone: number; claimed_at: string; used: boolean; studentName: string }
-type RecentCoupon = { id: number; code: string; milestone: number; claimed_at: string; used: boolean; studentName: string }
-
-// 쿠폰처리 — 학생 계정의 숙제 이행률 연속 달성 쿠폰을 코드로 검색해 사용 처리하는 admin 전용 메뉴.
-// 이전에는 학생관리 화면 상단에 있었는데, 학생을 찾을 필요 없이 코드만으로 바로 처리할 수 있도록
-// 별도 메뉴로 분리했다.
 export default function CouponProcessingView() {
   const { mobileMode } = useMobileMode()
-  const [codeInput, setCodeInput] = useState('')
-  const [searchBusy, setSearchBusy] = useState(false)
-  const [searchErr, setSearchErr] = useState('')
-  const [found, setFound] = useState<FoundCoupon | null>(null)
-  const [recent, setRecent] = useState<RecentCoupon[]>([])
-  const [loadingRecent, setLoadingRecent] = useState(true)
-  const [notif, setNotif] = useState<{ msg: string; ok: boolean } | null>(null)
-
-  function toast(msg: string, ok = true) { setNotif({ msg, ok }); setTimeout(() => setNotif(null), 3000) }
-
-
-  async function loadRecent() {
-    setLoadingRecent(true)
-    const { data: coupons } = await supabase
-      .from('student_coupons').select('id,code,milestone,claimed_at,used,student_id')
-      .eq('used', false).order('claimed_at', { ascending: false }).limit(30)
-    if (!coupons || coupons.length === 0) { setRecent([]); setLoadingRecent(false); return }
-    const studentIds = [...new Set(coupons.map(c => c.student_id))]
-    const { data: stus } = await supabase.from('students').select('id,name').in('id', studentIds)
-    const nameMap: Record<number, string> = {}
-    for (const s of (stus ?? [])) nameMap[s.id] = s.name
-    setRecent(coupons.map(c => ({
-      id: c.id, code: c.code, milestone: c.milestone, claimed_at: c.claimed_at, used: c.used,
-      studentName: nameMap[c.student_id] ?? '알 수 없음',
-    })))
-    setLoadingRecent(false)
+  const [name, setName] = useState('')
+  const [query, setQuery] = useState('')
+  const [coupons, setCoupons] = useState<Coupon[]>([])
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState<number | null>(null)
+  const [message, setMessage] = useState('')
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      let studentsQuery = supabase.from('students').select('id,name').order('name')
+      if (query) studentsQuery = studentsQuery.ilike('name', `%${query.replace(/[\\%_]/g, '\\$&')}%`)
+      const { data: students, error: studentsError } = await studentsQuery
+      if (studentsError) throw studentsError
+      if (!students?.length) { setCoupons([]); return }
+      const names = new Map(students.map(student => [student.id, student.name]))
+      const { data, error } = await supabase.from('student_coupons')
+        .select('id,code,milestone,claimed_at,used,used_at,student_id')
+        .in('student_id', students.map(student => student.id))
+        .or(`used.eq.false,used_at.gt.${new Date(Date.now() - 86400000).toISOString()}`)
+        .order('claimed_at', { ascending: false })
+      if (error) throw error
+      setCoupons((data ?? []).map(coupon => ({ ...coupon, studentName: names.get(coupon.student_id) ?? '알 수 없음' })))
+    } catch { setMessage('쿠폰을 불러오지 못했습니다. 다시 시도해 주세요.') }
+    finally { setLoading(false) }
+  }, [query])
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void load() }, 0)
+    const refresh = window.setInterval(() => { void load() }, 60000)
+    return () => { window.clearTimeout(timer); window.clearInterval(refresh) }
+  }, [load])
+  async function process(coupon: Coupon, action: 'use' | 'cancel' | 'restore') {
+    if (busy !== null) return
+    if (action === 'restore' && !window.confirm(`${coupon.studentName} 학생의 쿠폰을 반납하고 연속 도전을 복원할까요?`)) return
+    setBusy(coupon.id)
+    const { error } = await supabase.rpc('admin_process_coupon', { p_coupon_id: coupon.id, p_action: action })
+    setBusy(null)
+    if (error) { setMessage(error.message); return }
+    setMessage(action === 'use' ? '사용 처리했습니다. 24시간 안에 사용 취소할 수 있습니다.' : action === 'cancel' ? '쿠폰 사용을 취소했습니다.' : '쿠폰을 반납하고 다음 도전을 이어가도록 복원했습니다.')
+    await load()
   }
-
-  useEffect(() => { const timer = window.setTimeout(() => { void loadRecent() }, 0); return () => window.clearTimeout(timer) }, [])
-
-  function normalizeCode(raw: string): string | null {
-    const clean = raw.replace(/[^A-Za-z0-9]/g, '').toUpperCase()
-    if (clean.length !== 6) return null
-    return `${clean.slice(0, 3)}-${clean.slice(3)}`
-  }
-
-  async function searchByCode() {
-    const code = normalizeCode(codeInput)
-    if (!code) { setSearchErr('코드 6자리를 정확히 입력하세요.'); setFound(null); return }
-    setSearchBusy(true); setSearchErr(''); setFound(null)
-    const { data: coupon } = await supabase
-      .from('student_coupons').select('id,code,milestone,claimed_at,used,student_id').eq('code', code).maybeSingle()
-    if (!coupon) { setSearchErr('일치하는 쿠폰이 없습니다.'); setSearchBusy(false); return }
-    const { data: stu } = await supabase.from('students').select('name').eq('id', coupon.student_id).maybeSingle()
-    setFound({ id: coupon.id, code: coupon.code, milestone: coupon.milestone, claimed_at: coupon.claimed_at, used: coupon.used, studentName: stu?.name ?? '알 수 없음' })
-    setSearchBusy(false)
-  }
-
-  async function toggleUsed(id: number, nextUsed: boolean) {
-    const { error } = await supabase.from('student_coupons')
-      .update({ used: nextUsed, used_at: nextUsed ? new Date().toISOString() : null }).eq('id', id)
-    if (error) return toast('처리 실패: ' + error.message, false)
-    if (found?.id === id) setFound({ ...found, used: nextUsed })
-    setRecent(rs => nextUsed ? rs.filter(r => r.id !== id) : rs)
-    toast(nextUsed ? '쿠폰을 사용 처리했습니다' : '쿠폰 사용을 취소했습니다')
-  }
-
-  return (
-    <div style={{ padding: 0, fontFamily: "'Noto Sans KR',sans-serif" }}>
-      {notif && (
-        <div style={{ background: notif.ok ? gbg : 'var(--ui-danger-bg)', border: `1px solid ${notif.ok ? gr : re}`, borderRadius: 8, padding: '8px 12px', marginBottom: 14, fontSize: 12, color: notif.ok ? gr : re }}>
-          {notif.msg}
-        </div>
-      )}
-
-      <div style={{ marginBottom: mobileMode ? 14 : 20 }}>
-        <h1 style={{ fontSize: mobileMode ? 17 : 21, fontWeight: 700, color: tx }}>쿠폰처리</h1>
-        {!mobileMode && <p style={{ fontSize: 13, color: tx2, marginTop: 4 }}>학생이 보여준 쿠폰 코드를 검색해서 사용 처리합니다</p>}
-      </div>
-
-      {/* 코드 검색 */}
-      <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: mobileMode ? 14 : 18, marginBottom: 20, boxShadow: '0 1px 4px rgba(0,0,0,.06)' }}>
-        <p style={{ fontSize: 13, fontWeight: 600, color: tx, margin: '0 0 10px', display: 'flex', alignItems: 'center', gap: 6 }}><IconCoupon size={14} /> 쿠폰 코드로 검색</p>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <input
-            value={codeInput}
-            onChange={e => setCodeInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && searchByCode()}
-            placeholder="예) K3X-9QF"
-            style={{ flex: 1, minWidth: 160, padding: '9px 12px', border: `1.5px solid ${bd}`, borderRadius: 8, fontSize: 14, fontFamily: 'monospace', letterSpacing: 1, outline: 'none', color: tx }}
-          />
-          <button className="bgold" onClick={searchByCode} disabled={searchBusy || !codeInput.trim()}>
-            {searchBusy ? '검색 중...' : '검색'}
-          </button>
-        </div>
-        {searchErr && <p style={{ fontSize: 12, color: re, margin: '8px 0 0' }}>{searchErr}</p>}
-        {found && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 12, padding: '10px 14px', background: bg, borderRadius: 10, flexWrap: 'wrap' }}>
-            <div>
-              <p style={{ fontSize: 14, fontWeight: 700, color: tx, margin: 0 }}>{found.studentName} · {found.milestone}일 연속 달성 쿠폰</p>
-              <p style={{ fontSize: 11, color: tx3, margin: '2px 0 0' }}>{found.claimed_at.slice(0, 10)} 획득 · 코드 {found.code} · {found.used ? '사용완료' : '사용가능'}</p>
-            </div>
-            <button className={found.used ? 'bout' : 'bgold'} onClick={() => toggleUsed(found.id, !found.used)}>
-              {found.used ? '사용 취소' : '사용 처리'}
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* 최근 발급된 미사용 쿠폰 목록 — 코드를 놓쳤을 때 훑어볼 수 있도록 */}
-      <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: mobileMode ? 14 : 18, boxShadow: '0 1px 4px rgba(0,0,0,.06)' }}>
-        <p style={{ fontSize: 13, fontWeight: 600, color: tx, margin: '0 0 12px' }}>사용 가능한 쿠폰 (최근 {recent.length}건)</p>
-        {loadingRecent ? (
-          <p style={{ textAlign: 'center', color: tx3, fontSize: 13, padding: '20px 0' }}>불러오는 중...</p>
-        ) : recent.length === 0 ? (
-          <p style={{ textAlign: 'center', color: tx3, fontSize: 13, padding: '20px 0' }}>사용 가능한 쿠폰이 없습니다</p>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: mobileMode ? '1fr' : 'repeat(auto-fill, minmax(320px, 1fr))', gap: 10 }}>
-            {recent.map(c => (
-              <div key={c.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 14px', background: bg, borderRadius: 10 }}>
-                <div>
-                  <p style={{ fontSize: 13, fontWeight: 700, color: tx, margin: 0 }}>{c.studentName} · {c.milestone}일 연속</p>
-                  <p style={{ fontSize: 11, color: tx3, margin: '2px 0 0', fontFamily: 'monospace' }}>{c.code} · {c.claimed_at.slice(0, 10)}</p>
-                </div>
-                <button className="bgold" onClick={() => toggleUsed(c.id, true)}>사용 처리</button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  )
+  return <section style={{ color: 'var(--ui-text)' }}>
+    <h2 style={{ fontSize: 17, fontWeight: 700 }}>쿠폰</h2>
+    <p style={{ fontSize: 13, color: 'var(--ui-text-2)', margin: '8px 0 16px', lineHeight: 1.7 }}>사용 처리 후 24시간 동안 취소할 수 있으며, 이후 쿠폰이 자동 삭제됩니다. 복원은 쿠폰을 반납하고 받기 전의 연속 도전을 이어갑니다. 이후 새 쿠폰을 받은 경우 이전 쿠폰은 복원할 수 없습니다.</p>
+    <form onSubmit={event => { event.preventDefault(); if (query === name.trim()) void load(); else setQuery(name.trim()) }} style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+      <input aria-label="학생 이름 검색" placeholder="학생 이름으로 검색" value={name} onChange={event => setName(event.target.value)} style={{ flex: 1, minWidth: 0, padding: '10px 12px', border: '1px solid var(--ui-border)', borderRadius: 8 }} />
+      <button className="bgold" disabled={loading}>검색</button>
+      <button type="button" className="bout" onClick={() => { setName(''); setQuery(''); if (!query) void load() }}>전체</button>
+    </form>
+    {message && <p role="status" style={{ fontSize: 13, marginBottom: 12 }}>{message}</p>}
+    {loading ? <p>불러오는 중…</p> : !coupons.length ? <p>해당 학생의 쿠폰이 없습니다.</p> : <div style={{ display: 'grid', gridTemplateColumns: mobileMode ? '1fr' : 'repeat(auto-fill,minmax(340px,1fr))', gap: 10 }}>{coupons.map(coupon => <div key={coupon.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, background: 'var(--ui-surface-2)', borderRadius: 10, padding: 14 }}>
+      <div><strong style={{ fontSize: 13 }}>{coupon.studentName} · {coupon.milestone}일 연속</strong><p style={{ fontSize: 11, color: 'var(--ui-text-3)', marginTop: 4 }}>{coupon.code} · {new Date(coupon.claimed_at).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })}</p>{coupon.used && <p style={{ fontSize: 11, color: 'var(--ui-text-2)', marginTop: 4 }}>사용 완료 · {new Date(new Date(coupon.used_at!).getTime() + 86400000).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })} 삭제 예정</p>}</div>
+      <div style={{ display: 'flex', gap: 6 }}><button className="bout" disabled={busy !== null} onClick={() => void process(coupon, coupon.used ? 'cancel' : 'use')}>{coupon.used ? '사용 취소' : '사용 처리'}</button>{!coupon.used && <button className="bout" disabled={busy !== null} onClick={() => void process(coupon, 'restore')}>복원</button>}</div>
+    </div>)}</div>}
+  </section>
 }

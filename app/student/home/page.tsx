@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { kstNow } from '@/lib/kst'
-import { computeStreak, COUPON_MILESTONES } from '@/lib/streak'
+import { COUPON_MILESTONES } from '@/lib/streak'
 import { nextClassDate, formatClassDate } from '@/lib/nextClass'
 import TodayClassBanner from '@/components/TodayClassBanner'
 import StreakCouponPrompt from '@/components/StreakCouponPrompt'
@@ -60,9 +60,10 @@ export default function StudentHome() {
     const classIds = [...new Set(((csRows ?? []) as { class_id: number }[]).map(r => r.class_id))]
     if (classIds.length === 0) { setClasses([]); setLoading(false); return }
 
-    const [{ data: classesData }, { data: recsRaw }] = await Promise.all([
+    const [{ data: classesData }, { data: recsRaw }, { data: progress }] = await Promise.all([
       supabase.from('classes').select('id,name,days,time').in('id', classIds),
       supabase.rpc('client_records', { p_token: token, p_student_id: studentId }),
+      supabase.rpc('client_streak_progress', { p_token: token }),
     ])
     if (!isActive()) return
     const recs = (recsRaw ?? []) as Rec[]
@@ -102,7 +103,7 @@ export default function StudentHome() {
     setNextByClass(next)
     const chrono = [...recs].reverse().map(r => ({ date: r.date, hw_rate: r.hw_rate }))
     setChronoRecs(chrono)
-    setStreak(computeStreak(chrono).current)
+    setStreak((progress as { current: number } | null)?.current ?? 0)
     setLoading(false)
   }
 
@@ -120,7 +121,7 @@ export default function StudentHome() {
 
   return (
     <div>
-      {student?.studentId && <StreakCouponPrompt studentId={student.studentId} sessionToken={student.sessionToken} chronoRecs={chronoRecs} />}
+      {student?.studentId && <StreakCouponPrompt studentId={student.studentId} sessionToken={student.sessionToken} chronoRecs={chronoRecs} onClaimed={() => setStreak(0)} />}
       <TodayClassBanner studentId={student?.studentId ?? null} sessionToken={student?.sessionToken} />
 
       <div style={{ marginBottom: 16 }}>

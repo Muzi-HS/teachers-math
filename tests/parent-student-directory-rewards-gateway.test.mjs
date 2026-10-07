@@ -87,6 +87,84 @@ async function loginStudent(db, phone, pin) {
   return (await db.query('SELECT * FROM verify_student_pin($1,$2)', [phone, pin])).rows[0].session_token
 }
 
+test('coupon return restores the challenge, no-homework skips, and use expires after 24 hours', async t => {
+  const db = await setup()
+  t.after(() => db.close())
+  await db.exec(`CREATE SCHEMA auth;
+    CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$ SELECT '00000000-0000-0000-0000-000000000001'::uuid $$;
+    CREATE TABLE teachers(user_id uuid, role text, approved boolean);
+    INSERT INTO teachers VALUES ('00000000-0000-0000-0000-000000000001', 'admin', true);`)
+  const migration = readFileSync(new URL('../supabase/coupon_processing_migration.sql', import.meta.url), 'utf8')
+  await db.exec(migration)
+  await db.exec(migration)
+  const token = await loginStudent(db, '01033334444', '0000')
+  for (let i = 1; i <= 5; i++) {
+    await db.query('INSERT INTO records(id,student_id,date,hw_rate) VALUES ($1,10,$2,100)', [i, `2026-01-0${i}`])
+  }
+  await db.exec("INSERT INTO records(id,student_id,date,hw_rate) VALUES (6,10,'2026-01-06',-1)")
+  assert.equal((await db.query('SELECT client_streak_progress($1) p', [token])).rows[0].p.current, 5)
+  // A direct claim must create the state and reset it, even without a status call.
+  await db.exec('SET ROLE anon')
+  await db.query('SELECT client_claim_streak_coupon($1)', [token])
+  assert.equal((await db.query('SELECT client_streak_progress($1) p', [token])).rows[0].p.current, 0)
+  await db.exec('RESET ROLE')
+  let coupon = (await db.query('SELECT * FROM student_coupons')).rows[0]
+  await db.exec("UPDATE teachers SET role = 'teacher'")
+  await assert.rejects(db.query("SELECT admin_process_coupon($1,'use')", [coupon.id]), /관리자/)
+  await db.exec("UPDATE teachers SET role = 'admin'")
+  await db.exec('SET ROLE anon')
+  await assert.rejects(db.query("SELECT admin_process_coupon($1,'restore')", [coupon.id]), /permission denied/)
+  await db.exec('RESET ROLE')
+  await db.query("SELECT admin_process_coupon($1,'use')", [coupon.id])
+  assert.equal((await db.query('SELECT used FROM student_coupons')).rows[0].used, true)
+  await assert.rejects(db.query("SELECT admin_process_coupon($1,'restore')", [coupon.id]), /취소/)
+  await db.query("SELECT admin_process_coupon($1,'cancel')", [coupon.id])
+  assert.equal((await db.query('SELECT used_at FROM student_coupons')).rows[0].used_at, null)
+  await db.query("SELECT admin_process_coupon($1,'restore')", [coupon.id])
+  assert.equal((await db.query('SELECT * FROM student_coupons')).rows.length, 0)
+  assert.equal((await db.query('SELECT client_streak_progress($1) p', [token])).rows[0].p.current, 5)
+  assert.equal((await db.query('SELECT client_streak_status($1) s', [token])).rows[0].s, null)
+  for (let i = 7; i <= 11; i++) {
+    await db.query('INSERT INTO records(id,student_id,date,hw_rate) VALUES ($1,10,$2,100)', [i, `2026-01-${String(i).padStart(2, '0')}`])
+  }
+  assert.equal((await db.query('SELECT client_streak_status($1) s', [token])).rows[0].s.milestone, 10)
+  await db.query('SELECT client_claim_streak_coupon($1)', [token])
+  coupon = (await db.query('SELECT * FROM student_coupons')).rows[0]
+  await db.query("SELECT admin_process_coupon($1,'use')", [coupon.id])
+  // Simulate elapsed time without bypassing the application timestamp trigger in normal use.
+  await db.exec('ALTER TABLE student_coupons DISABLE TRIGGER enforce_coupon_use_time')
+  await db.query("UPDATE student_coupons SET used_at = now() - interval '25 hours' WHERE id = $1", [coupon.id])
+  await db.exec('ALTER TABLE student_coupons ENABLE TRIGGER enforce_coupon_use_time')
+  await assert.rejects(db.query("SELECT admin_process_coupon($1,'cancel')", [coupon.id]), /24시간/)
+  const cronMigration = readFileSync(new URL('../supabase/coupon_cleanup_cron_migration.sql', import.meta.url), 'utf8')
+  await db.exec(cronMigration.match(/\$\$([\s\S]*?)\$\$/)[1])
+  assert.equal((await db.query('SELECT * FROM student_coupons')).rows.length, 0)
+  assert.equal((await db.query('SELECT client_streak_progress($1) p', [token])).rows[0].p.current, 0)
+  await db.exec("INSERT INTO records(id,student_id,date,hw_rate) VALUES (12,10,'2099-01-01',100), (13,10,'2099-01-02',-1), (14,10,'2099-01-03',-2)")
+  assert.equal((await db.query('SELECT client_streak_progress($1) p', [token])).rows[0].p.current, 0)
+})
+
+test('older coupon history is preserved and only the latest claim can be returned', async t => {
+  const db = await setup()
+  t.after(() => db.close())
+  await db.exec(`CREATE SCHEMA auth;
+    CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$ SELECT '00000000-0000-0000-0000-000000000001'::uuid $$;
+    CREATE TABLE teachers(user_id uuid, role text, approved boolean);
+    INSERT INTO teachers VALUES ('00000000-0000-0000-0000-000000000001', 'admin', true);
+    INSERT INTO student_coupons(student_id,milestone,streak_value,code,claimed_at)
+    VALUES (10,5,5,'OLD-001','2026-01-01T01:00:00Z'), (10,10,10,'OLD-002','2026-02-01T01:00:00Z');
+    INSERT INTO student_streak_state(student_id,last_claimed_date) VALUES (10,'2026-02-01');`)
+  await db.exec(readFileSync(new URL('../supabase/coupon_processing_migration.sql', import.meta.url), 'utf8'))
+  const coupons = (await db.query('SELECT * FROM student_coupons ORDER BY id')).rows
+  assert.equal(coupons[1].previous_coupon_id, coupons[0].id)
+  assert.equal(coupons[1].previous_claimed_date.toISOString().slice(0,10), '2026-01-01')
+  await assert.rejects(db.query("SELECT admin_process_coupon($1,'restore')", [coupons[0].id]), /이후 발급/)
+  await db.query("SELECT admin_process_coupon($1,'restore')", [coupons[1].id])
+  const state = (await db.query('SELECT * FROM student_streak_state')).rows[0]
+  assert.equal(state.latest_coupon_id, coupons[0].id)
+  assert.equal(state.last_claimed_date.toISOString().slice(0,10), '2026-01-01')
+})
+
 test('directory tables lock out anon direct access after the migration', async t => {
   const db = await setup()
   t.after(() => db.close())

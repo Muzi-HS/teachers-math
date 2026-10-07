@@ -65,7 +65,7 @@ export default function ScheduleUpcoming({ source, dashboard = false, refreshTok
         {loading ? <p className="schedule-upcoming-empty">불러오는 중…</p> : group.rows.length ? <ul>{group.rows.map(event => <li key={event.id}>
           <time dateTime={event.start_date}>{event.start_date.slice(5).replace('-', '.')}</time><div>
             <strong style={{ color: event.type === 'holiday' ? 'var(--ui-danger)' : source === 'admin' ? scheduleColor(event.category ?? '').color : undefined, textDecoration: event.completed ? 'line-through' : undefined }}>{event.title}</strong>
-            <small>{[event.type === 'holiday' ? '휴원' : event.category, event.start_time ? `${event.start_time.slice(0, 5)}${event.end_time ? ` – ${event.end_time.slice(0, 5)}` : ''}` : '종일', event.end_date && event.end_date !== event.start_date ? `~ ${event.end_date.slice(5).replace('-', '.')}` : '', event.location, event.completed ? '완료' : ''].filter(Boolean).join(' · ')}</small>
+            <small>{source === 'admin' && <span title={scheduleColor(event.category ?? '').name} aria-label={scheduleColor(event.category ?? '').name} style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', background: scheduleColor(event.category ?? '').color, marginRight: 6 }} />}{[event.type === 'holiday' ? '휴원' : '', event.start_time ? `${event.start_time.slice(0, 5)}${event.end_time ? ` – ${event.end_time.slice(0, 5)}` : ''}` : '종일', event.end_date && event.end_date !== event.start_date ? `~ ${event.end_date.slice(5).replace('-', '.')}` : '', event.location, event.completed ? '완료' : ''].filter(Boolean).join(' · ')}</small>
           </div></li>)}</ul> : <p className="schedule-upcoming-empty">{group.title} 예정된 일정이 없습니다.</p>}
       </div>)}</div>}
   </section>

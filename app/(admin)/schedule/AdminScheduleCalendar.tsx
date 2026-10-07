@@ -15,7 +15,6 @@ type Event = {
   category: string; owner: string; location: string; memo: string; completed: boolean
 }
 type Draft = Omit<Event, 'id' | 'start_time' | 'end_time'> & { start_time: string; end_time: string; allDay: boolean }
-const categories = scheduleColors.map(item => item.name)
 function shift(date: string, days: number) {
   const value = new Date(date + 'T00:00:00Z')
   value.setUTCDate(value.getUTCDate() + days)
@@ -132,7 +131,7 @@ export default function AdminScheduleCalendar() {
   function list(items: Event[], empty: string) {
     return loading ? <p>일정을 불러오는 중…</p> : error ? <p>일정 조회에 실패했습니다.</p> : items.length ? items.map(event =>
       <div className="internal-event" key={event.id}>
-        <span className="internal-badge" style={{ color: scheduleColor(event.category).color, background: scheduleColor(event.category).bg }}>{scheduleColor(event.category).name}</span>
+        <span className="internal-badge" title={scheduleColor(event.category).name} aria-label={scheduleColor(event.category).name} style={{ background: scheduleColor(event.category).color }} />
         <span><strong style={{ textDecoration: event.completed ? 'line-through' : undefined }}>{event.title}</strong>
           {(event.location || event.completed) && <small>{[event.location, event.completed ? '완료' : ''].filter(Boolean).join(' · ')}</small>}
           {event.memo && <small style={{ whiteSpace: 'pre-wrap' }}>{event.memo}</small>}</span>
@@ -150,7 +149,7 @@ export default function AdminScheduleCalendar() {
       .internal-event{display:flex;align-items:center;gap:10px;flex-wrap:${mobileMode ? 'wrap' : 'nowrap'};width:100%;padding:10px 0;border-bottom:1px solid var(--ui-border);color:inherit;font-size:13px}
       .internal-event>span:nth-child(2){flex:1;min-width:0;overflow-wrap:anywhere}.internal-event small{display:block;margin-top:4px;color:var(--ui-text-2);font-size:12px}
       .internal-date{font-size:12px;color:var(--ui-text-3);white-space:nowrap}.internal-empty{color:var(--ui-text-3);font-size:14px;padding:30px 0;text-align:center}
-      .internal-badge{font-size:10px;padding:2px 7px;border-radius:3px;background:var(--ui-surface-2);color:var(--ui-primary);flex-shrink:0}
+      .internal-badge{width:12px;height:12px;border-radius:50%;background:var(--ui-surface-2);color:var(--ui-primary);flex-shrink:0}
       .internal-dialog{position:fixed;inset:0;margin:auto;width:min(560px,calc(100vw - 32px));max-height:90dvh;overflow:auto;border:0;border-radius:12px;background:#fff;color:var(--ui-text);padding:0;box-shadow:0 20px 60px rgba(0,0,0,.15)}
       .internal-dialog::backdrop{background:rgba(0,0,0,.42)}.internal-fields{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:18px 22px}
       .internal-schedule button:focus-visible{outline:2px solid var(--ui-primary);outline-offset:3px}
@@ -194,7 +193,7 @@ export default function AdminScheduleCalendar() {
     </article>
     <ScheduleUpcoming source="admin" refreshToken={events} />
     <article className="internal-card">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 14 }}><h2>{listTitle} 일정 목록</h2><label style={{ fontSize: 12, color: 'var(--ui-text-2)' }}>분류 <select className="bsm" aria-label="일정 분류" value={filter} onChange={e => setFilter(e.target.value)}>{['전체', ...categories].map(c => <option key={c}>{c}</option>)}</select></label></div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}><h2>{listTitle} 일정 목록</h2><div role="group" aria-label="일정 색상 필터" style={{ display: 'flex', alignItems: 'center', gap: 8 }}><button className="bsm" aria-pressed={filter === '전체'} onClick={() => setFilter('전체')}>전체</button>{scheduleColors.map(item => <button key={item.name} type="button" title={item.name} aria-label={item.name} aria-pressed={filter === item.name} onClick={() => setFilter(item.name)} style={{ width: 22, height: 22, borderRadius: '50%', background: item.color, border: '2px solid white', outline: filter === item.name ? `2px solid ${item.color}` : '2px solid transparent', cursor: 'pointer', color: '#fff', fontSize: 11 }}>{filter === item.name ? '✓' : ''}</button>)}</div></div>
       {list(items, `${listTitle}에 일정이 없습니다`)}
     </article>
     {draft && <dialog ref={dialogRef} className="internal-dialog" aria-labelledby="internal-dialog-title" onCancel={e => { e.preventDefault(); close() }}>
@@ -207,7 +206,7 @@ export default function AdminScheduleCalendar() {
           <label>종료일 *<input type="date" required min={draft.start_date} value={draft.end_date} onChange={e => setDraft({ ...draft, end_date: e.target.value })} /></label>
           <label className="internal-full"><input type="checkbox" checked={!draft.allDay} onChange={e => setDraft({ ...draft, allDay: !e.target.checked })} /> 시간 지정</label>
           {!draft.allDay && <><label>시작 시간 *<input type="time" required value={draft.start_time} onChange={e => setDraft({ ...draft, start_time: e.target.value })} /></label><label>종료 시간<input type="time" value={draft.end_time} onChange={e => setDraft({ ...draft, end_time: e.target.value })} /></label></>}
-          <div className="internal-full"><p style={{ fontSize: 12, color: 'var(--ui-text-2)', marginBottom: 8 }}>분류 색상 · {draft.category}</p><div role="group" aria-label="분류 색상" style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>{scheduleColors.map(item => <button type="button" key={item.name} aria-label={item.name} aria-pressed={draft.category === item.name} onClick={() => setDraft({ ...draft, category: item.name })} style={{ width: 38, height: 38, borderRadius: '50%', background: item.color, border: '3px solid white', outline: draft.category === item.name ? `2px solid ${item.color}` : '2px solid transparent', cursor: 'pointer', color: '#fff', fontWeight: 700 }}>{draft.category === item.name ? '✓' : ''}</button>)}</div></div>
+          <div className="internal-full"><p style={{ fontSize: 12, color: 'var(--ui-text-2)', marginBottom: 8 }}>분류 색상</p><div role="group" aria-label="분류 색상" style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>{scheduleColors.map(item => <button type="button" key={item.name} aria-label={item.name} aria-pressed={draft.category === item.name} onClick={() => setDraft({ ...draft, category: item.name })} style={{ width: 38, height: 38, borderRadius: '50%', background: item.color, border: '3px solid white', outline: draft.category === item.name ? `2px solid ${item.color}` : '2px solid transparent', cursor: 'pointer', color: '#fff', fontWeight: 700 }}>{draft.category === item.name ? '✓' : ''}</button>)}</div></div>
           <label className="internal-full">장소<input maxLength={200} placeholder="예: 상담실" value={draft.location} onChange={e => setDraft({ ...draft, location: e.target.value })} /></label>
           <label className="internal-full">메모<textarea rows={3} maxLength={5000} placeholder="준비물, 확인할 내용 등을 입력하세요" value={draft.memo} onChange={e => setDraft({ ...draft, memo: e.target.value })} /></label>
           <label className="internal-full"><input type="checkbox" checked={draft.completed} onChange={e => setDraft({ ...draft, completed: e.target.checked })} /> 완료한 일정</label>

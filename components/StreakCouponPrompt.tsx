@@ -16,7 +16,7 @@ const tx2 = '#6A7B6E'
 // "30일 연속 달성했다"고 주장하는 값을 그대로 믿고 쿠폰을 내주지 않도록, 본인 세션
 // 토큰으로 서버가 본인 기록에서 직접 다시 계산한 결과만 인정한다. chronoRecs는 값 자체는
 // 더 이상 쓰지 않고, 수업기록을 새로 불러올 때마다 다시 확인하기 위한 트리거로만 쓴다.
-export default function StreakCouponPrompt({ studentId, sessionToken, chronoRecs }: { studentId: number; sessionToken: string | undefined; chronoRecs: StreakRec[] }) {
+export default function StreakCouponPrompt({ studentId, sessionToken, chronoRecs, onClaimed }: { studentId: number; sessionToken: string | undefined; chronoRecs: StreakRec[]; onClaimed?: () => void }) {
   const [prompt, setPrompt] = useState<{ milestone: number; nextMilestone: number | null; streakValue: number } | null>(null)
   const [busy, setBusy] = useState(false)
   const [claimedCode, setClaimedCode] = useState<string | null>(null)
@@ -40,6 +40,7 @@ export default function StreakCouponPrompt({ studentId, sessionToken, chronoRecs
     setBusy(false)
     if (error || !data) return
     setClaimedCode((data as { code: string }).code)
+    onClaimed?.()
   }
 
   async function decline() {

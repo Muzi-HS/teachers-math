@@ -14,8 +14,8 @@ import { navy, navyDk, navyM, gold, goldL, bg, bd, tx, tx2, tx3, re, rbg, gr, gb
 import AdminTestResultCard from '@/components/AdminTestResultCard'
 
 type Class = { id: number; name: string; days: string; time: string; mode?: string; active?: boolean }
-type ClassStaff = { user_id: string; name: string; role: 'teacher' | 'assistant' }
-type ClassAssignment = { class_id: number; teacher_user_id: string }
+type ClassStaff = { user_id: string; name: string; role: 'admin' | 'teacher' | 'assistant' }
+type ClassAssignment = { class_id: number; teacher_user_id: string; assignment_role: 'teacher' | 'assistant' }
 type Student = { id: number; name: string; birth_year: number; school: string; parent_phone?: string }
 type Test = { id: number; name: string; date: string; total: number; is_archived?: boolean }
 type TestItem = { testId: number | null; tTotal: number; tCor: number; tScore: number }
@@ -48,7 +48,7 @@ export default function ClassesPage() {
   const [staffCandidates, setStaffCandidates] = useState<ClassStaff[]>([])
   const [classAssignments, setClassAssignments] = useState<ClassAssignment[]>([])
   const [staffModal, setStaffModal] = useState(false)
-  const [staffDraft, setStaffDraft] = useState<Set<string>>(new Set())
+  const [staffDraft, setStaffDraft] = useState<Map<string, 'teacher' | 'assistant'>>(new Map())
   const [staffSaving, setStaffSaving] = useState(false)
   const [assignmentError, setAssignmentError] = useState('')
   const [students, setStudents] = useState<Student[]>([])
@@ -139,7 +139,7 @@ export default function ClassesPage() {
 
   async function fetchAll() {
     const { data: assignments, error: assignmentsError } = await supabase
-      .from('class_staff_assignments').select('class_id,teacher_user_id')
+      .from('class_staff_assignments').select('class_id,teacher_user_id,assignment_role')
     if (assignmentsError) {
       setAssignmentError('반별 담당자 설정을 불러오지 못했습니다. DB 마이그레이션을 확인해주세요.')
       setClasses([])
@@ -151,7 +151,7 @@ export default function ClassesPage() {
     const allowedClassIds = new Set((assignments ?? []).map(a => a.class_id))
     if (role === 'admin') {
       const { data: staff } = await supabase.from('teachers')
-        .select('user_id,name,role').eq('approved', true).in('role', ['teacher', 'assistant']).order('name')
+        .select('user_id,name,role').eq('approved', true).in('role', ['admin', 'teacher', 'assistant']).order('name')
       setStaffCandidates((staff ?? []) as ClassStaff[])
     }
     const [{ data: c }, { data: s }, { data: cs }, { data: rc }, { data: t }] = await Promise.all([
@@ -182,15 +182,14 @@ export default function ClassesPage() {
 
   function openStaffModal(cls: Class) {
     setDetailCls(cls)
-    setStaffDraft(new Set(classAssignments.filter(a => a.class_id === cls.id).map(a => a.teacher_user_id)))
+    setStaffDraft(new Map(classAssignments.filter(a => a.class_id === cls.id).map(a => [a.teacher_user_id, a.assignment_role])))
     setStaffModal(true)
   }
 
-  function assignedNames(classId: number, staffRole: ClassStaff['role']) {
+  function assignedNames(classId: number, staffRole: ClassAssignment['assignment_role']) {
     return classAssignments
-      .filter(assignment => assignment.class_id === classId)
+      .filter(assignment => assignment.class_id === classId && assignment.assignment_role === staffRole)
       .map(assignment => staffCandidates.find(member => member.user_id === assignment.teacher_user_id))
-      .filter(member => member?.role === staffRole)
       .map(member => member?.name)
       .join(', ') || '미배정'
   }
@@ -198,8 +197,10 @@ export default function ClassesPage() {
   async function saveStaffAssignments() {
     if (!detailCls || staffSaving) return
     setStaffSaving(true)
-    const { error } = await supabase.rpc('set_class_staff_assignments', {
-      p_class_id: detailCls.id, p_user_ids: [...staffDraft],
+    const { error } = await supabase.rpc('set_class_staff_roles', {
+      p_class_id: detailCls.id,
+      p_teacher_ids: [...staffDraft].filter(([, value]) => value === 'teacher').map(([id]) => id),
+      p_assistant_ids: [...staffDraft].filter(([, value]) => value === 'assistant').map(([id]) => id),
     })
     setStaffSaving(false)
     if (error) { toast('담당자 저장에 실패했습니다: ' + error.message, false); return }
@@ -723,20 +724,20 @@ export default function ClassesPage() {
         <button className="bout" onClick={() => setStaffModal(false)}>취소</button>
         <button className="bgold" disabled={staffSaving} onClick={saveStaffAssignments}>{staffSaving ? '저장 중...' : '저장'}</button>
       </>}>
-        <p style={{ fontSize: 12, color: tx2, margin: '0 0 12px' }}>선생님과 조교를 여러 명 선택할 수 있습니다. 배정된 담당자는 이 반의 정보와 수업기록을 볼 수 있고 기록을 작성·발송할 수 있습니다.</p>
+        <p style={{ fontSize: 12, color: tx2, margin: '0 0 12px' }}>선생님과 조교를 여러 명 선택할 수 있습니다. 관리자는 선생님으로, 선생님은 조교로 배정할 수 있습니다. 한 사람은 반마다 하나의 담당 역할을 선택합니다. 관리자는 배정과 관계없이 모든 반을 볼 수 있습니다.</p>
         {staffCandidates.length === 0 && <p style={{ fontSize: 13, color: tx3 }}>배정 가능한 승인된 선생님·조교가 없습니다.</p>}
         <div style={{ display: 'grid', gap: 16, maxHeight: 320, overflowY: 'auto' }}>
           {(['teacher', 'assistant'] as const).map(staffRole => {
-            const members = staffCandidates.filter(member => member.role === staffRole)
+            const members = staffCandidates.filter(member => staffRole === 'teacher' ? member.role === 'teacher' || member.role === 'admin' : member.role === 'teacher' || member.role === 'assistant')
             return <section key={staffRole} aria-label={staffRole === 'teacher' ? '선생님 선택' : '조교 선택'}>
               <p style={{ fontSize: 12, fontWeight: 700, color: tx, margin: '0 0 8px' }}>{staffRole === 'teacher' ? '선생님' : '조교'} <span style={{ color: tx3, fontWeight: 400 }}>{members.length}명</span></p>
               <div style={{ display: 'grid', gap: 8 }}>
                 {members.length === 0 && <p style={{ fontSize: 12, color: tx3, margin: 0 }}>배정 가능한 인원이 없습니다.</p>}
                 {members.map(member => <label key={member.user_id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, border: `1px solid ${bd}`, borderRadius: 8, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={staffDraft.has(member.user_id)} onChange={() => setStaffDraft(previous => {
-                    const next = new Set(previous)
-                    if (next.has(member.user_id)) next.delete(member.user_id)
-                    else next.add(member.user_id)
+                  <input type="checkbox" checked={staffDraft.get(member.user_id) === staffRole} onChange={() => setStaffDraft(previous => {
+                    const next = new Map(previous)
+                    if (next.get(member.user_id) === staffRole) next.delete(member.user_id)
+                    else next.set(member.user_id, staffRole)
                     return next
                   })} />
                   <span style={{ fontSize: 13, color: tx }}>{member.name}</span>
