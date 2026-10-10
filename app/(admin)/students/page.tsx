@@ -60,6 +60,7 @@ export default function StudentsPage() {
   const [form,     setForm]     = useState<Omit<Student, 'id'>>({ ...BLANK })
   const [editId,   setEditId]   = useState<number | null>(null)
   const [saving,   setSaving]   = useState(false)
+  const [resettingStudentPin, setResettingStudentPin] = useState(false)
   const [search,   setSearch]   = useState('')
   const [ageFlt,   setAgeFlt]   = useState<string[]>([])
   const [stageFlt, setStageFlt] = useState<SchoolKey[]>([])
@@ -215,6 +216,21 @@ export default function StudentsPage() {
     const { error } = await supabase.rpc('admin_reset_parent_pin', { p_phone: parentPhone })
     if (error) return toast('PIN 초기화 실패: ' + error.message, false)
     toast(`${studentName} 학부모 PIN이 초기화됐습니다`)
+  }
+
+  async function resetStudentPin(studentId: number, studentName: string) {
+    if (!isAdmin || resettingStudentPin) return
+    if (!confirm(`${studentName} 학생의 PIN을 0000으로 초기화하시겠습니까?`)) return
+    setResettingStudentPin(true)
+    try {
+      const { error } = await supabase.rpc('admin_reset_student_pin', { p_student_id: studentId })
+      if (error) { toast('학생 PIN 초기화 실패: ' + error.message, false); return }
+      toast(`${studentName} 학생 PIN이 0000으로 초기화됐습니다`)
+    } catch {
+      toast('학생 PIN 초기화에 실패했습니다. 다시 시도해주세요.', false)
+    } finally {
+      setResettingStudentPin(false)
+    }
   }
 
   async function remove(id: number, name: string) {
@@ -754,6 +770,18 @@ export default function StudentsPage() {
                       <p style={{ fontSize:11,color:tx3,margin:'0 0 2px' }}>학부모</p>
                       <p style={{ fontSize:13,fontWeight:600,color:tx,margin:0 }}>{fmtPhone(detailStu.parent_phone)}</p>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {isAdmin && (
+                <div style={{ background:bg,borderRadius:10,padding:'14px 16px',marginBottom:14 }}>
+                  <p style={{ fontSize:11,fontWeight:700,color:tx3,letterSpacing:1,margin:'0 0 10px' }}>학생 PIN</p>
+                  <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap' }}>
+                    <p style={{ fontSize:12,color:tx3,margin:0 }}>보안을 위해 암호화 저장되어 현재 PIN은 확인할 수 없습니다.</p>
+                    <button className="bdng" disabled={resettingStudentPin} onClick={() => void resetStudentPin(detailStu.id, detailStu.name)}>
+                      {resettingStudentPin ? '초기화 중...' : 'PIN 초기화'}
+                    </button>
                   </div>
                 </div>
               )}
