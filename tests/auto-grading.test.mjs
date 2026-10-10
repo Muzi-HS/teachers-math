@@ -32,10 +32,10 @@ test('choice selection and countdown handle duplicates, single-choice replacemen
   assert.deepEqual(Array.from(toggleChoice([1], 3)), [1, 3])
   assert.deepEqual(Array.from(toggleChoice([1, 3], 1)), [3])
   assert.deepEqual(Array.from(toggleChoice([1], 3, false)), [3])
-  assert.equal(remainingSeconds(120000, 0), 120)
-  assert.equal(remainingSeconds(120000, 119999), 1)
-  assert.equal(remainingSeconds(120000, 120000), 0)
-  assert.equal(remainingSeconds(120000, 130000), 0)
+  assert.equal(remainingSeconds(180000, 0), 180)
+  assert.equal(remainingSeconds(180000, 179999), 1)
+  assert.equal(remainingSeconds(180000, 180000), 0)
+  assert.equal(remainingSeconds(180000, 190000), 0)
 })
 
 test('isAnswerCorrect mirrors server-side grading: unordered multi-select and trimmed exact text', () => {
@@ -82,6 +82,11 @@ test('PostgreSQL migration and exam lifecycle', async t => {
   const migration = readFileSync(new URL('../supabase/auto_grading_migration.sql', import.meta.url), 'utf8')
   await db.exec(migration)
   await db.exec(migration) // SQL Editor reruns must remain safe.
+  // Simulate an existing installation with its earlier two-minute default.
+  await db.exec("alter table test_attempts alter column deadline_at set default (clock_timestamp() + interval '2 minutes')")
+  const durationMigration = readFileSync(new URL('../supabase/test_answer_entry_three_minutes_migration.sql', import.meta.url), 'utf8')
+  await db.exec(durationMigration)
+  await db.exec(durationMigration)
   const reviewMigration = readFileSync(new URL('../supabase/test_review_and_late_assignees_migration.sql', import.meta.url), 'utf8')
   await db.exec(reviewMigration)
   await db.exec(reviewMigration)
@@ -134,7 +139,7 @@ test('PostgreSQL migration and exam lifecycle', async t => {
     const again = await act(id,'start')
     assert.equal(again.attempt.id, data.attempt.id)
     assert.equal(again.attempt.deadline_at, data.attempt.deadline_at)
-    assert.ok(Math.abs(Date.parse(data.attempt.deadline_at) - Date.parse(data.attempt.started_at) - 120000) < 20)
+    assert.ok(Math.abs(Date.parse(data.attempt.deadline_at) - Date.parse(data.attempt.started_at) - 180000) < 20)
     await db.query('select publish_auto_test($1,false)', [id])
     assert.equal((await act(id,'save',{1:[2]},1)).attempt.revision, 1)
   })

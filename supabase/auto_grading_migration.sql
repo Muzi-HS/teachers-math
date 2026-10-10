@@ -24,7 +24,7 @@ create table if not exists public.test_attempts (
   test_id bigint not null references public.tests(id) on delete cascade,
   student_id bigint not null references public.students(id) on delete cascade,
   started_at timestamptz not null default clock_timestamp(),
-  deadline_at timestamptz not null default (clock_timestamp() + interval '2 minutes'),
+  deadline_at timestamptz not null default (clock_timestamp() + interval '3 minutes'),
   submitted_at timestamptz,
   answers jsonb not null default '{}'::jsonb,
   revision integer not null default 0,

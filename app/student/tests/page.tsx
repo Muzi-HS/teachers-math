@@ -15,7 +15,7 @@ export default function StudentTestsPage() {
   const [tests, setTests] = useState<StudentExam[]>([])
   const [active, setActive] = useState<ExamState | null>(null)
   const [answers, setAnswers] = useState<ExamAnswers>({})
-  const [seconds, setSeconds] = useState(120)
+  const [seconds, setSeconds] = useState(180)
   const [needsPin, setNeedsPin] = useState(false)
   const [pin, setPin] = useState('')
   const [error, setError] = useState('')
@@ -86,7 +86,7 @@ export default function StudentTestsPage() {
     finally { setBusy(false) }
   }
   async function open(test: StudentExam) {
-    if (!test.attempt && !window.confirm('답안 입력을 시작하면 2분 후 자동 제출됩니다. 시험당 한 번만 응시할 수 있습니다. 시작할까요?')) return
+    if (!test.attempt && !window.confirm('답안 입력을 시작하면 3분 후 자동 제출됩니다. 시험당 한 번만 응시할 수 있습니다. 시작할까요?')) return
     setBusy(true); setError('')
     setReviewFilter('all')
     try {
@@ -245,7 +245,7 @@ export default function StudentTestsPage() {
       </label>
       <button className="exam-primary" disabled={busy || pin.length !== 4} onClick={verify} style={{ marginTop: 14, width: '100%' }}>PIN 확인</button>
     </section> : !active ? <>
-      <div className="exam-row"><p style={{ margin: 0 }}>선생님이 답안 입력을 연 회차에 응시할 수 있습니다. 시작 후 2분이 지나면 자동 제출됩니다.</p><button disabled={busy} onClick={load}>새로고침</button></div>
+      <div className="exam-row"><p style={{ margin: 0 }}>선생님이 답안 입력을 연 회차에 응시할 수 있습니다. 시작 후 3분이 지나면 자동 제출됩니다.</p><button disabled={busy} onClick={load}>새로고침</button></div>
       {busy && <p>불러오는 중...</p>}
       {!busy && !tests.length && !error && <section className="exam-card" style={{ textAlign: 'center', color: 'var(--ui-text-3)' }}>배정된 시험이 없습니다.</section>}
       {tests.map(test => {
