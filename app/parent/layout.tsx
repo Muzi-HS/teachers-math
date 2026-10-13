@@ -5,6 +5,8 @@ import { useResetMenuScroll } from '@/lib/use-reset-menu-scroll'
 import Image from 'next/image'
 import { useAuth } from '@/context/AuthContext'
 import { requestFCMToken, isFCMSupported } from '@/lib/firebase'
+import NotificationSettingsButton from '@/components/NotificationSettingsButton'
+import { notificationSetupIssue } from '@/lib/notification-settings'
 import ForegroundNotification from '@/components/ForegroundNotification'
 import { MobileModeProvider } from '@/context/MobileModeContext'
 import { supabase } from '@/lib/supabase'
@@ -116,15 +118,15 @@ function ParentLayoutContent({ children }: { children: React.ReactNode }) {
   // useRef로 초기화 여부 추적 — 리렌더에 영향 없음
   const initDone = useRef(false)
 
-  const registerFCMToken = useCallback(async (parentId: number) => {
+  const registerFCMToken = useCallback(async (parentId: number, promptPermission = false): Promise<boolean> => {
     try {
       console.log('[FCM] 토큰 등록 시작, parentId:', parentId)
-      const token = await requestFCMToken()
+      const token = await requestFCMToken(promptPermission)
       console.log('[FCM] 토큰 발급 결과:', token ? '성공' : '실패(null)')
       if (typeof Notification !== 'undefined') setNotifPerm(Notification.permission)
-      if (!token) return
+      if (!token) return false
 
-      if (!parent?.sessionToken) return
+      if (!parent?.sessionToken) return false
       // register-fcm-token Edge Function 호출 (기존 토큰 삭제 후 새 토큰 저장)
       // session_token을 함께 보내서, Edge Function이 parent_id를 그대로 믿지 않고
       // "이 토큰이 정말 이 parentId의 것인지" 서버에서 확인하게 한다.
@@ -142,18 +144,22 @@ function ParentLayoutContent({ children }: { children: React.ReactNode }) {
       const data = await res.json()
       if (data.success) console.log('[FCM] DB 저장 성공')
       else console.error('[FCM] DB 저장 실패:', data.error)
+      return res.ok && data.success === true
     } catch (e) {
       console.error('[FCM] 토큰 등록 오류:', e)
+      return false
     }
   }, [parent])
 
   // 배너의 "알림 켜기" 버튼 — 권한이 아직 결정 안 됐으면(default) 다시 허용 팝업을 띄운다
   // (브라우저는 한 번 "차단"된 권한은 JS로 다시 물어볼 수 없어 안내 문구로 대체)
-  async function enableNotifications() {
-    if (!parent?.parentId || notifRequesting) return
+  async function enableNotifications(): Promise<boolean> {
+    if (!parent?.parentId || notifRequesting) return false
+    const issue = notificationSetupIssue()
+    if (issue) { window.alert(issue); return false }
     setNotifRequesting(true)
-    await registerFCMToken(parent.parentId)
-    setNotifRequesting(false)
+    try { return await registerFCMToken(parent.parentId, true) }
+    finally { setNotifRequesting(false) }
   }
 
   function dismissNotifBanner() {
@@ -282,6 +288,7 @@ function ParentLayoutContent({ children }: { children: React.ReactNode }) {
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+          <NotificationSettingsButton permission={notifPerm} onEnable={enableNotifications} noticesHref="/parent/notices" />
           <span style={{ fontSize: 11, color: '#627668', whiteSpace: 'nowrap' }}>{childList.find(c => c.id === selChild)?.name ?? ''} 학부모님</span>
           <button
             onClick={logout} aria-label="로그아웃"

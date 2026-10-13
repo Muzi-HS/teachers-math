@@ -12,16 +12,18 @@ const firebaseConfig = {
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0]
 
-export async function requestFCMToken(): Promise<string | null> {
+export async function requestFCMToken(promptPermission = true): Promise<string | null> {
   try {
+    if (typeof Notification === 'undefined') return null
+    const permission = Notification.permission === 'default' && promptPermission
+      ? await Notification.requestPermission()
+      : Notification.permission
+    if (permission !== 'granted') return null
     const supported = await isSupported()
     console.log('[FCM] 지원 여부:', supported)
     if (!supported) return null
 
     const messaging = getMessaging(app)
-    const permission = await Notification.requestPermission()
-    console.log('[FCM] 알림 권한:', permission)
-    if (permission !== 'granted') return null
 
     const sw = await navigator.serviceWorker.register('/firebase-messaging-sw.js')
     console.log('[FCM] SW 등록:', sw.scope)

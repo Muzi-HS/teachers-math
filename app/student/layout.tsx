@@ -7,6 +7,8 @@ import Image from 'next/image'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { requestFCMToken, isFCMSupported } from '@/lib/firebase'
+import NotificationSettingsButton from '@/components/NotificationSettingsButton'
+import { notificationSetupIssue } from '@/lib/notification-settings'
 import ForegroundNotification from '@/components/ForegroundNotification'
 
 const NOTICES_SEEN_KEY = (studentId: number) => `student_notices_seen_${studentId}`
@@ -73,14 +75,14 @@ function StudentLayoutContent({ children }: { children: React.ReactNode }) {
   }, [student, pathname])
   const initDone = useRef(false)
 
-  const registerFCMToken = useCallback(async (studentId: number) => {
+  const registerFCMToken = useCallback(async (studentId: number, promptPermission = false): Promise<boolean> => {
     try {
-      const token = await requestFCMToken()
+      const token = await requestFCMToken(promptPermission)
       if (typeof Notification !== 'undefined') setNotifPerm(Notification.permission)
-      if (!token || !student?.sessionToken) return
+      if (!token || !student?.sessionToken) return false
       // session_token을 함께 보내서, Edge Function이 student_id를 그대로 믿지 않고
       // "이 토큰이 정말 이 studentId의 것인지" 서버에서 확인하게 한다.
-      await fetch(
+      const res = await fetch(
         `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/register-fcm-token`,
         {
           method: 'POST',
@@ -91,16 +93,21 @@ function StudentLayoutContent({ children }: { children: React.ReactNode }) {
           body: JSON.stringify({ student_id: studentId, token, session_token: student.sessionToken }),
         }
       )
+      const data = await res.json()
+      return res.ok && data.success === true
     } catch (e) {
       console.error('[FCM] 학생 토큰 등록 오류:', e)
+      return false
     }
   }, [student])
 
-  async function enableNotifications() {
-    if (!student?.studentId || notifRequesting) return
+  async function enableNotifications(): Promise<boolean> {
+    if (!student?.studentId || notifRequesting) return false
+    const issue = notificationSetupIssue()
+    if (issue) { window.alert(issue); return false }
     setNotifRequesting(true)
-    await registerFCMToken(student.studentId)
-    setNotifRequesting(false)
+    try { return await registerFCMToken(student.studentId, true) }
+    finally { setNotifRequesting(false) }
   }
 
   function dismissNotifBanner() {
@@ -206,13 +213,7 @@ function StudentLayoutContent({ children }: { children: React.ReactNode }) {
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-          <button
-            onClick={() => router.push('/student/notices')} aria-label={`공지 ${unreadNotices}건`}
-            style={{ position: 'relative', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4E6456', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '50%' }}
-          >
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M6 10a6 6 0 1 1 12 0c0 4 1.5 5.5 1.5 5.5H4.5S6 14 6 10Z" /><path d="M10 19a2 2 0 0 0 4 0" /></svg>
-            {unreadNotices > 0 && <span style={{ position: 'absolute', top: 1, right: 1, minWidth: 14, height: 14, padding: '0 3px', borderRadius: 7, background: '#E4574A', color: '#fff', fontSize: 9, fontWeight: 700, lineHeight: '14px', textAlign: 'center' }}>{unreadNotices}</span>}
-          </button>
+          <NotificationSettingsButton permission={notifPerm} onEnable={enableNotifications} unreadCount={unreadNotices} noticesHref="/student/notices" />
           <span style={{ fontSize: 11, color: '#627668', whiteSpace: 'nowrap' }}>{student?.name ?? ''} 학생</span>
           <button
             onClick={logout} aria-label="로그아웃"
