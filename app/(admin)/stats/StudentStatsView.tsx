@@ -168,7 +168,7 @@ export default function StudentStatsView(){
               const cls=classes.find(c=>c.id===csMap[s.id])
               const isSel=selStu?.id===s.id
               return(
-                <div key={s.id} className="ssl-item" onClick={()=>selectStu(s)}
+                <div key={s.id} className="ssl-item" role="button" tabIndex={0} onKeyDown={e=>{if(e.target === e.currentTarget && (e.key==='Enter'||e.key===' ')){e.preventDefault(); void selectStu(s)}}} onClick={()=>selectStu(s)}
                   style={{background:isSel?navyM:undefined,border:isSel?`1px solid color-mix(in srgb, ${navy} 20%, transparent)`:'1px solid transparent'}}>
                   <div className="sav" style={isSel?{background:navy,color:'#fff'}:undefined}>{s.name[0]}</div>
                   <div>
@@ -236,6 +236,7 @@ export default function StudentStatsView(){
                   </div>
                 </div>
               </div>
+
 
               {loading?(
                 <p style={{textAlign:'center',color:tx3,padding:'40px 0'}}>불러오는 중...</p>

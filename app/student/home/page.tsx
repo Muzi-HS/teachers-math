@@ -4,12 +4,14 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { kstNow } from '@/lib/kst'
+import StudyLaunchCard from '@/components/StudyLaunchCard'
+import StudentTestLaunch from '@/components/StudentTestLaunch'
 import { COUPON_MILESTONES } from '@/lib/streak'
 import { nextClassDate, formatClassDate } from '@/lib/nextClass'
 import TodayClassBanner from '@/components/TodayClassBanner'
 import StreakCouponPrompt from '@/components/StreakCouponPrompt'
 import GrowthIllustration from '@/components/streak-preview/GrowthIllustration'
-import { IconCalendar, IconClipboard, IconInbox } from '@/components/icons'
+import { IconInbox } from '@/components/icons'
 
 // 새 학생 시안(streak-preview/student-v2)의 정확한 색상을 그대로 사용한다 — 사이트 테마 토큰
 // 대신 이 화면만의 고정 팔레트로, 홈 화면이 실제로 새 디자인처럼 보이게 한다.
@@ -21,13 +23,7 @@ const segActive = '#1C5939'
 
 type Rec = { id: number; date: string; content: string; homework: string; hw_rate: number; hw_cor: number; class_id: number | null }
 type ClassInfo = { id: number; name: string; days: string; time: string | null }
-type EventRow = { id: number; title: string; start_date: string }
 
-function formatEventDate(ds: string): string {
-  const d = new Date(ds + 'T00:00:00')
-  const dow = ['일', '월', '화', '수', '목', '금', '토'][d.getDay()]
-  return `${d.getMonth() + 1}.${d.getDate()}(${dow})`
-}
 
 // 학생 홈 — 자주 보는 화면(이번 숙제·다음 수업·수업기록 바로가기·연속 이행 요약·학원일정 요약)을
 // 한 화면에 모았다. 하단 탭은 홈/시험/학원일정/공지/쿠폰함 다섯 개뿐이라, 수업기록은 여기
@@ -42,16 +38,7 @@ export default function StudentHome() {
   const [streak, setStreak] = useState(0)
   const [chronoRecs, setChronoRecs] = useState<{ date: string; hw_rate: number }[]>([])
   const [loading, setLoading] = useState(true)
-  const [upcomingEvents, setUpcomingEvents] = useState<EventRow[]>([])
 
-  useEffect(() => {
-    const today = kstNow()
-    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
-    supabase.from('events').select('id,title,start_date')
-      .eq('student_visible', true).gte('start_date', todayStr)
-      .order('start_date', { ascending: true }).limit(2)
-      .then(({ data }) => setUpcomingEvents((data ?? []) as EventRow[]))
-  }, [])
 
   async function load(studentId: number, token: string, isActive: () => boolean) {
     setLoading(true)
@@ -174,28 +161,8 @@ export default function StudentHome() {
           }}>수업기록 보기 <span>→</span></button>
         </section>
 
-        <button onClick={() => router.push('/student/tests')} style={{
-          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 46,
-          background: '#fff', border: `1px solid ${bd}`, borderRadius: 10, color: tx2, fontSize: 12, fontFamily: 'inherit', cursor: 'pointer', marginBottom: 14,
-        }}>
-          <IconClipboard size={16} />확인할 시험
-        </button>
-
-        <button onClick={() => router.push('/student/schedule')} style={{
-          width: '100%', border: `1px solid ${bd}`, background: '#fff', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 12,
-          padding: '14px 15px', marginBottom: 14, color: tx, textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
-        }}>
-          <span style={{ flexShrink: 0, color: tx2, display: 'flex' }}><IconCalendar size={20} /></span>
-          <span style={{ flex: 1 }}>
-            <strong style={{ display: 'block', fontSize: 13, fontWeight: 600 }}>학원일정 확인하기</strong>
-            <small style={{ display: 'block', fontSize: 10, color: tx3, marginTop: 5 }}>
-              {upcomingEvents.length === 0
-                ? '예정된 일정이 없어요'
-                : `${formatEventDate(upcomingEvents[0].start_date)} ${upcomingEvents[0].title}${upcomingEvents.length > 1 ? ` 외 ${upcomingEvents.length - 1}건` : ''}`}
-            </small>
-          </span>
-          <span aria-hidden="true">›</span>
-        </button>
+        <StudentTestLaunch />
+        <StudyLaunchCard />
 
         <button onClick={() => router.push('/student/growth')} style={{
           width: '100%', border: `1px solid ${bd}`, background: growthBg, borderRadius: 12, display: 'flex', alignItems: 'center', gap: 12,
@@ -209,6 +176,7 @@ export default function StudentHome() {
           <span aria-hidden="true">›</span>
         </button>
       </>}
+      {!loading && classes.length === 0 && <><StudentTestLaunch /><StudyLaunchCard /></>}
     </div>
   )
 }
