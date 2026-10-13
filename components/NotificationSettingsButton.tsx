@@ -1,7 +1,19 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { notificationSetupIssue } from '@/lib/notification-settings'
+import { isIOSDevice, notificationSetupIssue } from '@/lib/notification-settings'
+
+export function NotificationSetupGuidance({ permission }: { permission: NotificationPermission | null }) {
+  const [ios, setIOS] = useState(false)
+  useEffect(() => { setIOS(isIOSDevice()) }, [])
+  return <>{ios
+    ? permission === 'denied'
+      ? 'iPhone·iPad: 설정 → 알림 → 티처스 수학학원에서 알림 허용을 켜주세요.'
+      : 'iPhone·iPad: Safari 공유 → 홈 화면에 추가 후 홈 화면 앱에서 아래 알림 켜기를 눌러주세요. iOS 16.4 이상이 필요합니다.'
+    : permission === 'denied'
+      ? 'Android: 휴대폰 설정 → 앱 → Chrome(또는 설치한 앱) → 알림과 Chrome의 사이트 설정 → 알림에서 허용해주세요.'
+      : '알림 켜기 또는 우측 상단 종 버튼을 눌러 알림을 허용해주세요. 설정이 완료되면 종 버튼은 사라집니다.'}</>
+}
 
 export default function NotificationSettingsButton({ permission, onEnable, unreadCount = 0, noticesHref }: {
   permission: NotificationPermission | null; onEnable: () => Promise<boolean>; unreadCount?: number; noticesHref?: string
@@ -9,6 +21,8 @@ export default function NotificationSettingsButton({ permission, onEnable, unrea
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
+  const [ios, setIOS] = useState<boolean | null>(null)
+  useEffect(() => { setIOS(isIOSDevice()) }, [])
   async function enable() {
     if (busy) return
     setOpen(true)
@@ -22,8 +36,9 @@ export default function NotificationSettingsButton({ permission, onEnable, unrea
     } catch { setMessage('알림 설정에 실패했습니다. 다시 시도해주세요.') }
     finally { setBusy(false) }
   }
+  if (ios === null || ios || permission === 'granted') return null
   return <div style={{ position: 'relative' }}>
-    <button type="button" onClick={() => void enable()} disabled={busy} aria-label={`알림 설정${unreadCount ? ` · 읽지 않은 공지 ${unreadCount}건` : ''}`} aria-expanded={open} style={{ position: 'relative', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', color: permission === 'granted' ? '#23633F' : '#4E6456', background: 'none', border: 'none', cursor: busy ? 'wait' : 'pointer', borderRadius: '50%' }}>
+    <button type="button" onClick={() => void enable()} disabled={busy} aria-label={`알림 설정${unreadCount ? ` · 읽지 않은 공지 ${unreadCount}건` : ''}`} aria-expanded={open} style={{ position: 'relative', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4E6456', background: 'none', border: 'none', cursor: busy ? 'wait' : 'pointer', borderRadius: '50%' }}>
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M6 10a6 6 0 1 1 12 0c0 4 1.5 5.5 1.5 5.5H4.5S6 14 6 10Z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg>
       {unreadCount > 0 && <span style={{ position: 'absolute', top: 1, right: 1, minWidth: 14, height: 14, padding: '0 3px', borderRadius: 7, background: '#E4574A', color: '#fff', fontSize: 9, lineHeight: '14px' }}>{unreadCount}</span>}
     </button>

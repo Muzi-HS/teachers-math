@@ -5,7 +5,7 @@ import { useResetMenuScroll } from '@/lib/use-reset-menu-scroll'
 import Image from 'next/image'
 import { useAuth } from '@/context/AuthContext'
 import { requestFCMToken, isFCMSupported } from '@/lib/firebase'
-import NotificationSettingsButton from '@/components/NotificationSettingsButton'
+import NotificationSettingsButton, { NotificationSetupGuidance } from '@/components/NotificationSettingsButton'
 import { notificationSetupIssue } from '@/lib/notification-settings'
 import ForegroundNotification from '@/components/ForegroundNotification'
 import { MobileModeProvider } from '@/context/MobileModeContext'
@@ -332,9 +332,7 @@ function ParentLayoutContent({ children }: { children: React.ReactNode }) {
                 {notifPerm === 'denied' ? '알림이 차단되어 있어요' : '알림을 켜주세요'}
               </p>
               <p style={{ margin: '3px 0 0', fontSize: 11.5, color: tx2, lineHeight: 1.5 }}>
-                {notifPerm === 'denied'
-                  ? '수업기록·공지사항 알림을 받으려면 휴대폰 설정 → 이 앱(또는 브라우저)의 알림 권한을 허용으로 바꿔주세요.'
-                  : '수업기록이 등록되거나 공지사항이 올라오면 바로 알려드려요.'}
+                <NotificationSetupGuidance permission={notifPerm} />
               </p>
             </div>
             {notifPerm !== 'denied' && (
