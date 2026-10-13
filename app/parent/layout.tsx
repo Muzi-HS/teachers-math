@@ -5,7 +5,7 @@ import { useResetMenuScroll } from '@/lib/use-reset-menu-scroll'
 import Image from 'next/image'
 import { useAuth } from '@/context/AuthContext'
 import { requestFCMToken, isFCMSupported } from '@/lib/firebase'
-import NotificationSettingsButton, { NotificationSetupGuidance } from '@/components/NotificationSettingsButton'
+import { NotificationSetupGuidance } from '@/components/NotificationSetupGuidance'
 import { notificationSetupIssue } from '@/lib/notification-settings'
 import ForegroundNotification from '@/components/ForegroundNotification'
 import { MobileModeProvider } from '@/context/MobileModeContext'
@@ -288,7 +288,6 @@ function ParentLayoutContent({ children }: { children: React.ReactNode }) {
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-          <NotificationSettingsButton permission={notifPerm} onEnable={enableNotifications} noticesHref="/parent/notices" />
           <span style={{ fontSize: 11, color: '#627668', whiteSpace: 'nowrap' }}>{childList.find(c => c.id === selChild)?.name ?? ''} 학부모님</span>
           <button
             onClick={logout} aria-label="로그아웃"

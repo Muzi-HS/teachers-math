@@ -7,7 +7,7 @@ import Image from 'next/image'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { requestFCMToken, isFCMSupported } from '@/lib/firebase'
-import NotificationSettingsButton, { NotificationSetupGuidance } from '@/components/NotificationSettingsButton'
+import { NotificationSetupGuidance } from '@/components/NotificationSetupGuidance'
 import { notificationSetupIssue } from '@/lib/notification-settings'
 import ForegroundNotification from '@/components/ForegroundNotification'
 
@@ -213,7 +213,6 @@ function StudentLayoutContent({ children }: { children: React.ReactNode }) {
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-          <NotificationSettingsButton permission={notifPerm} onEnable={enableNotifications} unreadCount={unreadNotices} noticesHref="/student/notices" />
           <span style={{ fontSize: 11, color: '#627668', whiteSpace: 'nowrap' }}>{student?.name ?? ''} 학생</span>
           <button
             onClick={logout} aria-label="로그아웃"
