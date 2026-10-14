@@ -8,7 +8,7 @@ serve(async (req) => {
   }
 
   try {
-    const { parent_phone, student_id, title, body, link } = await req.json()
+    const { parent_phone, student_id, title, body, link, tag } = await req.json()
 
     const supabase = createServiceClient()
 
@@ -46,7 +46,7 @@ serve(async (req) => {
 
     const { sent, total } = await sendFcmToTokens(
       tokens.map(t => t.token),
-      { title, body, link: link || (student_id ? '/student/records' : '/parent/records') },
+      { title, body, link: link || (student_id ? '/student/records' : '/parent/records'), ...(typeof tag === 'string' ? { tag } : {}) },
       '푸시 발송'
     )
 

@@ -16,11 +16,11 @@ const messaging = firebase.messaging()
 messaging.onBackgroundMessage(payload => {
   const title = payload.data?.title || '티처스 수학학원'
   const body  = payload.data?.body  || '새로운 수업기록이 등록됐습니다.'
-  self.registration.showNotification(title, {
+  return self.registration.showNotification(title, {
     body,
     icon:  '/logo.png',
     badge: '/logo.png',
-    tag:   'teachers-math-notification',  // 동일 tag면 이전 알림 교체 (중복 방지)
+    tag:   payload.data?.tag || 'teachers-math-notification',
     data:  { link: payload.data?.link || '/parent/records' },
   })
 })

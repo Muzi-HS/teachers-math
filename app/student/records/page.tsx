@@ -5,7 +5,6 @@ import { useAuth } from '@/context/AuthContext'
 import { IconInbox } from '@/components/icons'
 import TestResultCard from '@/components/TestResultCard'
 import HomeworkStatsView from '@/components/HomeworkStatsView'
-import TodayClassBanner from '@/components/TodayClassBanner'
 import StreakCouponPrompt from '@/components/StreakCouponPrompt'
 
 const navy='var(--ui-primary)', gold='var(--ui-primary)', tx='var(--ui-text)', tx2='var(--ui-text-2)', tx3='var(--ui-text-3)'
@@ -99,7 +98,6 @@ export default function StudentRecords() {
   return (
     <div>
       {student?.studentId && <StreakCouponPrompt studentId={student.studentId} sessionToken={student.sessionToken} chronoRecs={chronoRecs} />}
-      <TodayClassBanner studentId={student?.studentId ?? null} sessionToken={student?.sessionToken} />
 
       {/* 학생 헤더 */}
       <div style={{ background: 'var(--student-card-bg, #fff)', borderRadius: 12, border: `1px solid ${bd}`, padding: '14px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>

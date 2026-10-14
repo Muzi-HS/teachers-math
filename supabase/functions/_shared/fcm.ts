@@ -71,6 +71,7 @@ export interface FcmPushPayload {
   title: string
   body: string
   link: string
+  tag?: string
 }
 
 export async function sendFcmToTokens(

@@ -59,6 +59,7 @@ export default function StudyTimer() {
   <section className={styles.card} aria-label="집중 타이머">
    <h3 className={styles.title}>⏱ 나만의 집중 타이머</h3>
    <p className={styles.hint}>목표 하나, 집중 한 번. 오늘도 차근차근 쌓아봐요.</p>
+   <p className={styles.hint}>알림을 허용하면 집중·휴식 종료 시 푸시 알림을 받을 수 있어요.</p>
    {!loaded ? <p className={styles.hint}>진행 중인 타이머 확인 중…</p> : !session ? <form onSubmit={e => { e.preventDefault(); setMessage(''); void act('start', { goal, focus, rest, rounds, mode }) }}>
     <div className={styles.presets} aria-label="시간 측정 방식">{(['timer','stopwatch'] as const).map(m => <button type="button" key={m} aria-pressed={mode === m} className={mode === m ? styles.primary : styles.secondary} onClick={() => setMode(m)}>{m === 'timer' ? '뽀모도로 / 타이머' : '스톱워치'}</button>)}</div>
     <Dial seconds={mode === 'stopwatch' ? 0 : focus * 60} totalSeconds={focus * 60} stopwatch={mode === 'stopwatch'} label={mode === 'stopwatch' ? '스톱워치 · 0초부터 시작' : '타이머 · 집중을 준비해요'} />

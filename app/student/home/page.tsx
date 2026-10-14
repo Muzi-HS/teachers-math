@@ -8,7 +8,6 @@ import StudyLaunchCard from '@/components/StudyLaunchCard'
 import StudentTestLaunch from '@/components/StudentTestLaunch'
 import { COUPON_MILESTONES } from '@/lib/streak'
 import { nextClassDate, formatClassDate } from '@/lib/nextClass'
-import TodayClassBanner from '@/components/TodayClassBanner'
 import StreakCouponPrompt from '@/components/StreakCouponPrompt'
 import GrowthIllustration from '@/components/streak-preview/GrowthIllustration'
 import { IconInbox } from '@/components/icons'
@@ -109,7 +108,6 @@ export default function StudentHome() {
   return (
     <div>
       {student?.studentId && <StreakCouponPrompt studentId={student.studentId} sessionToken={student.sessionToken} chronoRecs={chronoRecs} onClaimed={() => setStreak(0)} />}
-      <TodayClassBanner studentId={student?.studentId ?? null} sessionToken={student?.sessionToken} />
 
       <div style={{ marginBottom: 16 }}>
         <p style={{ fontSize: 11, color: tx3, margin: '0 0 4px' }}>오늘도 차근차근</p>

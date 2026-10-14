@@ -215,7 +215,7 @@ function StudentLayoutContent({ children }: { children: React.ReactNode }) {
           {theme !== 'green' && <span className="student-giants-badge">GIANTS</span>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-          <button className="student-theme-entry" onClick={() => router.push('/student/themes')} aria-label={`${student?.name ?? ''} 학생, 내 테마 선택`}>{student?.name ?? ''} 학생 <span aria-hidden="true">⌄</span></button>
+          <button className="student-theme-entry" onClick={() => router.push('/student/themes')} aria-label={`${student?.name ?? ''} 학생, 내 테마 선택`}>{student?.name ?? ''} 학생</button>
           <button
             onClick={logout} aria-label="로그아웃"
             style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--student-819085, #819085)', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '50%' }}
