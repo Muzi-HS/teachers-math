@@ -102,8 +102,8 @@ export default function StudentRecords() {
       <TodayClassBanner studentId={student?.studentId ?? null} sessionToken={student?.sessionToken} />
 
       {/* 학생 헤더 */}
-      <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: '14px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div style={{ width: 42, height: 42, borderRadius: '50%', background: navy, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+      <div style={{ background: 'var(--student-card-bg, #fff)', borderRadius: 12, border: `1px solid ${bd}`, padding: '14px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ width: 42, height: 42, borderRadius: '50%', background: navy, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, color: 'var(--student-card-bg, #fff)', flexShrink: 0 }}>
           {student?.name?.[0]}
         </div>
         <div style={{ flex: 1 }}>
@@ -112,8 +112,8 @@ export default function StudentRecords() {
         </div>
         <button onClick={() => setShowStats(s => !s)} style={{
           flexShrink: 0, padding: '7px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600,
-          border: `1.5px solid ${showStats ? navy : bd}`, background: showStats ? navy : '#fff',
-          color: showStats ? '#fff' : tx2, cursor: 'pointer', fontFamily: 'inherit',
+          border: `1.5px solid ${showStats ? navy : bd}`, background: showStats ? navy : 'var(--student-card-bg, #fff)',
+          color: showStats ? 'var(--student-card-bg, #fff)' : tx2, cursor: 'pointer', fontFamily: 'inherit',
         }}>
           {showStats ? '기록 보기' : '통계 보기'}
         </button>
@@ -124,7 +124,7 @@ export default function StudentRecords() {
       ) : loading ? (
         <p style={{ textAlign: 'center', color: tx3, padding: '40px 0' }}>불러오는 중...</p>
       ) : recs.length === 0 ? (
-        <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: '60px 0', textAlign: 'center', color: tx3 }}>
+        <div style={{ background: 'var(--student-card-bg, #fff)', borderRadius: 12, border: `1px solid ${bd}`, padding: '60px 0', textAlign: 'center', color: tx3 }}>
           <p style={{ marginBottom: 8, display: 'flex', justifyContent: 'center' }}><IconInbox size={28} /></p>
           <p style={{ fontSize: 14 }}>수업 기록이 없습니다</p>
         </div>
@@ -135,7 +135,7 @@ export default function StudentRecords() {
           {recs.map(r => {
             const tItems = r.record_test_items ?? []
             return (
-              <div key={r.id} style={{ background: '#fff', border: `1px solid ${bd}`, borderRadius: 12, padding: 16, marginBottom: 12 }}>
+              <div key={r.id} style={{ background: 'var(--student-card-bg, #fff)', border: `1px solid ${bd}`, borderRadius: 12, padding: 16, marginBottom: 12 }}>
                 {/* 헤더 */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, paddingBottom: 10, borderBottom: `1px solid ${bd}` }}>
                   <b style={{ fontSize: 14, color: tx }}>{r.date}</b>

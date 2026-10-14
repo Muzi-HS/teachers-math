@@ -5,9 +5,13 @@ import { supabase } from '@/lib/supabase'
 import { StudySession, studyRemaining, studyDisplaySeconds } from '@/lib/study'
 import StudyRecords from './StudyRecords'
 import StudyDial from './StudyDial'
+import GiantsRingDial from './student-preview/GiantsRingDial'
+import { useStudentTheme } from '@/context/StudentThemeContext'
 import styles from './Study.module.css'
 
 export default function StudyTimer() {
+ const { theme } = useStudentTheme()
+ const Dial = theme === 'green' ? StudyDial : GiantsRingDial
  const { student } = useAuth()
  const token = student?.sessionToken
  const [session, setSession] = useState<StudySession | null>(null)
@@ -57,7 +61,7 @@ export default function StudyTimer() {
    <p className={styles.hint}>목표 하나, 집중 한 번. 오늘도 차근차근 쌓아봐요.</p>
    {!loaded ? <p className={styles.hint}>진행 중인 타이머 확인 중…</p> : !session ? <form onSubmit={e => { e.preventDefault(); setMessage(''); void act('start', { goal, focus, rest, rounds, mode }) }}>
     <div className={styles.presets} aria-label="시간 측정 방식">{(['timer','stopwatch'] as const).map(m => <button type="button" key={m} aria-pressed={mode === m} className={mode === m ? styles.primary : styles.secondary} onClick={() => setMode(m)}>{m === 'timer' ? '뽀모도로 / 타이머' : '스톱워치'}</button>)}</div>
-    <StudyDial seconds={mode === 'stopwatch' ? 0 : focus * 60} stopwatch={mode === 'stopwatch'} label={mode === 'stopwatch' ? '스톱워치 · 0초부터 시작' : '타이머 · 집중을 준비해요'} />
+    <Dial seconds={mode === 'stopwatch' ? 0 : focus * 60} totalSeconds={focus * 60} stopwatch={mode === 'stopwatch'} label={mode === 'stopwatch' ? '스톱워치 · 0초부터 시작' : '타이머 · 집중을 준비해요'} />
     <label>오늘의 공부 목표<input required maxLength={120} placeholder="예: 수학 오답 10문제 다시 풀기" value={goal} onChange={e => setGoal(e.target.value)} /></label>
     {mode === 'timer' && <><div className={styles.fields}>
      <label>집중 (분)<input type="number" min={1} max={180} required value={focus} onChange={e => setFocus(Number(e.target.value))} /></label>
@@ -69,7 +73,7 @@ export default function StudyTimer() {
     {mode === 'stopwatch' && <p className={styles.hint}>0초부터 공부한 시간을 측정해요. 쉬는 동안은 일시정지를 눌러주세요. 한 기록은 최대 24시간까지 측정합니다.</p>}
     <div className={styles.actions}><button className={styles.primary} disabled={busy || !valid}>집중 시작하기</button></div>
    </form> : <>
-    <StudyDial seconds={seconds} stopwatch={session.mode === 'stopwatch'} paused={session.paused} label={session.mode === 'stopwatch' ? '스톱워치 · 공부한 시간' : `${session.phase === 'focus' ? '집중 시간' : session.phase === 'break' ? '휴식 시간' : '다음 집중 준비'} · ${session.round} / ${session.rounds}회차`} />
+    <Dial seconds={seconds} totalSeconds={(session.phase === 'break' ? session.break_minutes : session.focus_minutes) * 60} resting={session.phase === 'break'} stopwatch={session.mode === 'stopwatch'} paused={session.paused} label={session.mode === 'stopwatch' ? '스톱워치 · 공부한 시간' : `${session.phase === 'focus' ? '집중 시간' : session.phase === 'break' ? '휴식 시간' : '다음 집중 준비'} · ${session.round} / ${session.rounds}회차`} />
     <p className={styles.activeGoal}>{session.goal}</p>
     <p className={styles.hint}>{session.mode === 'stopwatch' ? '화면을 꺼도 시간은 이어집니다. 다시 열면 경과 시간을 복원해요. 최대 24시간 후 자동 종료됩니다.' : '화면을 꺼도 현재 집중·휴식 시간은 이어집니다. 휴식 후 다음 집중은 직접 시작해주세요.'}</p>
     <div className={styles.actions}>{session.phase === 'ready' ? <button className={styles.primary} disabled={busy} onClick={() => void act('next')}>다음 집중 시작</button> : <button className={styles.primary} disabled={busy} onClick={() => void act(session.paused ? 'resume' : 'pause')}>{session.paused ? '이어서 집중하기' : '일시정지'}</button>}<button className={styles.secondary} disabled={busy} onClick={() => void act('finish')}>여기까지 기록</button></div>

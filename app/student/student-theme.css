@@ -1,0 +1,72 @@
+@font-face{font-family:Giants;src:url('/fonts/giants/Giants-Regular.otf') format('opentype');font-weight:400;font-display:swap}
+@font-face{font-family:'Giants Inline';src:url('/fonts/giants/Giants-Inline.otf') format('opentype');font-weight:400;font-display:swap}
+.student-theme-entry{border:0;background:transparent;color:var(--ui-text-2);font:inherit;font-size:11px;min-height:40px;cursor:pointer;white-space:nowrap;padding:4px}
+.student-giants-badge{font-family:'Giants Inline',sans-serif;font-size:12px;color:#ca1237;border-left:1px solid #cbd5e1;padding-left:7px;white-space:nowrap}
+.student-shell[data-student-theme^='giants']{
+--ui-bg:#f7f9fc;--ui-surface:#ffffffd1;--ui-surface-2:#edf3fa;--ui-border:#dee5ed;--ui-text:#082744;--ui-text-2:#687b8e;--ui-text-3:#687b8e;--ui-primary:#ca1237;--ui-primary-hover:#ad0d2f;--ui-accent:#ca1237;--ui-accent-text:#082744;--ui-accent-bg:#edf3fa;--ui-focus:#62aedd;
+--student-card-bg:#ffffffd1;
+--student-1c5939:#ca1237;
+--student-203f30:#082744;
+--student-235f3f:#082744;
+--student-23633f:#ca1237;
+--student-2a5338:#082744;
+--student-2b6b45:#ca1237;
+--student-326244:#082744;
+--student-347653:#ca1237;
+--student-456650:#082744;
+--student-6a7b6e:#687b8e;
+--student-768478:#687b8e;
+--student-819085:#687b8e;
+--student-dde8df:#dee5ed;
+--student-e9efea:#ffffffd1;
+--student-edf4eb:#ffffffd1;
+
+ --study-203f30: #082744;
+ --study-294431: #082744;
+ --study-2a5338: #082744;
+ --study-326244: #082744;
+ --study-347653: #CA1237;
+ --study-37694c: #CA1237;
+ --study-456650: #082744;
+ --study-527363: #082744;
+ --study-54765a: #082744;
+ --study-658274: #687B8E;
+ --study-6a7b6e: #687B8E;
+ --study-6a9268: #CA1237;
+ --study-6b9360: #CA1237;
+ --study-768478: #687B8E;
+ --study-89a384: #687B8E;
+ --study-8ab99a: #687B8E;
+ --study-abc7a7: #687B8E;
+ --study-cbdcc8: #E3EAF2;
+ --study-cddbd0: #E3EAF2;
+ --study-d4e2d1: #E3EAF2;
+ --study-d6e3d3: #E3EAF2;
+ --study-dde8df: #E3EAF2;
+ --study-e0e7d9: #E3EAF2;
+ --study-e5eee2: #E3EAF2;
+ --study-e9efea: #E3EAF2;
+ --study-eaf2e8: #E3EAF2;
+ --study-edf2eb: #E3EAF2;
+ --study-edf4eb: #E3EAF2;
+ --study-f2f7ef: #E3EAF2;
+ --study-f4f6ea: #E3EAF2;
+ --study-f4f7ed: #E3EAF2;
+ --study-f4f7f3: #E3EAF2;
+ --study-f6f8f5: #E3EAF2;
+ --study-f6f9f5: #E3EAF2;
+}
+
+.student-shell[data-student-theme^='giants'] .student-main{position:relative;isolation:isolate}
+.student-shell[data-student-theme^='giants'] .student-main::before{content:'';position:absolute;inset:0;z-index:-1;pointer-events:none;background:url('/lotte-giants.png') center 85px/min(94%,540px) auto no-repeat;opacity:.14}
+.student-shell[data-student-theme^='giants'][data-student-screen='/student/study'] .student-main::before,.student-shell[data-student-theme^='giants'][data-student-screen='/student/themes'] .student-main::before{display:none}
+.student-shell[data-student-theme='giants-light'] .student-header{background:repeating-linear-gradient(90deg,transparent 0 20px,#08274419 20px 21px),#fff!important;border-bottom:3px solid #ca1237!important}
+.student-shell[data-student-theme='giants-uniform']{background:repeating-linear-gradient(90deg,transparent 0 20px,#08274419 20px 21px),#fff!important}
+.student-shell[data-student-theme='giants-uniform'] .student-header{background:#082744!important;border-bottom:3px solid #ca1237!important;color:#fff}
+.student-shell[data-student-theme='giants-uniform'] .student-header button,.student-shell[data-student-theme='giants-uniform'] .student-header span{color:#fff!important}
+.student-shell[data-student-theme='giants-uniform'] .student-header img{filter:brightness(0) invert(1)}
+.student-shell[data-student-theme='giants-uniform'] .student-header .student-giants-badge{color:#8fcff4!important}
+.student-shell[data-student-theme^='giants'] .student-main h1,.student-shell[data-student-theme^='giants'] .student-main h2,.student-shell[data-student-theme^='giants'] .student-main h3{font-family:Giants,sans-serif;font-weight:400}
+.student-shell[data-student-theme^='giants'] .student-page-title{font-family:Giants,sans-serif;font-weight:400!important}
+@media(max-width:380px){.student-shell .student-header{padding-left:12px!important;padding-right:12px!important}.student-shell .student-header>div{gap:5px!important}.student-giants-badge{font-size:10px;padding-left:5px}}
+.student-shell[data-student-theme^='giants'] [aria-label='집중 타이머']{background:#ffffffd1}.student-shell[data-student-theme^='giants'] [aria-label='집중 타이머'] h3{font-family:Giants,sans-serif;font-weight:400}

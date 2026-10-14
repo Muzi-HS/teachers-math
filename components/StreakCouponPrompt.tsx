@@ -3,11 +3,11 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { COUPON_MILESTONES, type StreakRec } from '@/lib/streak'
 import GrowthIllustration from '@/components/streak-preview/GrowthIllustration'
-import { CouponTicket } from '@/components/streak-preview/GrowthCards'
+import CouponTicket from '@/components/StudentCoupon'
 import { IconCoupon } from '@/components/icons'
 
-const navy = '#2B6B45', navyDk = '#203F30', gold = '#235F3F'
-const tx2 = '#6A7B6E'
+const navy = 'var(--student-2b6b45, #2b6b45)', navyDk = 'var(--student-203f30, #203f30)', gold = 'var(--student-235f3f, #235f3f)'
+const tx2 = 'var(--student-6a7b6e, #6a7b6e)'
 
 // 숙제 이행률 100% 연속 달성 마일스톤(5/10/15/20/25/30일)에 새로 도달했을 때 한 번만
 // "쿠폰 받기 vs 다음 목표 도전" 선택지를 보여준다.
@@ -56,7 +56,7 @@ export default function StreakCouponPrompt({ studentId, sessionToken, chronoRecs
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
       <div style={{
-        background: '#fff', borderRadius: 20, padding: '32px 26px', width: '100%', maxWidth: 340,
+        background: 'var(--student-card-bg, #fff)', borderRadius: 20, padding: '32px 26px', width: '100%', maxWidth: 340,
         textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,.25)',
       }}>
         {claimedCode ? (
@@ -68,7 +68,7 @@ export default function StreakCouponPrompt({ studentId, sessionToken, chronoRecs
             </div>
             <button onClick={() => { setClaimedCode(null); setPrompt(null) }} style={{
               width: '100%', padding: 14, borderRadius: 12, border: 'none', background: gold,
-              color: '#fff', fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
+              color: 'var(--student-card-bg, #fff)', fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
             }}>
               확인
             </button>
@@ -98,7 +98,7 @@ export default function StreakCouponPrompt({ studentId, sessionToken, chronoRecs
             </button>
 
             <button onClick={decline} disabled={busy} style={{
-              width: '100%', padding: 14, borderRadius: 12, border: `1.5px solid ${navy}`, background: '#fff',
+              width: '100%', padding: 14, borderRadius: 12, border: `1.5px solid ${navy}`, background: 'var(--student-card-bg, #fff)',
               color: navy, fontSize: 14, fontWeight: 700, cursor: busy ? 'not-allowed' : 'pointer',
               fontFamily: 'inherit', opacity: busy ? .7 : 1,
             }}>

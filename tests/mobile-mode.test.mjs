@@ -32,7 +32,10 @@ function mount({ width = 1440, coarse = false, saved = null, blocked = false, se
       },
     },
   }
-  if (!server) context.window = { matchMedia: query => ({
+  if (!server) context.window = { get innerWidth() { return width }, screen: { get width() { return width } },
+    addEventListener: (_, callback) => listeners.add(callback),
+    removeEventListener: (_, callback) => listeners.delete(callback),
+    matchMedia: query => ({
     matches: matches(query),
     addEventListener: (_, callback) => listeners.add(callback),
     removeEventListener: (_, callback) => listeners.delete(callback),

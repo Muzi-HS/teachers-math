@@ -10,6 +10,8 @@ import { requestFCMToken, isFCMSupported } from '@/lib/firebase'
 import { NotificationSetupGuidance } from '@/components/NotificationSetupGuidance'
 import { notificationSetupIssue } from '@/lib/notification-settings'
 import ForegroundNotification from '@/components/ForegroundNotification'
+import { StudentThemeProvider, useStudentTheme } from '@/context/StudentThemeContext'
+import './student-theme.css'
 
 const NOTICES_SEEN_KEY = (studentId: number) => `student_notices_seen_${studentId}`
 
@@ -29,10 +31,8 @@ const NAV = [
 ]
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
-  // 학생 화면은 테마 선택 없이 그린 테마로 고정한다 (관리자 화면의 InternalThemeProvider/
-  // localStorage 토글을 상속하지 않도록 data-ui-theme을 직접 "green"으로 박아둔다).
   return <div className="internal-ui" data-ui-theme="green" style={{ display: 'contents' }}>
-    <MobileModeProvider><StudentLayoutContent>{children}</StudentLayoutContent></MobileModeProvider>
+    <StudentThemeProvider><MobileModeProvider><StudentLayoutContent>{children}</StudentLayoutContent></MobileModeProvider></StudentThemeProvider>
   </div>
 }
 
@@ -40,6 +40,7 @@ function StudentLayoutContent({ children }: { children: React.ReactNode }) {
   const { student, role, loading, logout } = useAuth()
   const router   = useRouter()
   const pathname = usePathname()
+  const { theme } = useStudentTheme()
   useResetMenuScroll(pathname)
 
   const [ready, setReady] = useState(false)
@@ -191,7 +192,7 @@ function StudentLayoutContent({ children }: { children: React.ReactNode }) {
   if (!role || role !== 'student') return null
 
   return (
-    <div style={{ minHeight: '100vh', background: bg, fontFamily: "'Noto Sans KR',sans-serif", display: 'flex', flexDirection: 'column' }}>
+    <div className="student-shell" data-student-theme={theme} data-student-screen={pathname} style={{ minHeight: '100vh', background: bg, fontFamily: "'Noto Sans KR',sans-serif", display: 'flex', flexDirection: 'column' }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Montserrat:wght@700;800&display=swap');
         * { box-sizing: border-box; }
@@ -200,23 +201,24 @@ function StudentLayoutContent({ children }: { children: React.ReactNode }) {
       `}</style>
 
       {/* 상단 헤더 */}
-      <header style={{
-        background: '#fff', borderBottom: '1px solid #EBF0EC',
+      <header className="student-header" style={{
+        background: 'var(--student-card-bg, #fff)', borderBottom: '1px solid #EBF0EC',
         padding: '0 20px', height: 62,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         position: 'sticky', top: 0, zIndex: 100, flexShrink: 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, overflow: 'hidden' }}>
           <Image src="/logo.png" alt="로고" width={24} height={24} style={{ objectFit: 'contain', flexShrink: 0 }} />
-          <span style={{ fontSize: 13, fontWeight: 700, color: '#203F30', letterSpacing: -.2, flexShrink: 0, whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--student-203f30, #203f30)', letterSpacing: -.2, flexShrink: 0, whiteSpace: 'nowrap' }}>
             티처스 수학학원
           </span>
+          {theme !== 'green' && <span className="student-giants-badge">GIANTS</span>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-          <span style={{ fontSize: 11, color: '#627668', whiteSpace: 'nowrap' }}>{student?.name ?? ''} 학생</span>
+          <button className="student-theme-entry" onClick={() => router.push('/student/themes')} aria-label={`${student?.name ?? ''} 학생, 내 테마 선택`}>{student?.name ?? ''} 학생 <span aria-hidden="true">⌄</span></button>
           <button
             onClick={logout} aria-label="로그아웃"
-            style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#819085', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '50%' }}
+            style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--student-819085, #819085)', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '50%' }}
           >
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5" /><path d="M21 12H9" /></svg>
           </button>
@@ -242,7 +244,7 @@ function StudentLayoutContent({ children }: { children: React.ReactNode }) {
             {notifPerm !== 'denied' && (
               <button onClick={enableNotifications} disabled={notifRequesting} style={{
                 flexShrink: 0, border: 'none', borderRadius: 8, padding: '8px 14px',
-                background: navy, color: '#fff', fontWeight: 700, fontSize: 12,
+                background: navy, color: 'var(--student-card-bg, #fff)', fontWeight: 700, fontSize: 12,
                 cursor: notifRequesting ? 'not-allowed' : 'pointer', opacity: notifRequesting ? .7 : 1,
                 fontFamily: 'inherit',
               }}>{notifRequesting ? '확인 중...' : '알림 켜기'}</button>
@@ -260,7 +262,7 @@ function StudentLayoutContent({ children }: { children: React.ReactNode }) {
       {/* 하단 탭바 */}
       <nav className="student-nav" style={{
         position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100,
-        background: '#fff', borderTop: '1px solid #E2EAE3',
+        background: 'var(--student-card-bg, #fff)', borderTop: '1px solid #E2EAE3',
         display: 'flex',
       }}>
         {NAV.map(item => {
@@ -271,12 +273,12 @@ function StudentLayoutContent({ children }: { children: React.ReactNode }) {
               alignItems: 'center', justifyContent: 'center', gap: 6,
               height: 70,
               background: 'none', border: 'none', cursor: 'pointer',
-              color: active ? '#23633F' : '#819085',
+              color: active ? 'var(--student-23633f, #23633f)' : 'var(--student-819085, #819085)',
               fontFamily: "'Noto Sans KR',sans-serif",
               transition: 'color .15s',
             }}>
-              {active && <span style={{ position: 'absolute', top: 0, width: 18, height: 2, background: '#23633F', borderRadius: '0 0 2px 2px' }} />}
-              <span style={{ color: active ? '#23633F' : '#819085', display: 'flex' }}>{item.icon}</span>
+              {active && <span style={{ position: 'absolute', top: 0, width: 18, height: 2, background: 'var(--student-23633f, #23633f)', borderRadius: '0 0 2px 2px' }} />}
+              <span style={{ color: active ? 'var(--student-23633f, #23633f)' : 'var(--student-819085, #819085)', display: 'flex' }}>{item.icon}</span>
               <span style={{ fontSize: 10, fontWeight: active ? 700 : 400 }}>{item.label}</span>
             </button>
           )

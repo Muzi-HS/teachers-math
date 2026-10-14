@@ -63,12 +63,12 @@ export default function StudentNotices() {
       {loading ? (
         <p style={{ textAlign: 'center', color: tx3, padding: '40px 0' }}>불러오는 중...</p>
       ) : notices.length === 0 ? (
-        <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: '60px 0', textAlign: 'center', color: tx3 }}>
+        <div style={{ background: 'var(--student-card-bg, #fff)', borderRadius: 12, border: `1px solid ${bd}`, padding: '60px 0', textAlign: 'center', color: tx3 }}>
           <p style={{ marginBottom: 8, display: 'flex', justifyContent: 'center' }}><IconInbox size={28} /></p>
           <p style={{ fontSize: 14 }}>아직 받은 공지가 없습니다</p>
         </div>
       ) : (
-        <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: 16 }}>
+        <div style={{ background: 'var(--student-card-bg, #fff)', borderRadius: 12, border: `1px solid ${bd}`, padding: 16 }}>
           {notices.map(n => (
             <div key={n.id} style={{ marginBottom: 16 }}>
               {showClassBadge && (

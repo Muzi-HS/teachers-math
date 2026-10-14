@@ -303,7 +303,7 @@ export default function StudentTestsPage() {
       <button className="exam-primary" style={{ marginTop: 10 }} onClick={() => { setActive(null); activeRef.current = null; void load() }}>시험 목록으로</button>
     </section> : <>
       <div className="exam-clock">
-        <div><span>남은 시간</span><br /><strong style={{ color: seconds <= 20 ? '#F5B7B1' : '#fff' }}>{Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}</strong></div>
+        <div><span>남은 시간</span><br /><strong style={{ color: seconds <= 20 ? '#F5B7B1' : 'var(--student-card-bg, #fff)' }}>{Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}</strong></div>
         <button className="exam-primary" disabled={submitting || seconds === 0} onClick={() => submit(false)}>{submitting ? '제출 중...' : '제출'}</button>
       </div>
       <div className="exam-progress"><div className="exam-progress-fill" style={{ width: `${active.questions.length ? Math.round(answeredCount / active.questions.length * 100) : 0}%` }} /></div>

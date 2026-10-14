@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { IconCoupon } from '@/components/icons'
-import { CouponTicket } from '@/components/streak-preview/GrowthCards'
+import CouponTicket from '@/components/StudentCoupon'
 
 const bd = 'var(--ui-border)'
 const tx = 'var(--ui-text)', tx2 = 'var(--ui-text-2)', tx3 = 'var(--ui-text-3)'
@@ -47,7 +47,7 @@ export default function StudentCoupons() {
       {loading ? (
         <p style={{ textAlign: 'center', color: tx3, padding: '40px 0' }}>불러오는 중...</p>
       ) : coupons.length === 0 ? (
-        <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: '60px 0', textAlign: 'center', color: tx3 }}>
+        <div style={{ background: 'var(--student-card-bg, #fff)', borderRadius: 12, border: `1px solid ${bd}`, padding: '60px 0', textAlign: 'center', color: tx3 }}>
           <p style={{ marginBottom: 8, display: 'flex', justifyContent: 'center' }}><IconCoupon size={32} /></p>
           <p style={{ fontSize: 14 }}>아직 받은 쿠폰이 없습니다</p>
           <p style={{ fontSize: 12, marginTop: 4 }}>숙제 이행률 100%를 며칠 연속 달성해보세요!</p>

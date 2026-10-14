@@ -15,11 +15,11 @@ import { IconInbox } from '@/components/icons'
 
 // 새 학생 시안(streak-preview/student-v2)의 정확한 색상을 그대로 사용한다 — 사이트 테마 토큰
 // 대신 이 화면만의 고정 팔레트로, 홈 화면이 실제로 새 디자인처럼 보이게 한다.
-const tx = '#203F30', tx2 = '#6A7B6E', tx3 = '#768478'
-const bd = '#DDE8DF', bg = '#E9EFEA', re = '#C2483C'
-const accent = '#347653', accentText = '#326244', linkText = '#456650'
-const growthBg = '#EDF4EB', growthText = '#2A5338'
-const segActive = '#1C5939'
+const tx = 'var(--student-203f30, #203f30)', tx2 = 'var(--student-6a7b6e, #6a7b6e)', tx3 = 'var(--student-768478, #768478)'
+const bd = 'var(--student-dde8df, #dde8df)', bg = 'var(--student-e9efea, #e9efea)', re = '#C2483C'
+const accent = 'var(--student-347653, #347653)', accentText = 'var(--student-326244, #326244)', linkText = 'var(--student-456650, #456650)'
+const growthBg = 'var(--student-edf4eb, #edf4eb)', growthText = 'var(--student-2a5338, #2a5338)'
+const segActive = 'var(--student-1c5939, #1c5939)'
 
 type Rec = { id: number; date: string; content: string; homework: string; hw_rate: number; hw_cor: number; class_id: number | null }
 type ClassInfo = { id: number; name: string; days: string; time: string | null }
@@ -113,13 +113,13 @@ export default function StudentHome() {
 
       <div style={{ marginBottom: 16 }}>
         <p style={{ fontSize: 11, color: tx3, margin: '0 0 4px' }}>오늘도 차근차근</p>
-        <p style={{ fontSize: 20, fontWeight: 700, color: tx, margin: 0 }}>이번 숙제</p>
+        <p className="student-page-title" style={{ fontSize: 20, fontWeight: 700, color: tx, margin: 0 }}>이번 숙제</p>
       </div>
 
       {loading ? (
         <p style={{ textAlign: 'center', color: tx3, padding: '40px 0' }}>불러오는 중...</p>
       ) : classes.length === 0 ? (
-        <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: '60px 0', textAlign: 'center', color: tx3 }}>
+        <div style={{ background: 'var(--student-card-bg, #fff)', borderRadius: 12, border: `1px solid ${bd}`, padding: '60px 0', textAlign: 'center', color: tx3 }}>
           <p style={{ marginBottom: 8, display: 'flex', justifyContent: 'center' }}><IconInbox size={28} /></p>
           <p style={{ fontSize: 14 }}>등록된 반이 없습니다</p>
         </div>
@@ -130,13 +130,13 @@ export default function StudentHome() {
               <button key={c.id} onClick={() => setClassIndex(i)} style={{
                 flex: 1, minHeight: 40, border: 0, borderRadius: 6, fontSize: 12, fontFamily: 'inherit', cursor: 'pointer',
                 fontWeight: classIndex === i ? 700 : 500, color: classIndex === i ? segActive : tx2,
-                background: classIndex === i ? '#fff' : 'transparent', boxShadow: classIndex === i ? '0 1px 4px rgba(0,0,0,.05)' : 'none',
+                background: classIndex === i ? 'var(--student-card-bg, #fff)' : 'transparent', boxShadow: classIndex === i ? '0 1px 4px rgba(0,0,0,.05)' : 'none',
               }}>{c.name}</button>
             ))}
           </div>
         )}
 
-        <section style={{ background: '#fff', border: `1px solid ${bd}`, borderTop: `3px solid ${accent}`, borderRadius: 13, padding: '20px 18px 4px', marginBottom: 14 }}>
+        <section style={{ background: 'var(--student-card-bg, #fff)', border: `1px solid ${bd}`, borderTop: `3px solid ${accent}`, borderRadius: 13, padding: '20px 18px 4px', marginBottom: 14 }}>
           <div style={{ marginBottom: 16 }}>
             <p style={{ fontSize: 12, color: tx2, margin: 0 }}>
               다음 수업 <strong style={{ color: accentText, fontWeight: 600 }}>{next?.date ? formatClassDate(next.date) : '일정 없음'}{cls?.time ? ` ${cls.time.split('~')[0]?.trim()}` : ''}</strong>까지
