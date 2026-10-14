@@ -8,9 +8,12 @@ export const metadata: Metadata = {
   title: '티처스 수학학원',
   description: '티처스 수학학원',
   icons: {
-    icon: [{ url: '/app-icon-v2-192.png', sizes: '192x192', type: 'image/png' }],
-    shortcut: '/app-icon-v2-192.png',
-    apple: [{ url: '/apple-touch-icon-v2.png', sizes: '180x180', type: 'image/png' }],
+    icon: [
+      { url: '/app-icon-v3-32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/app-icon-v3-192.png', sizes: '192x192', type: 'image/png' },
+    ],
+    shortcut: '/app-icon-v3-32.png',
+    apple: [{ url: '/apple-touch-icon-v3.png', sizes: '180x180', type: 'image/png' }],
   },
   manifest: '/manifest.json',
   appleWebApp: {
