@@ -3,8 +3,11 @@
 .student-theme-entry{border:0;background:transparent;color:var(--ui-text-2);font:inherit;font-size:11px;min-height:40px;cursor:pointer;white-space:nowrap;padding:4px}
 .student-giants-badge{font-family:'Giants Inline',sans-serif;font-size:12px;color:#ca1237;border-left:1px solid #cbd5e1;padding-left:7px;white-space:nowrap}
 .student-shell[data-student-theme^='giants']{
---ui-bg:#f7f9fc;--ui-surface:#ffffffd1;--ui-surface-2:#edf3fa;--ui-border:#dee5ed;--ui-text:#082744;--ui-text-2:#687b8e;--ui-text-3:#687b8e;--ui-primary:#ca1237;--ui-primary-hover:#ad0d2f;--ui-accent:#ca1237;--ui-accent-text:#082744;--ui-accent-bg:#edf3fa;--ui-focus:#62aedd;
---student-card-bg:#ffffffd1;
+--ui-bg:#f7f9fc;--ui-surface:var(--student-card-bg);--ui-surface-2:#edf3fa;--ui-border:#dee5ed;--ui-text:#082744;--ui-text-2:#687b8e;--ui-text-3:#687b8e;--ui-primary:#ca1237;--ui-primary-hover:#ad0d2f;--ui-accent:#ca1237;--ui-accent-text:#082744;--ui-accent-bg:#edf3fa;--ui-focus:#62aedd;
+--student-card-bg:rgb(255 255 255 / 85%);
+--study-card-bg:var(--student-card-bg);
+--study-launch-bg:var(--student-card-bg);
+--study-launch-hover-bg:var(--student-card-bg);
 --student-1c5939:#ca1237;
 --student-203f30:#082744;
 --student-235f3f:#082744;
@@ -18,8 +21,8 @@
 --student-768478:#687b8e;
 --student-819085:#687b8e;
 --student-dde8df:#dee5ed;
---student-e9efea:#ffffffd1;
---student-edf4eb:#ffffffd1;
+--student-e9efea:var(--student-card-bg);
+--student-edf4eb:var(--student-card-bg);
 
  --study-203f30: #082744;
  --study-294431: #082744;
@@ -69,4 +72,4 @@
 .student-shell[data-student-theme^='giants'] .student-main h1,.student-shell[data-student-theme^='giants'] .student-main h2,.student-shell[data-student-theme^='giants'] .student-main h3{font-family:Giants,sans-serif;font-weight:400}
 .student-shell[data-student-theme^='giants'] .student-page-title{font-family:Giants,sans-serif;font-weight:400!important}
 @media(max-width:380px){.student-shell .student-header{padding-left:12px!important;padding-right:12px!important}.student-shell .student-header>div{gap:5px!important}.student-giants-badge{font-size:10px;padding-left:5px}}
-.student-shell[data-student-theme^='giants'] [aria-label='집중 타이머']{background:#ffffffd1}.student-shell[data-student-theme^='giants'] [aria-label='집중 타이머'] h3{font-family:Giants,sans-serif;font-weight:400}
+.student-shell[data-student-theme^='giants'] [aria-label='집중 타이머']{background:var(--student-card-bg)}.student-shell[data-student-theme^='giants'] [aria-label='집중 타이머'] h3{font-family:Giants,sans-serif;font-weight:400}

@@ -42,7 +42,7 @@ export default function TestResultCard({ testName, score, cor, total, pct, testI
   }, [testId, score])
 
   return (
-    <div style={{ border: `1px solid ${bd}`, borderRadius: 10, padding: 12, marginBottom: 8, background: '#fff' }}>
+    <div style={{ border: `1px solid ${bd}`, borderRadius: 10, padding: 12, marginBottom: 8, background: 'var(--student-card-bg, #fff)' }}>
       <p style={{ fontSize: 12, fontWeight: 700, color: tx, margin: '0 0 8px' }}>{testName}</p>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, marginBottom: 2 }}>
         <span style={{ fontSize: 26, fontWeight: 700, color: navy, lineHeight: 1 }}>{score}</span>

@@ -139,7 +139,7 @@
 .heading h2 { font-size: 20px; }
 .heading p { margin-bottom: 4px; }
 .quickLink { margin-bottom: 12px; }
-.app { --giants-card-bg: rgb(255 255 255 / 82%); }
+.app { --giants-card-bg: rgb(255 255 255 / 85%); }
 .previewLabel { background: #082744; color: #fff; letter-spacing: 1px; font-size: 8px; }
 .disclaimer { font-size: 11px !important; border-top: 1px solid #DCE3EB; padding-top: 18px; }
 .main { position: relative; isolation: isolate; background: repeating-linear-gradient(90deg, transparent 0 20px, #08274419 20px 21px), #fff; }

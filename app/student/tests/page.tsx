@@ -205,9 +205,9 @@ export default function StudentTestsPage() {
       .student-exams .exam-primary,.student-exams button[aria-pressed=true]{background:var(--ui-primary);color:var(--ui-primary-text);border-color:var(--ui-primary)}
       .student-exams input{border:1.5px solid var(--ui-border);border-radius:10px;padding:13px;font:inherit;font-size:16px;width:100%;box-sizing:border-box}
       .student-exams input:focus{outline:none;border-color:var(--ui-primary)}
-      .student-exams .exam-card{background:#fff;border:1px solid var(--ui-border);border-radius:14px;padding:18px;margin:12px 0;box-shadow:0 1px 3px rgba(13,27,54,.05)}
+      .student-exams .exam-card{background:var(--student-card-bg, #fff);border:1px solid var(--ui-border);border-radius:14px;padding:18px;margin:12px 0;box-shadow:0 1px 3px rgba(13,27,54,.05)}
       .student-exams .exam-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-      .student-exams .exam-list-card{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fff;border:1px solid var(--ui-border);border-radius:14px;padding:16px 18px;margin:12px 0;box-shadow:0 1px 3px rgba(13,27,54,.05)}
+      .student-exams .exam-list-card{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--student-card-bg, #fff);border:1px solid var(--ui-border);border-radius:14px;padding:16px 18px;margin:12px 0;box-shadow:0 1px 3px rgba(13,27,54,.05)}
       .student-exams .exam-badge{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:20px;margin-top:6px}
       .student-exams .exam-clock{position:sticky;top:8px;z-index:10;background:linear-gradient(135deg,var(--chrome-bg),var(--chrome-bg-2));color:#fff;padding:14px 16px;border-radius:14px;display:flex;justify-content:space-between;align-items:center;gap:10px;box-shadow:0 6px 18px rgba(13,42,94,.25)}
       .student-exams .exam-clock strong{font-variant-numeric:tabular-nums;font-size:26px;letter-spacing:.5px}

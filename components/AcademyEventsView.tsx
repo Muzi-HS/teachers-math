@@ -91,7 +91,7 @@ export default function AcademyEventsView({ role }: { role: 'parent' | 'student'
       ) : (
         <>
           {/* 달력 카드 */}
-          <div style={{ background: '#fff', borderRadius: 16, border: `1px solid ${bd}`, padding: '16px 12px', marginBottom: 14, boxShadow: '0 1px 6px rgba(0,0,0,.06)' }}>
+          <div style={{ background: 'var(--student-card-bg, #fff)', borderRadius: 16, border: `1px solid ${bd}`, padding: '16px 12px', marginBottom: 14, boxShadow: '0 1px 6px rgba(0,0,0,.06)' }}>
             <CompactMonthCalendar year={curYear} month={curMonth} selectedDate={selDate}
               holidays={publicHolidays}
               onMoveMonth={delta => delta < 0 ? prevMonth() : nextMonth()}
@@ -110,13 +110,13 @@ export default function AcademyEventsView({ role }: { role: 'parent' | 'student'
               </p>
 
               {selEvents.length === 0 ? (
-                <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: '24px 0', textAlign: 'center', color: tx3, fontSize: 13 }}>
+                <div style={{ background: 'var(--student-card-bg, #fff)', borderRadius: 12, border: `1px solid ${bd}`, padding: '24px 0', textAlign: 'center', color: tx3, fontSize: 13 }}>
                   이 날 예정된 일정이 없습니다
                 </div>
               ) : selEvents.map(e => {
                 const tc = eventColor(e)
                 return (
-                  <div key={e.id} style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: '14px 16px', marginBottom: 10, borderLeft: `4px solid ${tc.dot}` }}>
+                  <div key={e.id} style={{ background: 'var(--student-card-bg, #fff)', borderRadius: 12, border: `1px solid ${bd}`, padding: '14px 16px', marginBottom: 10, borderLeft: `4px solid ${tc.dot}` }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                       {e.type === 'holiday' && <span style={{ background: tc.bg, color: tc.color, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>휴일</span>}
                       <p style={{ fontSize: 14, fontWeight: 700, color: e.type === 'holiday' ? re : tx, margin: 0 }}>{e.title}</p>
@@ -142,14 +142,14 @@ export default function AcademyEventsView({ role }: { role: 'parent' | 'student'
               return monthStr >= e.start_date.slice(0, 7) && monthStr <= end
             })
             if (monthEvents.length === 0) return (
-              <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: '30px 0', textAlign: 'center', color: tx3, fontSize: 13 }}>
+              <div style={{ background: 'var(--student-card-bg, #fff)', borderRadius: 12, border: `1px solid ${bd}`, padding: '30px 0', textAlign: 'center', color: tx3, fontSize: 13 }}>
                 이번 달 예정된 일정이 없습니다
               </div>
             )
             return monthEvents.map(e => {
               const tc = eventColor(e)
               return (
-                <div key={e.id} style={{ background: '#fff', borderRadius: 12, border: `1px solid ${bd}`, padding: '14px 16px', marginBottom: 10, borderLeft: `4px solid ${tc.dot}` }}>
+                <div key={e.id} style={{ background: 'var(--student-card-bg, #fff)', borderRadius: 12, border: `1px solid ${bd}`, padding: '14px 16px', marginBottom: 10, borderLeft: `4px solid ${tc.dot}` }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                     {e.type === 'holiday' && <span style={{ background: tc.bg, color: tc.color, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>휴일</span>}
                     <p style={{ fontSize: 14, fontWeight: 700, color: e.type === 'holiday' ? re : tx, margin: 0 }}>{e.title}</p>
