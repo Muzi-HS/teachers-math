@@ -27,8 +27,8 @@ export default function StudentThemes() {
     <h1>내 테마</h1><p className={s.description}>나의 공부 공간을 좋아하는 분위기로 꾸며보세요.</p>
     <div className={s.cards} role="group" aria-label="학생 테마 선택">
       {choices.map(item => <button type="button" key={item.id} className={s.card} data-theme={item.id} aria-pressed={selected === item.id} disabled={saving || loading} onClick={() => { setSelection(item.id); setMessage('') }}>
-        <div className={s.swatch} aria-hidden="true"><div className={s.swatchHeader} /><div className={s.swatchBody}><i /></div></div>
-        <div className={s.label}><strong>{item.name}</strong><span>{theme === item.id ? '사용 중' : selected === item.id ? '선택됨' : ''}</span></div>
+        <div className={s.swatchHeader} aria-hidden="true"><i /><span>티처스 수학학원</span>{item.id !== 'green' && <em>GIANTS</em>}</div>
+        <div className={s.swatchBody}><strong>{item.name}</strong>{selected === item.id && <span className={s.check} aria-hidden="true">✓</span>}</div>
       </button>)}
     </div>
     <button type="button" className={s.apply} disabled={saving || loading} onClick={apply}>{loading ? '저장된 테마 확인 중…' : saving ? '저장 중…' : '이 테마 사용하기'}</button>
