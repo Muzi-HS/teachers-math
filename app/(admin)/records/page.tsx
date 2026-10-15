@@ -159,11 +159,11 @@ export default function RecordsPage() {
     const from = `${ym}-01`
     const last = new Date(llYear, llMonth + 1, 0).getDate()
     const to   = `${ym}-${String(last).padStart(2, '0')}`
-    const { data } = await supabase.from('records').select('date,class_id').eq('is_draft', false).gte('date', from).lte('date', to)
+    const { data } = await supabase.from('staff_records').select('date,class_id').eq('is_draft', false).gte('date', from).lte('date', to)
     const scopedDates = role === 'admin' ? (data ?? []) : (data ?? []).filter(r => r.class_id != null && assignedClassIds?.has(r.class_id))
     setRecDates(new Set(scopedDates.map(r => r.date)))
 
-    const { data: withComment } = await supabase.from('records')
+    const { data: withComment } = await supabase.from('staff_records')
       .select('date,class_id,parent_comment,parent_comment_at,parent_comment_read_at')
       .eq('is_draft', false).not('parent_comment', 'is', null)
       .gte('date', from).lte('date', to)
@@ -183,7 +183,7 @@ export default function RecordsPage() {
 
     // 1. records 기본 조회
     const { data: fetchedRecs } = await supabase
-      .from('records')
+      .from('staff_records')
       .select('*')
       .eq('date', selDate)
       .eq('is_draft', false)
@@ -197,7 +197,7 @@ export default function RecordsPage() {
     const recIds = recs.map(r => r.id)
     const [{ data: items }, { data: commentsData }] = await Promise.all([
       supabase.from('record_test_items').select('id, record_id, test_id, t_total, t_cor, t_score').in('record_id', recIds),
-      supabase.from('record_comments').select('*').in('record_id', recIds).order('created_at', { ascending: true }),
+      supabase.from('staff_record_comments').select('*').in('record_id', recIds).order('created_at', { ascending: true }),
     ])
 
     // 3. tests 조회 (시험명)
@@ -238,19 +238,25 @@ export default function RecordsPage() {
     // 학부모 의견 읽음 처리 — 이 날짜를 열람한 시점을 "확인함"으로 기록 (문의하기 읽음 처리와 동일한 개념)
     const unreadIds = merged.filter(isUnreadParentComment).map(r => r.id)
     setJustReadIds(new Set(unreadIds))
-    if (unreadIds.length > 0) {
-      const nowIso = new Date().toISOString()
+    if (unreadIds.length > 0 && teacher) {
       const unreadCommentIds = (commentsData ?? []).filter(c => c.sender_type === 'parent' && !c.is_read).map(c => c.id)
       Promise.all([
-        supabase.from('records').update({ parent_comment_read_at: nowIso }).in('id', unreadIds),
+        supabase.from('records_staff_reads').upsert(
+          merged.filter(r => unreadIds.includes(r.id)).map(r => ({ user_id: teacher.userId, record_id: r.id, read_at: r.parent_comment_at })),
+          { onConflict: 'user_id,record_id' },
+        ),
         unreadCommentIds.length > 0
-          ? supabase.from('record_comments').update({ is_read: true }).in('id', unreadCommentIds)
+          ? supabase.from('record_comments_staff_reads').upsert(
+              unreadCommentIds.map(comment_id => ({ user_id: teacher.userId, comment_id })),
+              { onConflict: 'user_id,comment_id', ignoreDuplicates: true },
+            )
           : Promise.resolve({ error: null }),
       ]).then(([r1, r2]) => {
         if (r1.error) { console.error('[학부모 의견 읽음 처리 실패]', r1.error); return }
         if (r2.error) console.error('[record_comments 읽음 처리 실패]', r2.error)
-        setDayRecs(rs => rs.map(r => unreadIds.includes(r.id) ? { ...r, parent_comment_read_at: nowIso } : r))
+        setDayRecs(rs => rs.map(r => unreadIds.includes(r.id) ? { ...r, parent_comment_read_at: r.parent_comment_at } : r))
         setComments(cs => cs.map(c => unreadCommentIds.includes(c.id) ? { ...c, is_read: true } : c))
+        window.dispatchEvent(new Event('staff-read'))
         setUnreadCommentDates(ds => { const n = new Set(ds); n.delete(selDate); return n })
       })
     }

@@ -74,7 +74,7 @@ function AdminInquiriesPageInner() {
   async function fetchAll() {
     setLoading(true)
     const [{ data: m }, { data: p }] = await Promise.all([
-      supabase.from('inquiry_messages').select('*').order('created_at', { ascending: true }),
+      supabase.from('staff_inquiry_messages').select('*').order('created_at', { ascending: true }),
       supabase.from('parents').select('id, phone, name, parent_students(students(name))'),
     ])
     setMsgs(m ?? [])
@@ -144,8 +144,14 @@ function AdminInquiriesPageInner() {
     setEditingId(null)
     const unreadIds = msgs.filter(m => m.parent_id === parentId && m.sender_type === 'parent' && !m.is_read).map(m => m.id)
     if (unreadIds.length === 0) return
+    if (!teacher) return
+    const { error } = await supabase.from('inquiry_messages_staff_reads').upsert(
+      unreadIds.map(message_id => ({ user_id: teacher.userId, message_id })),
+      { onConflict: 'user_id,message_id', ignoreDuplicates: true },
+    )
+    if (error) { toast('?? ?? ??? ??????.', false); return }
     setMsgs(prev => prev.map(m => unreadIds.includes(m.id) ? { ...m, is_read: true } : m))
-    await supabase.from('inquiry_messages').update({ is_read: true }).in('id', unreadIds)
+    window.dispatchEvent(new Event('staff-read'))
   }
 
   async function sendReply() {

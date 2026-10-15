@@ -58,10 +58,10 @@ export default function DashboardPage(){
       supabase.from('classes').select('id,name,days,time').order('name'),
       supabase.from('class_students').select('class_id,student_id'),
       supabase.from('students').select('id,name'),
-      supabase.from('inquiry_messages').select('id,parent_id,content,created_at',{count:'exact'}).eq('sender_type','parent').eq('is_read',false).order('created_at',{ascending:false}).limit(10),
+      supabase.from('staff_inquiry_messages').select('id,parent_id,content,created_at',{count:'exact'}).eq('sender_type','parent').eq('is_read',false).order('created_at',{ascending:false}).limit(10),
       supabase.from('parents').select('id, parent_students(students(name))'),
-      supabase.from('records').select('id,student_id,date,parent_comment,parent_comment_at,parent_comment_read_at')
-        .eq('is_draft',false).not('parent_comment','is',null).order('parent_comment_at',{ascending:false}).limit(50),
+      supabase.from('staff_records').select('id,student_id,date,parent_comment,parent_comment_at,parent_comment_read_at')
+        .eq('is_draft',false).not('parent_comment','is',null).order('parent_comment_at',{ascending:false}),
       supabase.from('attendance_notices').select('id,student_id,type,reason').eq('date',kstDateStr()),
     ])
     setClasses(cls??[])

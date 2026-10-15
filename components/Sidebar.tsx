@@ -84,36 +84,39 @@ export default function Sidebar() {
       if (!cancelled) setUnreadConsultations(count ?? 0)
     }
     fetchUnread()
+    window.addEventListener('staff-read', fetchUnread)
     const iv = setInterval(fetchUnread, 60000)
-    return () => { cancelled = true; clearInterval(iv) }
+    return () => { cancelled = true; clearInterval(iv); window.removeEventListener('staff-read', fetchUnread) }
   }, [role, pathname])
 
   useEffect(() => {
     if (role !== 'admin') return
     let cancelled = false
     async function fetchUnread() {
-      const { count } = await supabase.from('inquiry_messages')
+      const { count } = await supabase.from('staff_inquiry_messages')
         .select('id', { count: 'exact', head: true })
         .eq('sender_type', 'parent').eq('is_read', false)
       if (!cancelled) setUnreadInquiries(count ?? 0)
     }
     fetchUnread()
+    window.addEventListener('staff-read', fetchUnread)
     const iv = setInterval(fetchUnread, 60000)
-    return () => { cancelled = true; clearInterval(iv) }
+    return () => { cancelled = true; clearInterval(iv); window.removeEventListener('staff-read', fetchUnread) }
   }, [role, pathname])
 
   useEffect(() => {
-    if (role !== 'admin' && role !== 'teacher') return
+    if (role !== 'admin' && role !== 'teacher' && role !== 'assistant') return
     let cancelled = false
     async function fetchUnread() {
-      const { data } = await supabase.from('records')
+      const { data } = await supabase.from('staff_records')
         .select('parent_comment,parent_comment_at,parent_comment_read_at')
         .eq('is_draft', false).not('parent_comment', 'is', null)
       if (!cancelled) setUnreadComments((data ?? []).filter(isUnreadParentComment).length)
     }
     fetchUnread()
+    window.addEventListener('staff-read', fetchUnread)
     const iv = setInterval(fetchUnread, 60000)
-    return () => { cancelled = true; clearInterval(iv) }
+    return () => { cancelled = true; clearInterval(iv); window.removeEventListener('staff-read', fetchUnread) }
   }, [role, pathname])
 
   // 모바일 모드에서는 메뉴 이동 시 자동으로 드로어/편집모드를 닫는다
