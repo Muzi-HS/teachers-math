@@ -1,10 +1,12 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useSyncExternalStore } from 'react'
 import { isIOSDevice } from '@/lib/notification-settings'
 
+const subscribe = () => () => {}
+const serverSnapshot = () => false
+
 export function NotificationSetupGuidance({ permission }: { permission: NotificationPermission | null }) {
-  const [ios, setIOS] = useState(false)
-  useEffect(() => { setIOS(isIOSDevice()) }, [])
+  const ios = useSyncExternalStore(subscribe, isIOSDevice, serverSnapshot)
   return <>{ios
     ? permission === 'denied'
       ? 'iPhone·iPad: 설정 → 알림 → 티처스 수학학원에서 알림 허용을 켜주세요.'

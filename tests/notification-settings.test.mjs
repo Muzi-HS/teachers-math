@@ -11,6 +11,35 @@ function load(path, globals) {
   }).outputText, context)
   return context.exports
 }
+
+test('notification guidance uses a stable server snapshot and detects iOS on the client', () => {
+  let server = true
+  let ios = true
+  const context = {
+    exports: {},
+    require: name => {
+      if (name === 'react') return {
+        useSyncExternalStore: (subscribe, snapshot, serverSnapshot) => {
+          assert.equal(typeof subscribe(), 'function')
+          return server ? serverSnapshot() : snapshot()
+        },
+      }
+      if (name === 'react/jsx-runtime') return { jsx: (_type, props) => props.children }
+      if (name.includes('notification-settings')) return { isIOSDevice: () => ios }
+      throw new Error(`Unexpected import: ${name}`)
+    },
+  }
+  vm.runInNewContext(ts.transpileModule(readFileSync(new URL('../components/NotificationSetupGuidance.tsx', import.meta.url), 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
+  }).outputText, context)
+  const guidance = context.exports.NotificationSetupGuidance
+  assert.doesNotMatch(guidance({ permission: null }), /iPhone/)
+  server = false
+  assert.match(guidance({ permission: null }), /Safari/)
+  assert.doesNotMatch(guidance({ permission: 'denied' }), /Safari/)
+  ios = false
+  assert.match(guidance({ permission: 'denied' }), /Android/)
+})
 test('notification setup guides iPhone, iPad desktop mode, denied and unsupported browsers', () => {
   const navigator = { userAgent: 'iPhone', platform: 'iPhone', maxTouchPoints: 1, serviceWorker: {}, standalone: false }
   const window = { isSecureContext: true, PushManager: {}, matchMedia: () => ({ matches: false }) }

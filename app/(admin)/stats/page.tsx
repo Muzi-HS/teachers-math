@@ -1,13 +1,14 @@
 'use client'
 import { Suspense } from 'react'
+import dynamic from 'next/dynamic'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { useMobileMode } from '@/context/MobileModeContext'
-import AnalyticsView from './AnalyticsView'
-import StudentStatsView from './StudentStatsView'
-import HomeworkRanking from './HomeworkRanking'
-import StudyStatsView from './StudyStatsView'
-import CouponProcessingView from '@/components/CouponProcessingView'
+const AnalyticsView = dynamic(() => import('./AnalyticsView'))
+const StudentStatsView = dynamic(() => import('./StudentStatsView'))
+const HomeworkRanking = dynamic(() => import('./HomeworkRanking'))
+const StudyStatsView = dynamic(() => import('./StudyStatsView'))
+const CouponProcessingView = dynamic(() => import('@/components/CouponProcessingView'))
 
 function StatsTabs() {
   const params = useSearchParams()

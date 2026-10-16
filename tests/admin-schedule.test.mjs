@@ -84,11 +84,11 @@ test('internal calendar keeps month-first layout and date selection without redu
       if (name.includes('use-public-holidays')) return { usePublicHolidays: () => ({ holidays: [], fallback: false }) }
       if (name.includes('/kst')) return { kstDateStr: () => '2026-10-02' }
       if (name.includes('schedule-colors')) {
-        const module = { exports: {} }
+        const calendarModule = { exports: {} }
         vm.runInNewContext(ts.transpileModule(readFileSync(new URL('../lib/schedule-colors.ts', import.meta.url), 'utf8'), {
           compilerOptions: { module: ts.ModuleKind.CommonJS },
-        }).outputText, module)
-        return module.exports
+        }).outputText, calendarModule)
+        return calendarModule.exports
       }
       return {}
     },

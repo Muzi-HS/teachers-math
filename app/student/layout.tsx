@@ -5,15 +5,12 @@ import { useRouter, usePathname } from 'next/navigation'
 import { useResetMenuScroll } from '@/lib/use-reset-menu-scroll'
 import Image from 'next/image'
 import { useAuth } from '@/context/AuthContext'
-import { supabase } from '@/lib/supabase'
 import { requestFCMToken, isFCMSupported } from '@/lib/firebase'
 import { NotificationSetupGuidance } from '@/components/NotificationSetupGuidance'
 import { notificationSetupIssue } from '@/lib/notification-settings'
 import ForegroundNotification from '@/components/ForegroundNotification'
 import { StudentThemeProvider, useStudentTheme } from '@/context/StudentThemeContext'
 import './student-theme.css'
-
-const NOTICES_SEEN_KEY = (studentId: number) => `student_notices_seen_${studentId}`
 
 const navy='var(--ui-primary)', navyDk='var(--ui-primary)', bd='var(--ui-border)', bg='var(--ui-bg)', tx2='var(--ui-text-2)'
 
@@ -47,33 +44,12 @@ function StudentLayoutContent({ children }: { children: React.ReactNode }) {
   const [notifPerm, setNotifPerm] = useState<NotificationPermission | null>(null)
   const [notifBannerDismissed, setNotifBannerDismissed] = useState(false)
   const [notifRequesting, setNotifRequesting] = useState(false)
-  const [unreadNotices, setUnreadNotices] = useState(0)
 
   // 시험 화면은 별도 API를 사용하므로 화면 코드만 미리 준비해 탭 전환 시간을 줄인다.
   useEffect(() => {
     if (student?.studentId) router.prefetch('/student/tests')
   }, [student?.studentId, router])
 
-  // 반 공지(class_notices)에는 서버 쪽 읽음 표시가 없어서, 마지막으로 "공지" 탭을 연
-  // 시각(로컬 저장)보다 최근에 올라온 공지 수를 안 읽은 개수로 센다. 공지 탭에 들어가면
-  // (app/student/notices/page.tsx) 그 시각을 지금으로 갱신한다.
-  useEffect(() => {
-    if (!student?.studentId || !student?.sessionToken) return
-    let cancelled = false
-    async function loadUnread() {
-      const { data: csRows } = await supabase.rpc('client_class_students', { p_token: student!.sessionToken, p_student_id: student!.studentId })
-      const classIds = [...new Set(((csRows ?? []) as { class_id: number }[]).map(r => r.class_id))]
-      if (classIds.length === 0) { if (!cancelled) setUnreadNotices(0); return }
-      const { data: noticesRaw } = await supabase.rpc('client_class_notices', { p_token: student!.sessionToken, p_class_ids: classIds })
-      if (cancelled) return
-      const notices = (noticesRaw ?? []) as { created_at: string }[]
-      let seen = ''
-      try { seen = localStorage.getItem(NOTICES_SEEN_KEY(student!.studentId)) ?? '' } catch {}
-      setUnreadNotices(seen ? notices.filter(n => n.created_at > seen).length : notices.length)
-    }
-    loadUnread()
-    return () => { cancelled = true }
-  }, [student, pathname])
   const initDone = useRef(false)
 
   const registerFCMToken = useCallback(async (studentId: number, promptPermission = false): Promise<boolean> => {

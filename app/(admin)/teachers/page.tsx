@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { staffFetch } from '@/lib/staff-fetch'
 import { kstNow } from '@/lib/kst'
 import TimeSlotInput from '@/components/TimeSlotInput'
-import * as XLSX from 'xlsx-js-style'
+import type * as XLSX from 'xlsx-js-style'
 import { IconX } from '@/components/icons'
 import { useMobileMode } from '@/context/MobileModeContext'
 import { usePublicHolidays } from '@/lib/use-public-holidays'
@@ -76,22 +76,22 @@ function xlsxDataFill(rowIdxInData:number){
   return {fgColor:{rgb: rowIdxInData%2===1?'F5F7FA':'FFFFFF'},patternType:'solid' as const}
 }
 
-function xlsxSetCell(ws:XLSX.WorkSheet, r:number, c:number, style:XLSX.CellStyle){
+function xlsxSetCell(XLSX: typeof import('xlsx-js-style'), ws:XLSX.WorkSheet, r:number, c:number, style:XLSX.CellStyle){
   const addr=XLSX.utils.encode_cell({r,c})
   if(!ws[addr]) ws[addr]={t:'s',v:''}
   ws[addr].s=style
 }
 
 // 시트 공통 스타일 적용 (제목 / 부제 / 헤더 / 데이터 / 합계 행)
-function xlsxStyleSheet(ws:XLSX.WorkSheet, opts:{
+function xlsxStyleSheet(XLSX: typeof import('xlsx-js-style'), ws:XLSX.WorkSheet, opts:{
   titleRow:number; subRow?:number; headerRow:number
   dataStart:number; dataEnd:number; totalRow:number; colCount:number
 }){
   const {titleRow,subRow,headerRow,dataStart,dataEnd,totalRow,colCount}=opts
-  xlsxSetCell(ws,titleRow,0,{font:{name:XLSX_FONT_NAME,sz:13,bold:true,color:XLSX_NAVY},fill:XLSX_TITLE_FILL,alignment:{horizontal:'left',vertical:'center'}})
-  if(subRow!=null) xlsxSetCell(ws,subRow,0,{font:{name:XLSX_FONT_NAME,sz:10,bold:true,color:{rgb:'D87E13'}},fill:XLSX_SUB_FILL,alignment:{horizontal:'left'}})
+  xlsxSetCell(XLSX, ws,titleRow,0,{font:{name:XLSX_FONT_NAME,sz:13,bold:true,color:XLSX_NAVY},fill:XLSX_TITLE_FILL,alignment:{horizontal:'left',vertical:'center'}})
+  if(subRow!=null) xlsxSetCell(XLSX, ws,subRow,0,{font:{name:XLSX_FONT_NAME,sz:10,bold:true,color:{rgb:'D87E13'}},fill:XLSX_SUB_FILL,alignment:{horizontal:'left'}})
   for(let c=0;c<colCount;c++){
-    xlsxSetCell(ws,headerRow,c,{
+    xlsxSetCell(XLSX, ws,headerRow,c,{
       font:{name:XLSX_FONT_NAME,sz:10,bold:true,color:XLSX_NAVY},
       fill:XLSX_HEADER_FILL, border:XLSX_BORDER_ALL,
       alignment:{horizontal:'center',vertical:'center'},
@@ -100,7 +100,7 @@ function xlsxStyleSheet(ws:XLSX.WorkSheet, opts:{
   for(let r=dataStart;r<=dataEnd;r++){
     const fill=xlsxDataFill(r-dataStart)
     for(let c=0;c<colCount;c++){
-      xlsxSetCell(ws,r,c,{
+      xlsxSetCell(XLSX, ws,r,c,{
         font:{name:XLSX_FONT_NAME,sz:10,color:XLSX_TXT},
         fill, border:XLSX_BORDER_ALL,
         alignment:{horizontal:c===0?'left':'center',vertical:'center'},
@@ -108,7 +108,7 @@ function xlsxStyleSheet(ws:XLSX.WorkSheet, opts:{
     }
   }
   for(let c=0;c<colCount;c++){
-    xlsxSetCell(ws,totalRow,c,{
+    xlsxSetCell(XLSX, ws,totalRow,c,{
       font:{name:XLSX_FONT_NAME,sz:10,bold:true,color:XLSX_NAVY},
       fill:XLSX_TOTAL_FILL, border:XLSX_BORDER_ALL,
       alignment:{horizontal:'center',vertical:'center'},
@@ -117,15 +117,15 @@ function xlsxStyleSheet(ws:XLSX.WorkSheet, opts:{
 }
 
 // 승인/대기 값에 따라 옅은 초록·주황으로 강조 (개별상세 시트의 '승인 상태' 열)
-function xlsxColorStatusColumn(ws:XLSX.WorkSheet, dataStart:number, dataEnd:number, col:number){
+function xlsxColorStatusColumn(XLSX: typeof import('xlsx-js-style'), ws:XLSX.WorkSheet, dataStart:number, dataEnd:number, col:number){
   for(let r=dataStart;r<=dataEnd;r++){
     const addr=XLSX.utils.encode_cell({r,c:col})
     const cell=ws[addr]
     if(!cell) continue
     if(cell.v==='승인'){
-      xlsxSetCell(ws,r,col,{font:{name:XLSX_FONT_NAME,sz:10,bold:true,color:XLSX_APPROVED_TXT},fill:XLSX_APPROVED_FILL,border:XLSX_BORDER_ALL,alignment:{horizontal:'center',vertical:'center'}})
+      xlsxSetCell(XLSX, ws,r,col,{font:{name:XLSX_FONT_NAME,sz:10,bold:true,color:XLSX_APPROVED_TXT},fill:XLSX_APPROVED_FILL,border:XLSX_BORDER_ALL,alignment:{horizontal:'center',vertical:'center'}})
     } else if(cell.v==='대기'){
-      xlsxSetCell(ws,r,col,{font:{name:XLSX_FONT_NAME,sz:10,bold:true,color:XLSX_PENDING_TXT},fill:XLSX_PENDING_FILL,border:XLSX_BORDER_ALL,alignment:{horizontal:'center',vertical:'center'}})
+      xlsxSetCell(XLSX, ws,r,col,{font:{name:XLSX_FONT_NAME,sz:10,bold:true,color:XLSX_PENDING_TXT},fill:XLSX_PENDING_FILL,border:XLSX_BORDER_ALL,alignment:{horizontal:'center',vertical:'center'}})
     }
   }
 }
@@ -203,11 +203,17 @@ export default function TeachersPage(){
   function toast(msg:string,ok=true){setNotif({msg,ok});setTimeout(()=>setNotif(null),3000)}
 
   // 출근부 Excel 다운로드 (선택된 selYear/selMonth 기준)
-  function downloadAttendanceExcel(){
+  async function downloadAttendanceExcel(){
     const approvedTeachers=teachers.filter(t=>t.approved)
     if(approvedTeachers.length===0) return toast('승인된 선생님이 없습니다.',false)
 
     const ymTitle=`${selYear}년 ${String(selMonth).padStart(2,'0')}월`
+    let XLSX: typeof import('xlsx-js-style')
+    try {
+      XLSX = (await import('xlsx-js-style')).default
+    } catch {
+      return toast('엑셀 기능을 불러오지 못했습니다. 다시 시도해 주세요.',false)
+    }
     const wb=XLSX.utils.book_new()
 
     // ── 시트 1: 월별 집계 요약 (근무시간은 승인된 기록만 반영, 근무시간이 없는 사람은 제외) ──
@@ -235,7 +241,7 @@ export default function TeachersPage(){
     const ws1=XLSX.utils.aoa_to_sheet(s1Aoa)
     ws1['!merges']=[{s:{r:0,c:0},e:{r:0,c:5}}]
     ws1['!cols']=[{wch:12},{wch:10},{wch:10},{wch:16},{wch:16},{wch:22}]
-    xlsxStyleSheet(ws1,{titleRow:0,headerRow:1,dataStart:2,dataEnd:2+perTeacher.length-1,totalRow:2+perTeacher.length,colCount:6})
+    xlsxStyleSheet(XLSX, ws1,{titleRow:0,headerRow:1,dataStart:2,dataEnd:2+perTeacher.length-1,totalRow:2+perTeacher.length,colCount:6})
     XLSX.utils.book_append_sheet(wb,ws1,'월별 집계 요약')
 
     // ── 시트 2~N: 선생님별 일별 상세 (평일만, 승인/대기 구분, 합계는 승인된 시간만) ──
@@ -273,8 +279,8 @@ export default function TeachersPage(){
       const ws=XLSX.utils.aoa_to_sheet(aoa)
       ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:6}},{s:{r:1,c:0},e:{r:1,c:6}}]
       ws['!cols']=[{wch:12},{wch:6},{wch:12},{wch:12},{wch:14},{wch:16},{wch:12}]
-      xlsxStyleSheet(ws,{titleRow:0,subRow:1,headerRow:2,dataStart:3,dataEnd:3+rows.length-1,totalRow:3+rows.length,colCount:7})
-      xlsxColorStatusColumn(ws,3,3+rows.length-1,6)
+      xlsxStyleSheet(XLSX, ws,{titleRow:0,subRow:1,headerRow:2,dataStart:3,dataEnd:3+rows.length-1,totalRow:3+rows.length,colCount:7})
+      xlsxColorStatusColumn(XLSX, ws,3,3+rows.length-1,6)
       XLSX.utils.book_append_sheet(wb,ws,xlsxSheetName(t.name,usedNames))
     }
 
