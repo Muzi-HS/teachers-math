@@ -75,6 +75,7 @@ export default function ClassesPage() {
   const [noticeModal, setNoticeModal] = useState(false)
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
+  const [showInactive, setShowInactive] = useState(false)
   const [notif, setNotif] = useState<{ msg: string; ok: boolean } | null>(null)
   // 오늘 등록된 결석/지각 (반 상세에서 소속 학생 중 해당자 표시용)
   const [todayAttNotices, setTodayAttNotices] = useState<{ student_id: number; type: 'absence' | 'late'; reason: string | null }[]>([])
@@ -321,6 +322,9 @@ export default function ClassesPage() {
     const dayMatch = !dayFlt || (c.days ?? '').split(',').map(d => d.trim()).includes(dayFlt)
     return nameMatch && dayMatch
   })
+  const activeClasses = filtered.filter(c => c.active !== false)
+  const inactiveClasses = filtered.filter(c => c.active === false)
+  const inactiveExpanded = showInactive || search.trim().length > 0
   const detailStus = detailCls
     ? ((csMap[detailCls.id] ?? []).map(id => students.find(s => s.id === id)).filter(Boolean) as Student[])
         .sort((a, b) => a.name.localeCompare(b.name, 'ko'))
@@ -424,44 +428,62 @@ export default function ClassesPage() {
           )}
 
           {assignmentError && <p role="alert" style={{ color: re, fontSize: 13 }}>{assignmentError}</p>}
-          {filtered.map((c, idx) => {
-            const barColors = Array.from({ length: 6 }, (_, i) => `var(--ui-chart-${i + 1})`)
-            const barColor = barColors[idx % barColors.length]
-            return (
-              <div
-                key={c.id}
-                onClick={() => goDetail(c)}
-                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: idx < filtered.length - 1 ? `1px solid ${bd}` : 'none', cursor: 'pointer', opacity: c.active === false ? 0.55 : 1 }}
-                onMouseEnter={e => (e.currentTarget.style.background = navyM)}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-              >
-                <div style={{ width: 4, minHeight: 36, alignSelf: 'stretch', background: c.active === false ? tx3 : barColor, borderRadius: 2, flexShrink: 0 }} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <p style={{ fontSize: 13, fontWeight: 600, color: c.active === false ? tx3 : tx, margin: 0 }}>{c.name}</p>
-                    {c.active === false && <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 10, background: '#F0F0F0', color: tx3, border: `1px solid ${bd}` }}>비활성</span>}
-                  </div>
-                  <p style={{ fontSize: 11, color: tx3, margin: 0 }}>
-                    {[c.days, c.time, `학생 ${(csMap[c.id] ?? []).length}명`].filter(Boolean).join(' · ')}
-                  </p>
-                  {role === 'admin' && <div style={{ fontSize: 11, color: tx2, marginTop: 3, lineHeight: 1.5 }}>
-                    <div>선생님: {assignedNames(c.id, 'teacher')}</div>
-                    <div>조교: {assignedNames(c.id, 'assistant')}</div>
-                  </div>}
-                </div>
-                {canManageClassInfo && (
-                  <div style={{ display: 'flex', gap: 5 }} onClick={e => e.stopPropagation()}>
-                  <button className="bout" onClick={() => toggleClsActive(c)} style={{ color: c.active === false ? gr : wa, borderColor: c.active === false ? 'var(--ui-success-border)' : 'var(--ui-warning-border)' }}>
-                      {c.active === false ? '활성화' : '비활성화'}
-                    </button>
-                    <button className="bout" onClick={() => openStaffModal(c)}>담당자 배정</button>
-                    <button className="bout" onClick={() => openEditCls(c)}>수정</button>
-                    <button className="bdng" onClick={() => delCls(c.id, c.name)}>삭제</button>
-                  </div>
-                )}
+          {activeClasses.length === 0 && filtered.length > 0 && (
+            <p style={{ textAlign: 'center', padding: '20px 0', color: tx3, fontSize: 13 }}>현재 조건에 맞는 운영 중인 반이 없습니다.</p>
+          )}
+          {[activeClasses, inactiveClasses].map((group, groupIndex) => group.length > 0 && (
+            <section key={groupIndex} aria-label={groupIndex === 0 ? '운영 중인 반' : '비활성 반'}>
+              {groupIndex === 1 && (
+                <button type="button" aria-expanded={inactiveExpanded} aria-controls="inactive-class-list"
+                  onClick={() => setShowInactive(value => !value)}
+                  disabled={search.trim().length > 0}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '14px 0', marginTop: 12, border: 'none', borderTop: `1px solid ${bd}`, background: 'transparent', color: tx2, fontSize: 13, fontWeight: 600, fontFamily: 'inherit', cursor: search.trim() ? 'default' : 'pointer', textAlign: 'left' }}>
+                  <span>비활성 반 ({inactiveClasses.length})</span>
+                  <span style={{ fontSize: 12 }}>{search.trim() ? '검색 결과' : inactiveExpanded ? '접기 ▴' : '펼치기 ▾'}</span>
+                </button>
+              )}
+              <div id={groupIndex === 1 ? 'inactive-class-list' : undefined} hidden={groupIndex === 1 && !inactiveExpanded}>
+                {group.map((c, idx) => {
+                  const barColors = Array.from({ length: 6 }, (_, i) => `var(--ui-chart-${i + 1})`)
+                  const barColor = barColors[idx % barColors.length]
+                  return (
+                    <div
+                      key={c.id}
+                      onClick={() => goDetail(c)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: idx < group.length - 1 ? `1px solid ${bd}` : 'none', cursor: 'pointer', opacity: c.active === false ? 0.55 : 1 }}
+                      onMouseEnter={e => (e.currentTarget.style.background = navyM)}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      <div style={{ width: 4, minHeight: 36, alignSelf: 'stretch', background: c.active === false ? tx3 : barColor, borderRadius: 2, flexShrink: 0 }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <p style={{ fontSize: 13, fontWeight: 600, color: c.active === false ? tx3 : tx, margin: 0 }}>{c.name}</p>
+                          {c.active === false && <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 10, background: '#F0F0F0', color: tx3, border: `1px solid ${bd}` }}>비활성</span>}
+                        </div>
+                        <p style={{ fontSize: 11, color: tx3, margin: 0 }}>
+                          {[c.days, c.time, `학생 ${(csMap[c.id] ?? []).length}명`].filter(Boolean).join(' · ')}
+                        </p>
+                        {role === 'admin' && <div style={{ fontSize: 11, color: tx2, marginTop: 3, lineHeight: 1.5 }}>
+                          <div>선생님: {assignedNames(c.id, 'teacher')}</div>
+                          <div>조교: {assignedNames(c.id, 'assistant')}</div>
+                        </div>}
+                      </div>
+                      {canManageClassInfo && (
+                        <div style={{ display: 'flex', gap: 5 }} onClick={e => e.stopPropagation()}>
+                        <button className="bout" onClick={() => toggleClsActive(c)} style={{ color: c.active === false ? gr : wa, borderColor: c.active === false ? 'var(--ui-success-border)' : 'var(--ui-warning-border)' }}>
+                            {c.active === false ? '활성화' : '비활성화'}
+                          </button>
+                          <button className="bout" onClick={() => openStaffModal(c)}>담당자 배정</button>
+                          <button className="bout" onClick={() => openEditCls(c)}>수정</button>
+                          <button className="bdng" onClick={() => delCls(c.id, c.name)}>삭제</button>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
-            )
-          })}
+            </section>
+          ))}
 
           {canManageClassInfo && (
             <div
