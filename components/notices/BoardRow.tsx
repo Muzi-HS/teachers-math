@@ -20,7 +20,7 @@ export default function BoardRow({ notice, index, pinned, canWrite, mobile, visL
       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
       fontFamily: 'inherit', fontSize: 12, lineHeight: '20px',
       fontWeight: hasUnreadComments ? 600 : 500,
-      color: hasUnreadComments ? re : tx3, flexShrink: 0,
+      color: hasUnreadComments ? re : '#7C3AED', flexShrink: 0,
       fontVariantNumeric: 'tabular-nums',
     }}>[{commentCount}]</span>
   ) : null
@@ -41,8 +41,8 @@ export default function BoardRow({ notice, index, pinned, canWrite, mobile, visL
             ? <span style={{ background: gold, color: '#fff', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, flexShrink: 0 }}>공지</span>
             : <span style={{ fontSize: 11, color: tx3, flexShrink: 0, width: 14, textAlign: 'right' }}>{index}</span>
           }
-          {commentBadge}
           <span style={{ fontSize: 13.5, fontWeight: pinned ? 700 : 500, color: tx, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{notice.title}</span>
+          {commentBadge}
           {isNew(notice.created_at) && <span style={{ background: rbg, color: re, fontSize: 9.5, fontWeight: 700, flexShrink: 0, padding: '1px 5px', borderRadius: 20 }}>N</span>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
@@ -87,11 +87,11 @@ export default function BoardRow({ notice, index, pinned, canWrite, mobile, visL
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-        {commentBadge}
         <span style={{
           fontSize: 13.5, fontWeight: pinned ? 700 : 500, color: tx,
           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
         }}>{notice.title}</span>
+        {commentBadge}
         {isNew(notice.created_at) && (
           <span style={{ background: rbg, color: re, fontSize: 9.5, fontWeight: 700, flexShrink: 0, padding: '1px 5px', borderRadius: 20 }}>N</span>
         )}
