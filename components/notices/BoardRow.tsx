@@ -16,7 +16,13 @@ export default function BoardRow({ notice, index, pinned, canWrite, mobile, visL
   const visBadge = <span className="vis-badge" style={{ background: visColor.bg, color: visColor.color }}>{visLabel}</span>
 
   const commentBadge = commentCount > 0 ? (
-    <span aria-label={`댓글 ${commentCount}개`} style={{ color: hasUnreadComments ? re : tx3, fontWeight: 700, flexShrink: 0 }}>[{commentCount}]</span>
+    <span aria-label={`댓글 ${commentCount}개`} title={hasUnreadComments ? '읽지 않은 댓글이 있습니다' : undefined} style={{
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+      fontFamily: 'inherit', fontSize: 12, lineHeight: '20px',
+      fontWeight: hasUnreadComments ? 600 : 500,
+      color: hasUnreadComments ? re : tx3, flexShrink: 0,
+      fontVariantNumeric: 'tabular-nums',
+    }}>[{commentCount}]</span>
   ) : null
 
   if (mobile) {
@@ -30,13 +36,13 @@ export default function BoardRow({ notice, index, pinned, canWrite, mobile, visL
           borderBottom: isLast ? 'none' : `1px solid ${bd}`,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 7 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, marginBottom: 7 }}>
           {pinned
             ? <span style={{ background: gold, color: '#fff', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, flexShrink: 0 }}>공지</span>
             : <span style={{ fontSize: 11, color: tx3, flexShrink: 0, width: 14, textAlign: 'right' }}>{index}</span>
           }
           {commentBadge}
-          <span style={{ fontSize: 13.5, fontWeight: pinned ? 700 : 500, color: tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{notice.title}</span>
+          <span style={{ fontSize: 13.5, fontWeight: pinned ? 700 : 500, color: tx, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{notice.title}</span>
           {isNew(notice.created_at) && <span style={{ background: rbg, color: re, fontSize: 9.5, fontWeight: 700, flexShrink: 0, padding: '1px 5px', borderRadius: 20 }}>N</span>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
@@ -80,7 +86,7 @@ export default function BoardRow({ notice, index, pinned, canWrite, mobile, visL
         )}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
         {commentBadge}
         <span style={{
           fontSize: 13.5, fontWeight: pinned ? 700 : 500, color: tx,

@@ -182,6 +182,7 @@ export default function Sidebar() {
 
   function unreadCountOf(key: string) {
     return key === 'inquiries' ? unreadInquiries
+      : key === 'notices' ? unreadNoticeComments
       : key === 'records' ? unreadComments
       : key === 'consultations' ? unreadConsultations
       : 0
@@ -207,7 +208,6 @@ export default function Sidebar() {
       background: var(--ui-accent);
       border-radius: 3px;
     }
-    .sb-tab.notice-unread, .mnav-bar .mnav-tab.notice-unread { color: var(--ui-danger); }
     .desktop-menu .sb-tab { border-radius: 8px; }
     .desktop-menu { scrollbar-width: thin; scrollbar-color: var(--ui-border) transparent; }
     @media(prefers-reduced-motion:reduce){.sb-tab{transition:none;}}
@@ -261,7 +261,7 @@ export default function Sidebar() {
     const unreadCount = unreadCountOf(item.key)
     return (
       <button
-        className={`sb-tab${active ? ' active' : ''}${item.key === 'notices' && unreadNoticeComments > 0 ? ' notice-unread' : ''}`}
+        className={`sb-tab${active ? ' active' : ''}`}
         aria-current={active ? 'page' : undefined}
         onClick={() => router.push(item.href)}
         title={!expanded && !big ? item.label : ''}
@@ -313,7 +313,7 @@ export default function Sidebar() {
             const active = pathname === item.href || pathname.startsWith(item.href + '/')
             const unreadCount = unreadCountOf(item.key)
             return (
-              <button key={item.key} aria-current={active ? 'page' : undefined} className={`mnav-tab${active ? ' active' : ''}${item.key === 'notices' && unreadNoticeComments > 0 ? ' notice-unread' : ''}`} onClick={() => router.push(item.href)}>
+              <button key={item.key} aria-current={active ? 'page' : undefined} className={`mnav-tab${active ? ' active' : ''}`} onClick={() => router.push(item.href)}>
                 <span style={{ display: 'flex', position: 'relative' }}>
                   {item.icon}
                   {unreadCount > 0 && (
