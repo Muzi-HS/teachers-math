@@ -33,6 +33,8 @@ type NoticeComment = {
   is_anonymous: boolean; content: string; created_at: string
 }
 
+const NOTICE_PAGE_SIZE = 15
+
 const SCHOOL_TYPES = ['초등', '중등', '고등']
 
 const EMPTY = {
@@ -65,6 +67,7 @@ export default function NoticesPage() {
   const [saving,  setSaving]  = useState(false)
   const [notif,   setNotif]   = useState<{ msg: string; ok: boolean } | null>(null)
   const [search,  setSearch]  = useState('')
+  const [page, setPage] = useState(1)
   const [pickerSearch, setPickerSearch] = useState('')
   const [pickerStageFlt, setPickerStageFlt] = useState<string[]>([])
 
@@ -328,8 +331,15 @@ export default function NoticesPage() {
 
   // 검색 + 고정/일반 분리
   const filtered    = notices.filter(n => n.title.includes(search))
-  const pinnedList  = filtered.filter(n => n.pinned)
-  const normalList  = filtered.filter(n => !n.pinned)
+  const ordered = [...filtered.filter(n => n.pinned), ...filtered.filter(n => !n.pinned)]
+  const totalPages = Math.max(1, Math.ceil(ordered.length / NOTICE_PAGE_SIZE))
+  const currentPage = Math.min(page, totalPages)
+  const pageStart = (currentPage - 1) * NOTICE_PAGE_SIZE
+  const pageNotices = ordered.slice(pageStart, pageStart + NOTICE_PAGE_SIZE)
+  const pinnedList = pageNotices.filter(n => n.pinned)
+  const normalList = pageNotices.filter(n => !n.pinned)
+  const normalTotal = filtered.filter(n => !n.pinned).length
+  const normalOffset = ordered.slice(0, pageStart).filter(n => !n.pinned).length
 
   function targetLabel(n: Notice): string {
     if (!n.parent_visible) return '비공개'
@@ -421,7 +431,7 @@ export default function NoticesPage() {
       {/* 검색 */}
       <div className="sbox" style={{ maxWidth: 260, marginBottom: 12 }}>
         <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke={tx3}><circle cx="11" cy="11" r="8" strokeWidth={2}/><path strokeWidth={2} d="M21 21l-4.35-4.35"/></svg>
-        <input placeholder="제목 검색..." value={search} onChange={e => setSearch(e.target.value)} />
+        <input placeholder="제목 검색..." value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} />
       </div>
 
       {/* 게시판 테이블 */}
@@ -461,7 +471,7 @@ export default function NoticesPage() {
           )}
 
           {normalList.map((n, i) => (
-            <BoardRow key={n.id} notice={n} index={normalList.length - i} pinned={false} canWrite={canWrite} mobile={mobileMode} visLabel={targetLabel(n)}
+            <BoardRow key={n.id} notice={n} index={normalTotal - normalOffset - i} pinned={false} canWrite={canWrite} mobile={mobileMode} visLabel={targetLabel(n)}
               hasUnreadComments={(unreadByNotice[n.id] ?? 0) > 0}
               commentCount={n.notice_comments?.[0]?.count ?? 0}
               viewCount={readsByNotice[n.id]?.size ?? 0}
@@ -474,6 +484,20 @@ export default function NoticesPage() {
       <p style={{ fontSize: 11, color: tx3, textAlign: 'center', marginTop: 12 }}>총 {filtered.length}개 공지</p>
 
       {/* ── 상세 모달 ── */}
+      {!loading && totalPages > 1 && (
+        <nav aria-label="공지사항 페이지 이동" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 14, marginBottom: 16 }}>
+          <button type="button" className="btn-outline" disabled={currentPage === 1}
+            style={{ minHeight: 36, opacity: currentPage === 1 ? .4 : 1 }}
+            onClick={() => setPage(currentPage - 1)}>이전</button>
+          <span aria-live="polite" style={{ fontSize: 12, color: tx2, fontVariantNumeric: 'tabular-nums' }}>
+            {currentPage} / {totalPages}
+          </span>
+          <button type="button" className="btn-outline" disabled={currentPage === totalPages}
+            style={{ minHeight: 36, opacity: currentPage === totalPages ? .4 : 1 }}
+            onClick={() => setPage(currentPage + 1)}>다음</button>
+        </nav>
+      )}
+
       {detail && (
         <div onClick={() => setDetail(null)} style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,.42)',
