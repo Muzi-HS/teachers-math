@@ -72,6 +72,7 @@ export default function Sidebar() {
   const { mobileMode } = useMobileMode()
   const [unreadInquiries, setUnreadInquiries] = useState(0)
   const [unreadComments, setUnreadComments] = useState(0)
+  const [unreadNoticeComments, setUnreadNoticeComments] = useState(0)
   const [unreadConsultations, setUnreadConsultations] = useState(0)
 
   useEffect(() => {
@@ -124,6 +125,19 @@ export default function Sidebar() {
     const timer = window.setTimeout(() => { setDrawerOpen(false); setEditMode(false) }, 0)
     return () => window.clearTimeout(timer)
   }, [pathname])
+
+  useEffect(() => {
+    if (role !== 'admin' && role !== 'teacher' && role !== 'assistant') return
+    let cancelled = false
+    async function fetchUnread() {
+      const { data, error } = await supabase.rpc('staff_notice_comment_counts')
+      if (!cancelled && !error) setUnreadNoticeComments((data ?? []).reduce((sum: number, row: { unread_count: number }) => sum + Number(row.unread_count), 0))
+    }
+    fetchUnread()
+    window.addEventListener('staff-read', fetchUnread)
+    const iv = setInterval(fetchUnread, 60000)
+    return () => { cancelled = true; clearInterval(iv); window.removeEventListener('staff-read', fetchUnread) }
+  }, [role, pathname])
 
   const visibleNav = role
     ? NAV.filter(item =>
@@ -193,6 +207,7 @@ export default function Sidebar() {
       background: var(--ui-accent);
       border-radius: 3px;
     }
+    .sb-tab.notice-unread, .mnav-bar .mnav-tab.notice-unread { color: var(--ui-danger); }
     .desktop-menu .sb-tab { border-radius: 8px; }
     .desktop-menu { scrollbar-width: thin; scrollbar-color: var(--ui-border) transparent; }
     @media(prefers-reduced-motion:reduce){.sb-tab{transition:none;}}
@@ -246,7 +261,7 @@ export default function Sidebar() {
     const unreadCount = unreadCountOf(item.key)
     return (
       <button
-        className={`sb-tab${active ? ' active' : ''}`}
+        className={`sb-tab${active ? ' active' : ''}${item.key === 'notices' && unreadNoticeComments > 0 ? ' notice-unread' : ''}`}
         aria-current={active ? 'page' : undefined}
         onClick={() => router.push(item.href)}
         title={!expanded && !big ? item.label : ''}
@@ -298,7 +313,7 @@ export default function Sidebar() {
             const active = pathname === item.href || pathname.startsWith(item.href + '/')
             const unreadCount = unreadCountOf(item.key)
             return (
-              <button key={item.key} aria-current={active ? 'page' : undefined} className={`mnav-tab${active ? ' active' : ''}`} onClick={() => router.push(item.href)}>
+              <button key={item.key} aria-current={active ? 'page' : undefined} className={`mnav-tab${active ? ' active' : ''}${item.key === 'notices' && unreadNoticeComments > 0 ? ' notice-unread' : ''}`} onClick={() => router.push(item.href)}>
                 <span style={{ display: 'flex', position: 'relative' }}>
                   {item.icon}
                   {unreadCount > 0 && (

@@ -16,6 +16,7 @@ import BoardRow from '@/components/notices/BoardRow'
 type Notice = {
   id: number
   title: string
+  notice_comments?: { count: number }[]
   content: string
   pinned: boolean
   parent_visible: boolean
@@ -54,6 +55,7 @@ export default function NoticesPage() {
   const [targetsByNotice, setTargetsByNotice] = useState<Record<number, number[]>>({})
   const [readsByNotice, setReadsByNotice] = useState<Record<number, Set<number>>>({})
   const [parentsMap, setParentsMap] = useState<Record<number, { phone: string; names: string[] }>>({}) // parent_id -> 전화번호·자녀 이름
+  const [unreadByNotice, setUnreadByNotice] = useState<Record<number, number>>({})
   const [loading, setLoading] = useState(true)
   const [modal,   setModal]   = useState(false)
   const [detail,  setDetail]  = useState<Notice | null>(null)
@@ -73,16 +75,15 @@ export default function NoticesPage() {
   const [replyOpenFor, setReplyOpenFor] = useState<number | null>(null)
   const [sendingReply, setSendingReply] = useState(false)
 
-  useEffect(() => { fetchNotices(); fetchStudents(); fetchParentsMap(); fetchClasses() }, [])
-  useEffect(() => { if (detail) fetchComments(detail.id) }, [detail])
 
   async function fetchNotices() {
     const [{ data }, { data: targets }, { data: reads }] = await Promise.all([
-      supabase.from('notices').select('*').order('pinned', { ascending: false }).order('created_at', { ascending: false }),
+      supabase.from('notices').select('*, notice_comments(count)').order('pinned', { ascending: false }).order('created_at', { ascending: false }),
       supabase.from('notice_target_students').select('notice_id,student_id'),
       supabase.from('notice_reads').select('notice_id,student_id'),
     ])
     setNotices(data ?? [])
+    await fetchCommentCounts()
     const tmap: Record<number, number[]> = {}
     for (const row of (targets ?? []) as { notice_id: number; student_id: number }[]) {
       if (!tmap[row.notice_id]) tmap[row.notice_id] = []
@@ -96,6 +97,14 @@ export default function NoticesPage() {
     }
     setReadsByNotice(rmap)
     setLoading(false)
+  }
+
+  async function fetchCommentCounts() {
+    const { data, error } = await supabase.rpc('staff_notice_comment_counts')
+    if (error) return
+    const unread: Record<number, number> = {}
+    for (const row of data ?? []) unread[row.notice_id] = row.unread_count
+    setUnreadByNotice(unread)
   }
 
   async function fetchStudents() {
@@ -131,9 +140,26 @@ export default function NoticesPage() {
 
   async function fetchComments(noticeId: number) {
     setCommentsLoading(true)
-    const { data } = await supabase.from('notice_comments').select('*').eq('notice_id', noticeId).order('created_at', { ascending: true })
+    const { data, error } = await supabase.from('notice_comments').select('*').eq('notice_id', noticeId).order('created_at', { ascending: true })
+    if (error) {
+      toast('댓글을 불러오지 못했습니다. 다시 시도해 주세요.', false)
+      setCommentsLoading(false)
+      return
+    }
+    setNotices(ns => ns.map(n => n.id === noticeId ? { ...n, notice_comments: [{ count: (data ?? []).length }] } : n))
     setComments((data ?? []) as NoticeComment[])
     setCommentsLoading(false)
+    const parentComments = (data ?? []).filter((c: NoticeComment) => c.sender_type === 'parent')
+    if (parentComments.length && teacher?.userId) {
+      const { error: readError } = await supabase.from('notice_comment_staff_reads').upsert(
+        parentComments.map((c: NoticeComment) => ({ user_id: teacher.userId, comment_id: c.id })),
+        { onConflict: 'user_id,comment_id', ignoreDuplicates: true },
+      )
+      if (!readError) {
+        await fetchCommentCounts()
+        window.dispatchEvent(new Event('staff-read'))
+      }
+    }
   }
 
   function toast(msg: string, ok = true) {
@@ -143,7 +169,7 @@ export default function NoticesPage() {
 
   async function uploadNoticeImage(file: File): Promise<string | null> {
     const ext = file.name.split('.').pop() || 'png'
-    const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+    const path = `${crypto.randomUUID()}.${ext}`
     const { error } = await supabase.storage.from('notice-images').upload(path, file)
     if (error) { toast('이미지 업로드에 실패했습니다: ' + error.message, false); return null }
     const { data } = supabase.storage.from('notice-images').getPublicUrl(path)
@@ -253,6 +279,7 @@ export default function NoticesPage() {
     setSendingReply(false)
     if (error) { toast('답글 전송 실패: ' + error.message, false); return }
     setComments(cs => [...cs, data as NoticeComment])
+    setNotices(ns => ns.map(n => n.id === noticeId ? { ...n, notice_comments: [{ count: (n.notice_comments?.[0]?.count ?? 0) + 1 }] } : n))
     setReplyDrafts(d => ({ ...d, [parentCommentId]: '' }))
     setReplyOpenFor(null)
 
@@ -275,8 +302,9 @@ export default function NoticesPage() {
 
   async function deleteComment(id: number) {
     if (!confirm('이 댓글을 삭제하시겠습니까?')) return
-    await supabase.from('notice_comments').delete().eq('id', id)
-    setComments(cs => cs.filter(c => c.id !== id && c.parent_comment_id !== id))
+    const { error } = await supabase.from('notice_comments').delete().eq('id', id)
+    if (error) return toast('댓글을 삭제하지 못했습니다. 다시 시도해 주세요.', false)
+    if (detail) await fetchComments(detail.id)
   }
 
   function identityOf(c: NoticeComment): string {
@@ -285,6 +313,16 @@ export default function NoticesPage() {
     const names = c.parent_id != null ? (parentsMap[c.parent_id]?.names ?? []) : []
     return names.length > 0 ? names.join(', ') + ' 학부모' : '학부모'
   }
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => { fetchNotices(); fetchStudents(); fetchParentsMap(); fetchClasses() }, 0)
+    return () => window.clearTimeout(timer)
+  }, [])
+  useEffect(() => {
+    if (!detail) return
+    const timer = window.setTimeout(() => { fetchComments(detail.id) }, 0)
+    return () => window.clearTimeout(timer)
+  }, [detail])
 
   const canWrite = role ? can.writeNotice(role as Role) : false
 
@@ -411,6 +449,8 @@ export default function NoticesPage() {
 
           {pinnedList.map((n, i) => (
             <BoardRow key={n.id} notice={n} index="공지" pinned canWrite={canWrite} mobile={mobileMode} visLabel={targetLabel(n)}
+              hasUnreadComments={(unreadByNotice[n.id] ?? 0) > 0}
+              commentCount={n.notice_comments?.[0]?.count ?? 0}
               viewCount={readsByNotice[n.id]?.size ?? 0}
               onClick={() => setDetail(n)} onEdit={() => openEdit(n)} onDelete={() => remove(n.id)}
               isLast={i === pinnedList.length - 1 && normalList.length === 0} />
@@ -422,6 +462,8 @@ export default function NoticesPage() {
 
           {normalList.map((n, i) => (
             <BoardRow key={n.id} notice={n} index={normalList.length - i} pinned={false} canWrite={canWrite} mobile={mobileMode} visLabel={targetLabel(n)}
+              hasUnreadComments={(unreadByNotice[n.id] ?? 0) > 0}
+              commentCount={n.notice_comments?.[0]?.count ?? 0}
               viewCount={readsByNotice[n.id]?.size ?? 0}
               onClick={() => setDetail(n)} onEdit={() => openEdit(n)} onDelete={() => remove(n.id)}
               isLast={i === normalList.length - 1} />
