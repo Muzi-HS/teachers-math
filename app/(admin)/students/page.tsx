@@ -6,7 +6,7 @@ import { can } from '@/lib/permissions'
 import { kstDateStr, kstNow } from '@/lib/kst'
 import { IconUsers, IconLightbulb, IconCoupon } from '@/components/icons'
 import { useMobileMode } from '@/context/MobileModeContext'
-import { downloadContact } from '@/lib/contact-vcard'
+import { createContactVCard, downloadContact, downloadVCards, studentContactName } from '@/lib/contact-vcard'
 import { navy, navyDk, navyM, gold, goldL, bg, bd, tx, tx2, tx3, re, rbg, gr, gbg } from '@/lib/ui-tokens'
 
 type Student = {
@@ -50,10 +50,26 @@ function highestSchoolEntry(entries: SchoolEntry[]): SchoolEntry | null {
   return entries.reduce((a, b) => (SCHOOL_RANK[b.school_type] > SCHOOL_RANK[a.school_type] ? b : a))
 }
 
+function PhoneActions({ phone, label, detail = false }: { phone: string; label: string; detail?: boolean }) {
+  const number = (phone ?? '').replace(/[^\d+]/g, '')
+  const valid = /^\+?\d{7,15}$/.test(number)
+  const display = (phone ?? '').replace(/^(\d{3})-?(\d{4})-?(\d{4})$/, '$1-$2-$3') || '-'
+  if (!valid) return <span>{display}</span>
+  return (
+    <div style={{ display:'flex',alignItems:'center',gap:8,flexWrap:'wrap' }}>
+      <a href={`tel:${number}`} aria-label={`${label} ${display} 전화 걸기`} style={{ color:navy,fontWeight:600,textDecoration:'none',display:'inline-flex',alignItems:'center',minHeight:44 }}>{display}</a>
+      {detail && <a className="bout" href={`tel:${number}`} aria-label={`${label} 전화 걸기`} style={{ minHeight:40,textDecoration:'none' }}>전화</a>}
+      <a className="bout" href={`sms:${number}`} aria-label={`${label} 문자 보내기`} style={{ minHeight:40,textDecoration:'none' }}>문자</a>
+    </div>
+  )
+}
+
 export default function StudentsPage() {
   const { role } = useAuth()
   const { mobileMode } = useMobileMode()
   const [students, setStudents] = useState<Student[]>([])
+  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [contactTarget, setContactTarget] = useState('both')
   const [classes,  setClasses]  = useState<Class[]>([])
   const [csMap,    setCsMap]    = useState<Record<number, number[]>>({})
   const [loading,  setLoading]  = useState(true)
@@ -80,7 +96,7 @@ export default function StudentsPage() {
   function saveContact(student: Student, parent: boolean) {
     if (!can.viewFullStudent(role!)) return
     try {
-      downloadContact(parent ? `${student.name} 학부모` : student.name, parent ? student.parent_phone : student.phone)
+      downloadContact(studentContactName(student, parent), parent ? student.parent_phone : student.phone)
       toast('연락처 파일을 열어 휴대폰 연락처에 추가해주세요.')
     } catch {
       toast('연락처를 저장하지 못했습니다. 전화번호를 확인해주세요.', false)
@@ -138,12 +154,6 @@ export default function StudentsPage() {
 
   function ageOf(birth: number) {
     return kstNow().getFullYear() - birth + 1
-  }
-
-  function fmtPhone(p: string) {
-    if (!p) return '-'
-    const n = p.replace(/-/g, '')
-    return n.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3') || p
   }
 
   function openAdd() {
@@ -283,6 +293,35 @@ export default function StudentsPage() {
     const matchClass  = clsFlt.length === 0 || clsFlt.some(f => f === 'none' ? (csMap[s.id] ?? []).length === 0 : (csMap[s.id] ?? []).includes(Number(f)))
     return matchSearch && matchAge && matchSchool && matchStage && matchClass
   })
+
+  const selectedStudents = filtered.filter(s => selectedIds.includes(s.id))
+  const allSelected = filtered.length > 0 && selectedStudents.length === filtered.length
+
+  function saveSelectedContacts() {
+    if (!canFull || selectedStudents.length === 0) return
+    const cards: string[] = []
+    let skipped = 0
+    for (const student of selectedStudents) {
+      const contacts = [
+        ...(contactTarget !== 'parent' ? [{ name: studentContactName(student), phone: student.phone }] : []),
+        ...(contactTarget !== 'student' ? [{ name: studentContactName(student, true), phone: student.parent_phone }] : []),
+      ]
+      for (const contact of contacts) {
+        try {
+          cards.push(createContactVCard(contact.name, contact.phone ?? ''))
+        } catch {
+          skipped++
+        }
+      }
+    }
+    if (cards.length === 0) return toast('선택한 학생의 저장 가능한 연락처가 없습니다.', false)
+    try {
+      downloadVCards(`선택연락처_${kstDateStr()}`, cards.join(''))
+      toast(`${cards.length}개 연락처 파일을 열어 휴대폰에 추가해주세요.${skipped ? ` 번호 없음·오류 ${skipped}개 제외` : ''}`)
+    } catch {
+      toast('연락처 파일을 저장하지 못했습니다. 다시 시도해주세요.', false)
+    }
+  }
 
   const ageOptions       = [...new Set(students.map(s => ageOf(s.birth_year)))].sort((a, b) => a - b)
   const activeClasses    = classes.filter(c => c.active !== false)
@@ -473,6 +512,22 @@ export default function StudentsPage() {
           </div>
         </div>
 
+        {canFull && (
+          <div style={{ background:bg,borderRadius:8,padding:12,marginBottom:14 }}>
+            <div style={{ display:'flex',alignItems:'center',gap:10,flexWrap:'wrap' }}>
+              <span style={{ fontSize:13,fontWeight:600,color:tx }}>연락처 일괄 저장 · {selectedStudents.length}명 선택</span>
+              <select className="fsel" aria-label="저장할 연락처 종류" value={contactTarget} onChange={e => setContactTarget(e.target.value)}>
+                <option value="both">학생 + 학부모</option>
+                <option value="student">학생만</option>
+                <option value="parent">학부모만</option>
+              </select>
+              <button className="bgold" style={{ minHeight:40,opacity:loading || !selectedStudents.length ? 0.5 : 1 }} disabled={loading || !selectedStudents.length} onClick={saveSelectedContacts}>선택 연락처 저장</button>
+              <button className="bout" style={{ minHeight:40 }} onClick={() => setSelectedIds([])}>선택 해제</button>
+            </div>
+            <p style={{ fontSize:11,color:tx3,margin:'8px 0 0' }}>현재 검색·필터 결과에서 선택한 학생만 저장합니다. 내려받은 .vcf 파일을 열어 연락처에 추가하세요. 번호가 없거나 잘못된 항목은 제외됩니다.</p>
+          </div>
+        )}
+
         {loading ? (
           <p style={{ color:tx3,fontSize:13 }}>불러오는 중...</p>
         ) : filtered.length === 0 ? (
@@ -485,6 +540,7 @@ export default function StudentsPage() {
             <table>
               <thead>
                 <tr>
+                  {canFull && <th style={{ width:40,padding:4 }}><label style={{ display:'flex',alignItems:'center',justifyContent:'center',minHeight:44,minWidth:44 }}><input type="checkbox" aria-label="현재 검색 결과 전체 선택" checked={allSelected} ref={el => { if (el) el.indeterminate = selectedStudents.length > 0 && !allSelected }} onChange={() => setSelectedIds(allSelected ? [] : filtered.map(s => s.id))} /></label></th>}
                   <th>이름</th>
                   {!mobileMode && <th>나이</th>}
                   {!mobileMode && <th>학교</th>}
@@ -500,6 +556,7 @@ export default function StudentsPage() {
                   const stColor = s.school_type ? (SCHOOL_COLORS[s.school_type as SchoolKey] ?? SCHOOL_COLORS['none']) : null
                   return (
                     <tr key={s.id} onClick={() => setDetailStu(s)}>
+                      {canFull && <td style={{ padding:4 }} onClick={e => e.stopPropagation()}><label style={{ display:'flex',alignItems:'center',justifyContent:'center',minHeight:44,minWidth:44 }}><input type="checkbox" aria-label={`${s.name} 연락처 선택`} checked={selectedIds.includes(s.id)} onChange={() => toggleIn(setSelectedIds, s.id)} /></label></td>}
                       <td>
                         <div style={{ display:'flex',alignItems:'center',gap:6 }}>
                           <span style={{ fontWeight:600 }}>{s.name}</span>
@@ -510,8 +567,8 @@ export default function StudentsPage() {
                       </td>
                       {!mobileMode && <td style={{ color:tx2 }}>{ageOf(s.birth_year)}세</td>}
                       {!mobileMode && <td style={{ color:tx2 }}>{s.school || '-'}</td>}
-                      {!mobileMode && canFull && <td style={{ color:tx2 }}>{fmtPhone(s.phone)}</td>}
-                      {canFull && <td style={{ color:tx2 }}>{fmtPhone(s.parent_phone)}</td>}
+                      {!mobileMode && canFull && <td style={{ color:tx2 }} onClick={e => e.stopPropagation()}><PhoneActions phone={s.phone} label={`${s.name} 학생`} /></td>}
+                      {canFull && <td style={{ color:tx2 }} onClick={e => e.stopPropagation()}><PhoneActions phone={s.parent_phone} label={`${s.name} 학부모`} /></td>}
                       {!mobileMode && (
                         <td onClick={e => e.stopPropagation()}>
                           <div style={{ display:'flex',gap:4,flexWrap:'wrap' }}>
@@ -775,14 +832,14 @@ export default function StudentsPage() {
                   <div style={{ display:'grid',gridTemplateColumns:mobileMode?'1fr':'1fr 1fr',gap:10 }}>
                     <div>
                       <p style={{ fontSize:11,color:tx3,margin:'0 0 2px' }}>학생</p>
-                      <p style={{ fontSize:13,fontWeight:600,color:tx,margin:0 }}>{fmtPhone(detailStu.phone)}</p>
+                      <PhoneActions phone={detailStu.phone} label={`${detailStu.name} 학생`} detail />
                       {detailStu.phone?.trim() && (
                         <button className="bout" style={{ marginTop:8,minHeight:40 }} onClick={() => saveContact(detailStu, false)} aria-label={`${detailStu.name} 학생 연락처 저장`}>연락처 저장</button>
                       )}
                     </div>
                     <div>
                       <p style={{ fontSize:11,color:tx3,margin:'0 0 2px' }}>학부모</p>
-                      <p style={{ fontSize:13,fontWeight:600,color:tx,margin:0 }}>{fmtPhone(detailStu.parent_phone)}</p>
+                      <PhoneActions phone={detailStu.parent_phone} label={`${detailStu.name} 학부모`} detail />
                       {detailStu.parent_phone?.trim() && (
                         <button className="bout" style={{ marginTop:8,minHeight:40 }} onClick={() => saveContact(detailStu, true)} aria-label={`${detailStu.name} 학부모 연락처 저장`}>연락처 저장</button>
                       )}

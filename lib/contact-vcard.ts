@@ -1,3 +1,11 @@
+export function studentContactName(student: { name: string; school: string | null; school_type: string | null }, parent = false): string {
+  let school = (student.school ?? '').trim()
+    .replace(/초등학교$/, '초').replace(/중학교$/, '중').replace(/고등학교$/, '고')
+  const suffix = ({ '초등': '초', '중등': '중', '고등': '고' } as Record<string, string>)[student.school_type ?? '']
+  if (school && suffix && !school.endsWith(suffix)) school += suffix
+  return `${school ? `${school} ` : ''}${student.name.trim()}${parent ? ' 학부모' : ''}`
+}
+
 /** Escape text and fold UTF-8 lines as required by the vCard 3.0 format. */
 export function createContactVCard(name: string, phone: string): string {
   const escape = (value: string) => value.replace(/\\/g, '\\\\').replace(/\r\n|\r|\n/g, '\\n').replace(/;/g, '\\;').replace(/,/g, '\\,')
@@ -24,7 +32,11 @@ export function createContactVCard(name: string, phone: string): string {
 }
 
 export function downloadContact(name: string, phone: string) {
-  const blob = new Blob([createContactVCard(name, phone)], { type: 'text/vcard;charset=utf-8' })
+  downloadVCards(name, createContactVCard(name, phone))
+}
+
+export function downloadVCards(name: string, content: string) {
+  const blob = new Blob([content], { type: 'text/vcard;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
