@@ -6,6 +6,7 @@ import { can } from '@/lib/permissions'
 import { kstDateStr, kstNow } from '@/lib/kst'
 import { IconUsers, IconLightbulb, IconCoupon } from '@/components/icons'
 import { useMobileMode } from '@/context/MobileModeContext'
+import { downloadContact } from '@/lib/contact-vcard'
 import { navy, navyDk, navyM, gold, goldL, bg, bd, tx, tx2, tx3, re, rbg, gr, gbg } from '@/lib/ui-tokens'
 
 type Student = {
@@ -75,6 +76,16 @@ export default function StudentsPage() {
   const [schoolHigh,       setSchoolHigh]       = useState('')
   const [noSchoolMap, setNoSchoolMap] = useState<Record<SchoolKey, boolean>>({ '초등': false, '중등': false, '고등': false })
   const [detailCoupons, setDetailCoupons] = useState<{ id: number; milestone: number; claimed_at: string; used: boolean; code: string }[]>([])
+
+  function saveContact(student: Student, parent: boolean) {
+    if (!can.viewFullStudent(role!)) return
+    try {
+      downloadContact(parent ? `${student.name} 학부모` : student.name, parent ? student.parent_phone : student.phone)
+      toast('연락처 파일을 열어 휴대폰 연락처에 추가해주세요.')
+    } catch {
+      toast('연락처를 저장하지 못했습니다. 전화번호를 확인해주세요.', false)
+    }
+  }
 
   useEffect(() => { fetchAll() }, [])
   useEffect(() => {
@@ -765,12 +776,19 @@ export default function StudentsPage() {
                     <div>
                       <p style={{ fontSize:11,color:tx3,margin:'0 0 2px' }}>학생</p>
                       <p style={{ fontSize:13,fontWeight:600,color:tx,margin:0 }}>{fmtPhone(detailStu.phone)}</p>
+                      {detailStu.phone?.trim() && (
+                        <button className="bout" style={{ marginTop:8,minHeight:40 }} onClick={() => saveContact(detailStu, false)} aria-label={`${detailStu.name} 학생 연락처 저장`}>연락처 저장</button>
+                      )}
                     </div>
                     <div>
                       <p style={{ fontSize:11,color:tx3,margin:'0 0 2px' }}>학부모</p>
                       <p style={{ fontSize:13,fontWeight:600,color:tx,margin:0 }}>{fmtPhone(detailStu.parent_phone)}</p>
+                      {detailStu.parent_phone?.trim() && (
+                        <button className="bout" style={{ marginTop:8,minHeight:40 }} onClick={() => saveContact(detailStu, true)} aria-label={`${detailStu.name} 학부모 연락처 저장`}>연락처 저장</button>
+                      )}
                     </div>
                   </div>
+                  <p style={{ fontSize:11,color:tx3,margin:'10px 0 0' }}>저장한 .vcf 파일을 열어 휴대폰 연락처에 추가하세요.</p>
                 </div>
               )}
 
