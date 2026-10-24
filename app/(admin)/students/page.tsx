@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { can } from '@/lib/permissions'
@@ -50,23 +50,44 @@ function highestSchoolEntry(entries: SchoolEntry[]): SchoolEntry | null {
   return entries.reduce((a, b) => (SCHOOL_RANK[b.school_type] > SCHOOL_RANK[a.school_type] ? b : a))
 }
 
-function PhoneActions({ phone, label, detail = false }: { phone: string; label: string; detail?: boolean }) {
+function ContactPopup({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  const ref = useRef<HTMLDialogElement>(null)
+  useEffect(() => {
+    const dialog = ref.current
+    dialog?.showModal()
+    return () => dialog?.close()
+  }, [])
+  return <dialog ref={ref} aria-label={title} onCancel={onClose} onClick={e => { if (e.target === e.currentTarget) onClose() }} style={{ width:420,maxWidth:'calc(100% - 28px)',maxHeight:'80dvh',padding:20,border:0,borderRadius:16,color:tx }}>
+    <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16 }}><h2 style={{ fontSize:17,fontWeight:700 }}>{title}</h2><button className="bout" style={{ minHeight:44 }} onClick={onClose}>닫기</button></div>
+    {children}
+  </dialog>
+}
+
+function PhoneActions({ phone, label }: { phone: string; label: string; detail?: boolean }) {
+  const { isMobileScreen } = useMobileMode()
+  const [open, setOpen] = useState(false)
   const number = (phone ?? '').replace(/[^\d+]/g, '')
   const valid = /^\+?\d{7,15}$/.test(number)
   const display = (phone ?? '').replace(/^(\d{3})-?(\d{4})-?(\d{4})$/, '$1-$2-$3') || '-'
-  if (!valid) return <span>{display}</span>
+  if (!valid || !isMobileScreen) return <span>{display}</span>
   return (
     <div style={{ display:'flex',alignItems:'center',gap:8,flexWrap:'wrap' }}>
-      <a href={`tel:${number}`} aria-label={`${label} ${display} 전화 걸기`} style={{ color:navy,fontWeight:600,textDecoration:'none',display:'inline-flex',alignItems:'center',minHeight:44 }}>{display}</a>
-      {detail && <a className="bout" href={`tel:${number}`} aria-label={`${label} 전화 걸기`} style={{ minHeight:40,textDecoration:'none' }}>전화</a>}
-      <a className="bout" href={`sms:${number}`} aria-label={`${label} 문자 보내기`} style={{ minHeight:40,textDecoration:'none' }}>문자</a>
+      <button type="button" onClick={() => setOpen(true)} aria-label={`${label} ${display} 연락 방법 선택`} style={{ color:navy,fontWeight:600,border:0,background:'transparent',padding:0,fontSize:'inherit',fontFamily:'inherit',minHeight:44,cursor:'pointer' }}>{display}</button>
+      {open && <ContactPopup title={label} onClose={() => setOpen(false)}>
+        <p style={{ color:tx2 }}>{display}</p>
+        <div style={{ display:'grid',gap:10 }}>
+          <a className="bgold" href={`tel:${number}`} onClick={() => setOpen(false)} style={{ minHeight:48,justifyContent:'center',textDecoration:'none' }}>전화 걸기</a>
+          <a className="bout" href={`sms:${number}`} onClick={() => setOpen(false)} style={{ minHeight:48,justifyContent:'center',textDecoration:'none' }}>문자 보내기</a>
+        </div>
+      </ContactPopup>}
     </div>
   )
 }
 
 export default function StudentsPage() {
   const { role } = useAuth()
-  const { mobileMode } = useMobileMode()
+  const { mobileMode, isMobileScreen } = useMobileMode()
+  const [contactModal, setContactModal] = useState(false)
   const [students, setStudents] = useState<Student[]>([])
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [contactTarget, setContactTarget] = useState('both')
@@ -94,7 +115,7 @@ export default function StudentsPage() {
   const [detailCoupons, setDetailCoupons] = useState<{ id: number; milestone: number; claimed_at: string; used: boolean; code: string }[]>([])
 
   function saveContact(student: Student, parent: boolean) {
-    if (!can.viewFullStudent(role!)) return
+    if (!can.viewFullStudent(role!) || !isMobileScreen) return
     try {
       downloadContact(studentContactName(student, parent), parent ? student.parent_phone : student.phone)
       toast('연락처 파일을 열어 휴대폰 연락처에 추가해주세요.')
@@ -297,11 +318,12 @@ export default function StudentsPage() {
   const selectedStudents = filtered.filter(s => selectedIds.includes(s.id))
   const allSelected = filtered.length > 0 && selectedStudents.length === filtered.length
 
-  function saveSelectedContacts() {
-    if (!canFull || selectedStudents.length === 0) return
+  function saveSelectedContacts(all = false) {
+    const targets = all ? filtered : selectedStudents
+    if (!canFull || !isMobileScreen || targets.length === 0) return
     const cards: string[] = []
     let skipped = 0
-    for (const student of selectedStudents) {
+    for (const student of targets) {
       const contacts = [
         ...(contactTarget !== 'parent' ? [{ name: studentContactName(student), phone: student.phone }] : []),
         ...(contactTarget !== 'student' ? [{ name: studentContactName(student, true), phone: student.parent_phone }] : []),
@@ -357,6 +379,7 @@ export default function StudentsPage() {
     <div style={{ padding: mobileMode ? '16px 14px 88px' : '28px 32px', fontFamily: "'Noto Sans KR',sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
+        dialog::backdrop{background:rgba(0,0,0,.42);}
         table{width:100%;border-collapse:collapse;}
         th{padding:9px 12px;text-align:left;font-size:11px;font-weight:600;color:${tx3};letter-spacing:.5px;background:${bg};border-bottom:1px solid ${bd};}
         td{padding:11px 12px;border-bottom:1px solid ${bd};font-size:13px;color:${tx};}
@@ -512,8 +535,9 @@ export default function StudentsPage() {
           </div>
         </div>
 
-        {canFull && (
-          <div style={{ background:bg,borderRadius:8,padding:12,marginBottom:14 }}>
+        {canFull && isMobileScreen && <div style={{ display:'flex',justifyContent:'flex-end',marginBottom:12 }}><button className="bout" style={{ minHeight:44 }} disabled={loading || !filtered.length} onClick={() => { setSelectedIds([]); setContactModal(true) }}>연락처 저장</button></div>}
+        {contactModal && canFull && isMobileScreen && (
+          <ContactPopup title="연락처 저장" onClose={() => setContactModal(false)}>
             <div style={{ display:'flex',alignItems:'center',gap:10,flexWrap:'wrap' }}>
               <span style={{ fontSize:13,fontWeight:600,color:tx }}>연락처 일괄 저장 · {selectedStudents.length}명 선택</span>
               <select className="fsel" aria-label="저장할 연락처 종류" value={contactTarget} onChange={e => setContactTarget(e.target.value)}>
@@ -521,11 +545,16 @@ export default function StudentsPage() {
                 <option value="student">학생만</option>
                 <option value="parent">학부모만</option>
               </select>
-              <button className="bgold" style={{ minHeight:40,opacity:loading || !selectedStudents.length ? 0.5 : 1 }} disabled={loading || !selectedStudents.length} onClick={saveSelectedContacts}>선택 연락처 저장</button>
+              <button className="bgold" style={{ minHeight:40,opacity:loading || !selectedStudents.length ? 0.5 : 1 }} disabled={loading || !selectedStudents.length} onClick={() => saveSelectedContacts()}>선택 연락처 저장</button>
               <button className="bout" style={{ minHeight:40 }} onClick={() => setSelectedIds([])}>선택 해제</button>
             </div>
-            <p style={{ fontSize:11,color:tx3,margin:'8px 0 0' }}>현재 검색·필터 결과에서 선택한 학생만 저장합니다. 내려받은 .vcf 파일을 열어 연락처에 추가하세요. 번호가 없거나 잘못된 항목은 제외됩니다.</p>
-          </div>
+            <div style={{ maxHeight:'30dvh',overflowY:'auto',marginTop:12 }}>
+              <label style={{ display:'flex',gap:10,alignItems:'center',minHeight:44,fontSize:13 }}><input type="checkbox" checked={allSelected} ref={el => { if (el) el.indeterminate = selectedStudents.length > 0 && !allSelected }} onChange={() => setSelectedIds(allSelected ? [] : filtered.map(s => s.id))} />전체 선택 ({filtered.length}명)</label>
+              {filtered.map(s => <label key={s.id} style={{ display:'flex',gap:10,alignItems:'center',minHeight:44,fontSize:13 }}><input type="checkbox" aria-label={`${s.name} 연락처 선택`} checked={selectedIds.includes(s.id)} onChange={() => toggleIn(setSelectedIds, s.id)} />{s.name}<span style={{ color:tx3,fontSize:11 }}>{s.school_type}</span></label>)}
+            </div>
+            <button className="bout" style={{ minHeight:44,marginTop:12 }} disabled={loading || !filtered.length} onClick={() => saveSelectedContacts(true)}>검색 결과 전체 저장 ({filtered.length}명)</button>
+            <p style={{ fontSize:11,color:tx3,margin:'8px 0 0' }}>현재 검색·필터 결과의 전체 또는 선택한 학생을 저장합니다. 내려받은 .vcf 파일을 열어 연락처에 추가하세요. 번호가 없거나 잘못된 항목은 제외됩니다.</p>
+          </ContactPopup>
         )}
 
         {loading ? (
@@ -540,12 +569,11 @@ export default function StudentsPage() {
             <table>
               <thead>
                 <tr>
-                  {canFull && <th style={{ width:40,padding:4 }}><label style={{ display:'flex',alignItems:'center',justifyContent:'center',minHeight:44,minWidth:44 }}><input type="checkbox" aria-label="현재 검색 결과 전체 선택" checked={allSelected} ref={el => { if (el) el.indeterminate = selectedStudents.length > 0 && !allSelected }} onChange={() => setSelectedIds(allSelected ? [] : filtered.map(s => s.id))} /></label></th>}
                   <th>이름</th>
                   {!mobileMode && <th>나이</th>}
                   {!mobileMode && <th>학교</th>}
                   {!mobileMode && canFull && <th>학생 연락처</th>}
-                  {canFull && <th>학부모 연락처</th>}
+                  {canFull && <th>{mobileMode ? '연락처' : '학부모 연락처'}</th>}
                   {!mobileMode && <th>소속 반</th>}
                   {!mobileMode && isAdmin && <th>관리</th>}
                 </tr>
@@ -556,7 +584,6 @@ export default function StudentsPage() {
                   const stColor = s.school_type ? (SCHOOL_COLORS[s.school_type as SchoolKey] ?? SCHOOL_COLORS['none']) : null
                   return (
                     <tr key={s.id} onClick={() => setDetailStu(s)}>
-                      {canFull && <td style={{ padding:4 }} onClick={e => e.stopPropagation()}><label style={{ display:'flex',alignItems:'center',justifyContent:'center',minHeight:44,minWidth:44 }}><input type="checkbox" aria-label={`${s.name} 연락처 선택`} checked={selectedIds.includes(s.id)} onChange={() => toggleIn(setSelectedIds, s.id)} /></label></td>}
                       <td>
                         <div style={{ display:'flex',alignItems:'center',gap:6 }}>
                           <span style={{ fontWeight:600 }}>{s.name}</span>
@@ -568,7 +595,10 @@ export default function StudentsPage() {
                       {!mobileMode && <td style={{ color:tx2 }}>{ageOf(s.birth_year)}세</td>}
                       {!mobileMode && <td style={{ color:tx2 }}>{s.school || '-'}</td>}
                       {!mobileMode && canFull && <td style={{ color:tx2 }} onClick={e => e.stopPropagation()}><PhoneActions phone={s.phone} label={`${s.name} 학생`} /></td>}
-                      {canFull && <td style={{ color:tx2 }} onClick={e => e.stopPropagation()}><PhoneActions phone={s.parent_phone} label={`${s.name} 학부모`} /></td>}
+                      {canFull && <td style={{ color:tx2 }} onClick={e => e.stopPropagation()}>
+                        {mobileMode && <div><span style={{ fontSize:10,color:tx3 }}>학생</span><PhoneActions phone={s.phone} label={`${s.name} 학생`} /></div>}
+                        <div>{mobileMode && <span style={{ fontSize:10,color:tx3 }}>학부모</span>}<PhoneActions phone={s.parent_phone} label={`${s.name} 학부모`} /></div>
+                      </td>}
                       {!mobileMode && (
                         <td onClick={e => e.stopPropagation()}>
                           <div style={{ display:'flex',gap:4,flexWrap:'wrap' }}>
@@ -833,14 +863,14 @@ export default function StudentsPage() {
                     <div>
                       <p style={{ fontSize:11,color:tx3,margin:'0 0 2px' }}>학생</p>
                       <PhoneActions phone={detailStu.phone} label={`${detailStu.name} 학생`} detail />
-                      {detailStu.phone?.trim() && (
+                      {isMobileScreen && detailStu.phone?.trim() && (
                         <button className="bout" style={{ marginTop:8,minHeight:40 }} onClick={() => saveContact(detailStu, false)} aria-label={`${detailStu.name} 학생 연락처 저장`}>연락처 저장</button>
                       )}
                     </div>
                     <div>
                       <p style={{ fontSize:11,color:tx3,margin:'0 0 2px' }}>학부모</p>
                       <PhoneActions phone={detailStu.parent_phone} label={`${detailStu.name} 학부모`} detail />
-                      {detailStu.parent_phone?.trim() && (
+                      {isMobileScreen && detailStu.parent_phone?.trim() && (
                         <button className="bout" style={{ marginTop:8,minHeight:40 }} onClick={() => saveContact(detailStu, true)} aria-label={`${detailStu.name} 학부모 연락처 저장`}>연락처 저장</button>
                       )}
                     </div>
