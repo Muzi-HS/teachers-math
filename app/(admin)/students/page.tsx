@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ContactSaveDialog, PhoneContactDialog } from '@/components/StudentContactDialogs'
 import contactStyles from '@/components/StudentContactDialogs.module.css'
 import { StudentContactDetails, PinSettingsCard } from '@/components/StudentContactDetails'
@@ -24,6 +24,12 @@ type Student = {
 }
 
 type Class = { id: number; name: string; active: boolean }
+type TeacherDirectory = {
+  students: Pick<Student, 'id' | 'name' | 'birth_year' | 'school' | 'school_type' | 'reg_date'>[]
+  classes: Class[]
+  memberships: { student_id:number; class_id:number }[]
+  schools: { student_id:number; school_type:SchoolKey; school_name:string }[]
+}
 
 type SchoolEntry = { school_type: SchoolKey; school_name: string }
 
@@ -67,7 +73,9 @@ function PhoneActions({ phone, label, detail = false }: { phone: string; label: 
 }
 
 export default function StudentsPage() {
-  const { role } = useAuth()
+  const { role, teacher } = useAuth()
+  const loadRequest = useRef({ generation:0 })
+  const [loadError, setLoadError] = useState('')
   const { mobileMode, isMobileScreen } = useMobileMode()
   const [contactModal, setContactModal] = useState(false)
   const [students, setStudents] = useState<Student[]>([])
@@ -106,16 +114,20 @@ export default function StudentsPage() {
     }
   }
 
-  useEffect(() => { fetchAll() }, [])
   useEffect(() => {
-    if (!detailStu) {
+    const requests = loadRequest.current
+    void fetchAll()
+    return () => { requests.generation++ }
+  }, [role, teacher?.userId]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!detailStu || role !== 'admin') {
       const timer = window.setTimeout(() => setDetailCoupons([]), 0)
       return () => window.clearTimeout(timer)
     }
     supabase.from('student_coupons').select('id,milestone,claimed_at,used,code')
       .eq('student_id', detailStu.id).order('claimed_at', { ascending: false })
       .then(({ data }) => setDetailCoupons(data ?? []))
-  }, [detailStu?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [detailStu?.id, role]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function toggleCouponUsed(couponId: number, used: boolean) {
     const { error } = await supabase.from('student_coupons')
@@ -125,13 +137,43 @@ export default function StudentsPage() {
   }
 
   async function fetchAll() {
+    const request = ++loadRequest.current.generation
     setLoading(true)
-    const [{ data: s }, { data: c }, { data: cs }, { data: ss }] = await Promise.all([
+    setLoadError('')
+    setStudents([]); setClasses([]); setCsMap({}); setSsMap({}); setDetailStu(null)
+    if (role !== 'admin' && role !== 'teacher') { setLoading(false); return }
+    if (role === 'teacher') {
+      try {
+        const { data, error } = await supabase.rpc('teacher_student_directory')
+        if (request !== loadRequest.current.generation) return
+        if (error || !data) throw new Error('directory unavailable')
+        const directory = data as TeacherDirectory
+        setStudents(directory.students.map(s => ({ ...BLANK,...s })))
+        setClasses(directory.classes.map(c => ({ ...c,active:c.active ?? true })))
+        const memberships: Record<number,number[]> = {}
+        for (const row of directory.memberships) (memberships[row.student_id] ??= []).push(row.class_id)
+        setCsMap(memberships)
+        const schools: Record<number,SchoolEntry[]> = {}
+        for (const row of directory.schools) (schools[row.student_id] ??= []).push({ school_type:row.school_type,school_name:row.school_name })
+        setSsMap(schools)
+      } catch {
+        if (request === loadRequest.current.generation) setLoadError('담당 학생을 불러오지 못했습니다. 잠시 후 다시 시도해주세요. 계속되면 관리자에게 문의해주세요.')
+      } finally { if (request === loadRequest.current.generation) setLoading(false) }
+      return
+    }
+    const results = await Promise.all([
       supabase.from('students').select('*').order('name'),
       supabase.from('classes').select('id, name, active').order('name'),
       supabase.from('class_students').select('student_id, class_id'),
       supabase.from('student_schools').select('student_id, school_type, school_name'),
     ])
+    if (request !== loadRequest.current.generation) return
+    if (results.some(result => result.error)) {
+      setLoadError('학생 정보를 불러오지 못했습니다. 다시 시도해주세요.')
+      setLoading(false)
+      return
+    }
+    const [{ data:s },{ data:c },{ data:cs },{ data:ss }] = results
     setStudents(s ?? [])
     setClasses((c ?? []).map(x => ({ ...x, active: x.active ?? true })))
     const map: Record<number, number[]> = {}
@@ -397,7 +439,7 @@ export default function StudentsPage() {
       <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:mobileMode?14:20 }}>
         <div>
           <h1 style={{ fontSize:mobileMode?17:21,fontWeight:700,color:tx }}>학생 관리</h1>
-          {!mobileMode && <p style={{ fontSize:13,color:tx2,marginTop:4 }}>학원에 등록된 전체 학생</p>}
+          {(!mobileMode || role === 'teacher') && <p style={{ fontSize:12,color:tx2,marginTop:4 }}>{role === 'teacher' ? '배정된 반의 학생 기본 정보를 확인할 수 있습니다.' : '학원에 등록된 전체 학생'}</p>}
         </div>
         {isAdmin && (
           <button className="bgold" onClick={openAdd}>
@@ -411,7 +453,7 @@ export default function StudentsPage() {
       <div style={{ background:'#fff',borderRadius:12,border:`1px solid ${bd}`,padding:mobileMode?14:22,boxShadow:'0 1px 4px rgba(0,0,0,.06)' }}>
         <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16 }}>
           <span style={{ fontSize:14,fontWeight:600,color:tx }}>
-            전체 학생 <span style={{ fontSize:12,color:tx3,fontWeight:400 }}>{filtered.length}명</span>
+            {role === 'teacher' ? '담당 학생' : '전체 학생'} <span style={{ fontSize:12,color:tx3,fontWeight:400 }}>{filtered.length}명</span>
           </span>
         </div>
         {/* 검색 */}
@@ -522,12 +564,12 @@ export default function StudentsPage() {
           onSave={saveSelectedContacts} onClose={() => setContactModal(false)}
         />}
 
-        {loading ? (
+        {loadError ? <div role="alert" style={{ padding:'20px 0',color:re,fontSize:13 }}><p>{loadError}</p><button className="bout" style={{ marginTop:10,minHeight:40 }} onClick={() => void fetchAll()}>다시 시도</button></div> : loading ? (
           <p style={{ color:tx3,fontSize:13 }}>불러오는 중...</p>
         ) : filtered.length === 0 ? (
           <div style={{ textAlign:'center',padding:'40px 0',color:tx3 }}>
             <p style={{ marginBottom:8,display:'flex',justifyContent:'center' }}><IconUsers size={32} /></p>
-            <p style={{ fontSize:14 }}>등록된 학생이 없습니다</p>
+            <p style={{ fontSize:14 }}>{role === 'teacher' ? '배정된 반에 조건과 일치하는 학생이 없습니다' : '등록된 학생이 없습니다'}</p>
           </div>
         ) : (
           <div style={{ overflowX:'auto' }}>

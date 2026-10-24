@@ -16,7 +16,7 @@ export const can = {
   viewFullStudent:  (role: Role) => role === 'admin',
   viewBasicStudent: (role: Role) => role === 'admin' || role === 'teacher' || role === 'assistant',
 
-  // 학생 관리 메뉴 자체 접근 (등록/수정/삭제 포함) — admin만
+  // 학생 등록/수정/삭제 — admin만 (선생님 메뉴는 담당 학생 읽기 전용)
   manageStudents:   (role: Role) => role === 'admin',
 
   // 반 정보 관리 — 반 추가/수정/삭제, 반에 학생 추가/제외. admin만
@@ -54,7 +54,7 @@ export const can = {
 export const menuAccess: Record<string, (role: Role) => boolean> = {
   dashboard:  (r) => r === 'admin',
   classes:    (r) => r === 'admin' || r === 'teacher' || r === 'assistant',
-  students:   (r) => r === 'admin',
+  students:   (r) => r === 'admin' || r === 'teacher',
   records:    (r) => r === 'admin' || r === 'teacher' || r === 'assistant', // 수업기록 — 배정된 반만 접근
   tests:      (r) => r === 'admin' || r === 'teacher' || r === 'assistant',
   notices:    (r) => r !== 'parent' && r !== 'student', // parent/student는 각자 별도 화면에서 열람
