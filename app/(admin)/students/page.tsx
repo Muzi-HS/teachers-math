@@ -105,7 +105,7 @@ export default function StudentsPage() {
   const [detailCoupons, setDetailCoupons] = useState<{ id: number; milestone: number; claimed_at: string; used: boolean; code: string }[]>([])
 
   function saveContact(student: Student, parent: boolean) {
-    if (!can.viewFullStudent(role!) || !isMobileScreen) return
+    if (!can.viewStudentContacts(role!) || !isMobileScreen) return
     try {
       downloadContact(studentContactName(student, parent), parent ? student.parent_phone : student.phone)
       toast('연락처 파일을 열어 휴대폰 연락처에 추가해주세요.')
@@ -344,7 +344,7 @@ export default function StudentsPage() {
 
   function saveSelectedContacts(all = false) {
     const targets = all ? filtered : selectedStudents
-    if (!canFull || !isMobileScreen || targets.length === 0) return
+    if (!canContacts || !isMobileScreen || targets.length === 0) return
     const cards: string[] = []
     let skipped = 0
     for (const student of targets) {
@@ -558,8 +558,8 @@ export default function StudentsPage() {
           </div>
         </div>
 
-        {canFull && isMobileScreen && <div style={{ display:'flex',justifyContent:'flex-end',marginBottom:12 }}><button className="bout" style={{ minHeight:44 }} disabled={loading || !filtered.length} onClick={() => { setSelectedIds([]); setContactModal(true) }}>연락처 저장</button></div>}
-        {contactModal && canFull && isMobileScreen && <ContactSaveDialog
+        {canContacts && isMobileScreen && <div style={{ display:'flex',justifyContent:'flex-end',marginBottom:12 }}><button className="bout" style={{ minHeight:44 }} disabled={loading || !filtered.length} onClick={() => { setSelectedIds([]); setContactModal(true) }}>연락처 저장</button></div>}
+        {contactModal && canContacts && isMobileScreen && <ContactSaveDialog
           students={filtered} selectedIds={selectedIds} target={contactTarget}
           onTargetChange={setContactTarget} onSelectionChange={setSelectedIds}
           onSave={saveSelectedContacts} onClose={() => setContactModal(false)}
@@ -869,8 +869,8 @@ export default function StudentsPage() {
               {canContacts && <StudentContactDetails
                 studentNumber={<PhoneActions phone={detailStu.phone} label={`${detailStu.name} 학생`} detail />}
                 parentNumber={<PhoneActions phone={detailStu.parent_phone} label={`${detailStu.name} 학부모`} detail />}
-                onSaveStudent={canFull && isMobileScreen && detailStu.phone?.trim() ? () => saveContact(detailStu, false) : undefined}
-                onSaveParent={canFull && isMobileScreen && detailStu.parent_phone?.trim() ? () => saveContact(detailStu, true) : undefined}
+                onSaveStudent={canContacts && isMobileScreen && detailStu.phone?.trim() ? () => saveContact(detailStu, false) : undefined}
+                onSaveParent={canContacts && isMobileScreen && detailStu.parent_phone?.trim() ? () => saveContact(detailStu, true) : undefined}
               />}
               {isAdmin && <PinSettingsCard title="학생 PIN" resetting={resettingStudentPin} onReset={() => void resetStudentPin(detailStu.id,detailStu.name)} />}
               {canFull && detailStu.parent_phone && <PinSettingsCard title="학부모 PIN" onReset={() => void resetParentPin(detailStu.parent_phone,detailStu.name)} />}
