@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { ContactSaveDialog, PhoneContactDialog } from '@/components/StudentContactDialogs'
 import contactStyles from '@/components/StudentContactDialogs.module.css'
+import { StudentContactDetails, PinSettingsCard } from '@/components/StudentContactDetails'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { can } from '@/lib/permissions'
@@ -52,7 +53,7 @@ function highestSchoolEntry(entries: SchoolEntry[]): SchoolEntry | null {
   return entries.reduce((a, b) => (SCHOOL_RANK[b.school_type] > SCHOOL_RANK[a.school_type] ? b : a))
 }
 
-function PhoneActions({ phone, label }: { phone: string; label: string; detail?: boolean }) {
+function PhoneActions({ phone, label, detail = false }: { phone: string; label: string; detail?: boolean }) {
   const { isMobileScreen } = useMobileMode()
   const [open, setOpen] = useState(false)
   const number = (phone ?? '').replace(/[^\d+]/g, '')
@@ -60,7 +61,7 @@ function PhoneActions({ phone, label }: { phone: string; label: string; detail?:
   const display = (phone ?? '').replace(/^(\d{3})-?(\d{4})-?(\d{4})$/, '$1-$2-$3') || '-'
   if (!valid || !isMobileScreen) return <span>{display}</span>
   return <>
-    <button type="button" className={contactStyles.number} onClick={() => setOpen(true)} aria-label={`${label} ${display} 연락 방법 선택`}>{display}</button>
+    <button type="button" className={`${contactStyles.number}${detail ? ` ${contactStyles.detailNumber}` : ''}`} onClick={() => setOpen(true)} aria-label={`${label} ${display} 연락 방법 선택`}>{display}</button>
     {open && <PhoneContactDialog label={label} display={display} number={number} onClose={() => setOpen(false)} />}
   </>
 }
@@ -822,57 +823,15 @@ export default function StudentsPage() {
               </div>
 
               {/* 연락처 (admin만) */}
-              {canFull && (
-                <div style={{ background:bg,borderRadius:10,padding:'14px 16px',marginBottom: detailStu.parent_phone ? 14 : 0 }}>
-                  <p style={{ fontSize:11,fontWeight:700,color:tx3,letterSpacing:1,margin:'0 0 10px' }}>연락처</p>
-                  <div style={{ display:'grid',gridTemplateColumns:mobileMode?'1fr':'1fr 1fr',gap:10 }}>
-                    <div>
-                      <p style={{ fontSize:11,color:tx3,margin:'0 0 2px' }}>학생</p>
-                      <PhoneActions phone={detailStu.phone} label={`${detailStu.name} 학생`} detail />
-                      {isMobileScreen && detailStu.phone?.trim() && (
-                        <button className="bout" style={{ marginTop:8,minHeight:40 }} onClick={() => saveContact(detailStu, false)} aria-label={`${detailStu.name} 학생 연락처 저장`}>연락처 저장</button>
-                      )}
-                    </div>
-                    <div>
-                      <p style={{ fontSize:11,color:tx3,margin:'0 0 2px' }}>학부모</p>
-                      <PhoneActions phone={detailStu.parent_phone} label={`${detailStu.name} 학부모`} detail />
-                      {isMobileScreen && detailStu.parent_phone?.trim() && (
-                        <button className="bout" style={{ marginTop:8,minHeight:40 }} onClick={() => saveContact(detailStu, true)} aria-label={`${detailStu.name} 학부모 연락처 저장`}>연락처 저장</button>
-                      )}
-                    </div>
-                  </div>
-                  <p style={{ fontSize:11,color:tx3,margin:'10px 0 0' }}>저장한 .vcf 파일을 열어 휴대폰 연락처에 추가하세요.</p>
-                </div>
-              )}
+              {canFull && <StudentContactDetails
+                studentNumber={<PhoneActions phone={detailStu.phone} label={`${detailStu.name} 학생`} detail />}
+                parentNumber={<PhoneActions phone={detailStu.parent_phone} label={`${detailStu.name} 학부모`} detail />}
+                onSaveStudent={isMobileScreen && detailStu.phone?.trim() ? () => saveContact(detailStu, false) : undefined}
+                onSaveParent={isMobileScreen && detailStu.parent_phone?.trim() ? () => saveContact(detailStu, true) : undefined}
+              />}
+              {isAdmin && <PinSettingsCard title="학생 PIN" resetting={resettingStudentPin} onReset={() => void resetStudentPin(detailStu.id,detailStu.name)} />}
+              {canFull && detailStu.parent_phone && <PinSettingsCard title="학부모 PIN" onReset={() => void resetParentPin(detailStu.parent_phone,detailStu.name)} />}
 
-              {isAdmin && (
-                <div style={{ background:bg,borderRadius:10,padding:'14px 16px',marginBottom:14 }}>
-                  <p style={{ fontSize:11,fontWeight:700,color:tx3,letterSpacing:1,margin:'0 0 10px' }}>학생 PIN</p>
-                  <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap' }}>
-                    <p style={{ fontSize:12,color:tx3,margin:0 }}>보안을 위해 암호화 저장되어 현재 PIN은 확인할 수 없습니다.</p>
-                    <button className="bdng" disabled={resettingStudentPin} onClick={() => void resetStudentPin(detailStu.id, detailStu.name)}>
-                      {resettingStudentPin ? '초기화 중...' : 'PIN 초기화'}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* 학부모 PIN (admin만) — PIN은 암호화 저장되어 관리자도 현재 값을 볼 수 없고, 초기화(0000)만 가능하다 */}
-              {canFull && detailStu.parent_phone && (
-                <div style={{ background:bg,borderRadius:10,padding:'14px 16px' }}>
-                  <p style={{ fontSize:11,fontWeight:700,color:tx3,letterSpacing:1,margin:'0 0 10px' }}>학부모 PIN</p>
-                  <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between' }}>
-                    <p style={{ fontSize:12,color:tx3,margin:0 }}>보안을 위해 암호화 저장되어 현재 PIN은 확인할 수 없습니다.</p>
-                    {isAdmin && (
-                      <button className="bdng" onClick={() => resetParentPin(detailStu.parent_phone, detailStu.name)}>
-                        PIN 초기화
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* 쿠폰함 (admin만) — 학생이 숙제 이행률 연속 달성으로 받은 쿠폰의 실사용 처리 */}
               {isAdmin && detailCoupons.length > 0 && (
                 <div style={{ background:bg,borderRadius:10,padding:'14px 16px',marginTop:14 }}>
                   <p style={{ fontSize:11,fontWeight:700,color:tx3,letterSpacing:1,margin:'0 0 10px' }}>쿠폰함</p>

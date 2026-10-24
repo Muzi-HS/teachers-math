@@ -1,0 +1,15 @@
+.card { background: var(--ui-bg); border-radius: 10px; padding: 14px 16px; margin-bottom: 14px; }
+.title { margin: 0 0 12px; color: var(--ui-text-3); font-size: 11px; font-weight: 700; line-height: 1.5; letter-spacing: 1px; }
+.contacts { display: grid; gap: 16px; }
+.contactRow { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.contactInfo { min-width: 0; }
+.label { margin: 0 0 4px; color: var(--ui-text-3); font-size: 11px; line-height: 1.5; }
+.value { color: var(--ui-primary); font-size: 13px; font-weight: 600; line-height: 1.6; font-variant-numeric: tabular-nums; }
+.save, .reset { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; min-height: 36px; padding: 6px 10px; border: 1px solid var(--ui-border); border-radius: 7px; background: transparent; color: var(--ui-text-2); font: inherit; font-size: 11px; font-weight: 500; line-height: 1.5; white-space: nowrap; cursor: pointer; }
+.save:hover { border-color: var(--ui-primary); color: var(--ui-primary); }
+.help { margin: 12px 0 0; color: var(--ui-text-3); font-size: 11px; line-height: 1.8; word-break: keep-all; }
+.description { margin: 0; color: var(--ui-text-3); font-size: 12px; line-height: 1.8; word-break: keep-all; }
+.pinActions { display: flex; margin-top: 12px; }
+.reset { min-width: 88px; border-color: transparent; background: var(--ui-danger-bg); color: var(--ui-danger); }
+.reset:hover:not(:disabled) { border-color: var(--ui-danger-border); }
+.reset:disabled { opacity: .55; cursor: not-allowed; }

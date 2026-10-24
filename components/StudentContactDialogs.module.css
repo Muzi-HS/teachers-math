@@ -3,6 +3,7 @@
 .numberRow { display: grid; grid-template-columns: 34px minmax(0, 1fr); align-items: center; gap: 8px; min-height: 36px; }
 .numberRow > span { color: var(--ui-text-3); font-size: 10px; line-height: 1.4; }
 .numberRow .number { min-height: 36px; font-size: 12px; }
+.detailNumber { min-height: 36px; font-size: 13px; line-height: 1.6; }
 .phoneCard { padding: 16px; margin-bottom: 16px; border-radius: 10px; background: var(--ui-surface-2); }
 .phoneCard p { margin: 0 0 4px; color: var(--ui-text-3); font-size: 11px; }
 .phoneCard strong { color: var(--ui-primary); font-size: 21px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.5; }
