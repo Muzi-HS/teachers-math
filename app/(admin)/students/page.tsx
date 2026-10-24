@@ -25,7 +25,7 @@ type Student = {
 
 type Class = { id: number; name: string; active: boolean }
 type TeacherDirectory = {
-  students: Pick<Student, 'id' | 'name' | 'birth_year' | 'school' | 'school_type' | 'reg_date'>[]
+  students: Pick<Student, 'id' | 'name' | 'birth_year' | 'school' | 'school_type' | 'reg_date' | 'phone' | 'parent_phone'>[]
   classes: Class[]
   memberships: { student_id:number; class_id:number }[]
   schools: { student_id:number; school_type:SchoolKey; school_name:string }[]
@@ -328,6 +328,7 @@ export default function StudentsPage() {
 
   const isAdmin = role === 'admin'
   const canFull = can.viewFullStudent(role!)
+  const canContacts = can.viewStudentContacts(role!)
   const formAge = form.birth_year ? ageOf(form.birth_year) : 0
 
   const filtered = students.filter(s => {
@@ -439,7 +440,7 @@ export default function StudentsPage() {
       <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:mobileMode?14:20 }}>
         <div>
           <h1 style={{ fontSize:mobileMode?17:21,fontWeight:700,color:tx }}>학생 관리</h1>
-          {(!mobileMode || role === 'teacher') && <p style={{ fontSize:12,color:tx2,marginTop:4 }}>{role === 'teacher' ? '배정된 반의 학생 기본 정보를 확인할 수 있습니다.' : '학원에 등록된 전체 학생'}</p>}
+          {(!mobileMode || role === 'teacher') && <p style={{ fontSize:12,color:tx2,marginTop:4 }}>{role === 'teacher' ? '배정된 반의 학생 정보와 연락처를 확인할 수 있습니다.' : '학원에 등록된 전체 학생'}</p>}
         </div>
         {isAdmin && (
           <button className="bgold" onClick={openAdd}>
@@ -579,8 +580,8 @@ export default function StudentsPage() {
                   <th>이름</th>
                   {!mobileMode && <th>나이</th>}
                   {!mobileMode && <th>학교</th>}
-                  {!mobileMode && canFull && <th>학생 연락처</th>}
-                  {canFull && <th>{mobileMode ? '연락처' : '학부모 연락처'}</th>}
+                  {!mobileMode && canContacts && <th>학생 연락처</th>}
+                  {canContacts && <th>{mobileMode ? '연락처' : '학부모 연락처'}</th>}
                   {!mobileMode && <th>소속 반</th>}
                   {!mobileMode && isAdmin && <th>관리</th>}
                 </tr>
@@ -601,8 +602,8 @@ export default function StudentsPage() {
                       </td>
                       {!mobileMode && <td style={{ color:tx2 }}>{ageOf(s.birth_year)}세</td>}
                       {!mobileMode && <td style={{ color:tx2 }}>{s.school || '-'}</td>}
-                      {!mobileMode && canFull && <td style={{ color:tx2 }} onClick={e => e.stopPropagation()}><PhoneActions phone={s.phone} label={`${s.name} 학생`} /></td>}
-                      {canFull && <td style={{ color:tx2 }} onClick={e => e.stopPropagation()}>
+                      {!mobileMode && canContacts && <td style={{ color:tx2 }} onClick={e => e.stopPropagation()}><PhoneActions phone={s.phone} label={`${s.name} 학생`} /></td>}
+                      {canContacts && <td style={{ color:tx2 }} onClick={e => e.stopPropagation()}>
                         {mobileMode ? <div className={contactStyles.numbers}>
                           <div className={contactStyles.numberRow}><span>학생</span><PhoneActions phone={s.phone} label={`${s.name} 학생`} /></div>
                           <div className={contactStyles.numberRow}><span>학부모</span><PhoneActions phone={s.parent_phone} label={`${s.name} 학부모`} /></div>
@@ -865,11 +866,11 @@ export default function StudentsPage() {
               </div>
 
               {/* 연락처 (admin만) */}
-              {canFull && <StudentContactDetails
+              {canContacts && <StudentContactDetails
                 studentNumber={<PhoneActions phone={detailStu.phone} label={`${detailStu.name} 학생`} detail />}
                 parentNumber={<PhoneActions phone={detailStu.parent_phone} label={`${detailStu.name} 학부모`} detail />}
-                onSaveStudent={isMobileScreen && detailStu.phone?.trim() ? () => saveContact(detailStu, false) : undefined}
-                onSaveParent={isMobileScreen && detailStu.parent_phone?.trim() ? () => saveContact(detailStu, true) : undefined}
+                onSaveStudent={canFull && isMobileScreen && detailStu.phone?.trim() ? () => saveContact(detailStu, false) : undefined}
+                onSaveParent={canFull && isMobileScreen && detailStu.parent_phone?.trim() ? () => saveContact(detailStu, true) : undefined}
               />}
               {isAdmin && <PinSettingsCard title="학생 PIN" resetting={resettingStudentPin} onReset={() => void resetStudentPin(detailStu.id,detailStu.name)} />}
               {canFull && detailStu.parent_phone && <PinSettingsCard title="학부모 PIN" onReset={() => void resetParentPin(detailStu.parent_phone,detailStu.name)} />}

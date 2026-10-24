@@ -13,10 +13,13 @@ test('student menu allows teachers to read without granting administrative actio
   for (const role of ['assistant','parent','student']) assert.equal(menuAccess.students(role),false)
   assert.equal(can.manageStudents('teacher'),false)
   assert.equal(can.viewFullStudent('teacher'),false)
+  assert.equal(can.viewStudentContacts('teacher'),true)
+  assert.equal(can.viewStudentContacts('admin'),true)
+  assert.equal(can.viewStudentContacts('assistant'),false)
   assert.equal(can.viewBasicStudent('teacher'),true)
 })
 
-test('teacher directory returns only assigned students and class memberships, without contacts or PINs', async t => {
+test('teacher directory returns assigned contacts and class memberships without other students or PINs', async t => {
   const db = new PGlite()
   t.after(() => db.close())
   const teacher = '00000000-0000-0000-0000-000000000001'
@@ -32,7 +35,7 @@ test('teacher directory returns only assigned students and class memberships, wi
     CREATE TABLE class_staff_assignments(class_id bigint,teacher_user_id uuid);
     INSERT INTO class_staff_assignments VALUES(1,'${teacher}'),(3,'${teacher}'),(2,'${other}');
     CREATE TABLE students(id bigint,name text,birth_year integer,school text,school_type text,reg_date date,phone text,parent_phone text,pin_hash text);
-    INSERT INTO students VALUES(1,'Shared',2010,'School A','고등','2026-01-01','private student','private parent','secret'),(2,'Other only',2011,'School B','중등','2026-01-02','private','private','secret'),(3,'No class',2012,'School C','중등','2026-01-03','private','private','secret');
+    INSERT INTO students VALUES(1,'Shared',2010,'School A','고등','2026-01-01','private student','private parent','secret'),(2,'Other only',2011,'School B','중등','2026-01-02','other student','other parent','secret'),(3,'No class',2012,'School C','중등','2026-01-03','unassigned student','unassigned parent','secret');
     CREATE TABLE class_students(student_id bigint,class_id bigint);
     INSERT INTO class_students VALUES(1,1),(1,2),(1,3),(2,2);
     CREATE TABLE student_schools(student_id bigint,school_type text,school_name text);
@@ -52,8 +55,12 @@ test('teacher directory returns only assigned students and class memberships, wi
   assert.deepEqual(data.classes.map(c => c.id).sort(),[1,3])
   assert.deepEqual(data.memberships,[{ student_id:1,class_id:1 },{ student_id:1,class_id:3 }])
   assert.deepEqual(data.schools,[{ student_id:1,school_type:'고등',school_name:'School A' }])
-  assert.deepEqual(Object.keys(data.students[0]).sort(),['id','name','birth_year','school','school_type','reg_date'].sort())
-  assert.ok(!JSON.stringify(data).includes('private'))
+  assert.deepEqual(Object.keys(data.students[0]).sort(),['id','name','birth_year','school','school_type','reg_date','phone','parent_phone'].sort())
+  assert.equal(data.students[0].phone,'private student')
+  assert.equal(data.students[0].parent_phone,'private parent')
+  assert.ok(!JSON.stringify(data).includes('other student'))
+  assert.ok(!JSON.stringify(data).includes('other parent'))
+  assert.ok(!JSON.stringify(data).includes('unassigned'))
   assert.ok(!JSON.stringify(data).includes('secret'))
   await db.exec('SET ROLE anon')
   await assert.rejects(get(),/permission denied/)

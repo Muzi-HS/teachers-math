@@ -11,9 +11,12 @@ export const can = {
 
   // 학생 정보
   // - admin: 전체 정보(연락처 포함) 열람
-  // - teacher/assistant: 이름/나이/학교만 (연락처, 학부모연락처 비표시)
+  // - teacher: 담당 학생 기본 정보와 학생·학부모 연락처 열람
+  // - assistant: 기본 정보만 (학생관리 메뉴 접근 불가)
   // - parent: 본인 자녀만 (별도 화면에서 처리)
   viewFullStudent:  (role: Role) => role === 'admin',
+  // 선생님은 담당 학생 전용 RPC에서 반환한 연락처만 열람한다.
+  viewStudentContacts: (role: Role) => role === 'admin' || role === 'teacher',
   viewBasicStudent: (role: Role) => role === 'admin' || role === 'teacher' || role === 'assistant',
 
   // 학생 등록/수정/삭제 — admin만 (선생님 메뉴는 담당 학생 읽기 전용)

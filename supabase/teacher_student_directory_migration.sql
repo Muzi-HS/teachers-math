@@ -18,7 +18,7 @@ BEGIN
     SELECT cs.student_id,cs.class_id FROM public.class_students cs
     JOIN assigned_classes c ON c.id = cs.class_id
   ), scoped_students AS MATERIALIZED (
-    SELECT s.id,s.name,s.birth_year,s.school,s.school_type,s.reg_date
+    SELECT s.id,s.name,s.birth_year,s.school,s.school_type,s.reg_date,s.phone,s.parent_phone
     FROM public.students s WHERE EXISTS (
       SELECT 1 FROM memberships m WHERE m.student_id = s.id)
   )
