@@ -1,0 +1,32 @@
+.number { display: inline-flex; align-items: center; min-height: 44px; padding: 0; border: 0; background: transparent; color: var(--ui-primary); font: inherit; font-weight: 600; font-variant-numeric: tabular-nums; text-decoration: none; white-space: nowrap; cursor: pointer; }
+.numbers { display: grid; gap: 0; }
+.numberRow { display: grid; grid-template-columns: 34px minmax(0, 1fr); align-items: center; gap: 8px; min-height: 36px; }
+.numberRow > span { color: var(--ui-text-3); font-size: 10px; line-height: 1.4; }
+.numberRow .number { min-height: 36px; font-size: 12px; }
+.phoneCard { padding: 16px; margin-bottom: 16px; border-radius: 10px; background: var(--ui-surface-2); }
+.phoneCard p { margin: 0 0 4px; color: var(--ui-text-3); font-size: 11px; }
+.phoneCard strong { color: var(--ui-primary); font-size: 21px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.5; }
+.actions { display: grid; gap: 10px; }
+.primary, .secondary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; box-sizing: border-box; min-height: 46px; padding: 10px 12px; border: 1px solid var(--ui-border); border-radius: 9px; background: transparent; color: var(--ui-text-2); font: inherit; font-size: 13px; font-weight: 600; line-height: 1.5; text-decoration: none; cursor: pointer; }
+.primary { background: var(--ui-primary); border-color: var(--ui-primary); color: #fff; }
+.primary:disabled, .secondary:disabled { opacity: .45; cursor: not-allowed; }
+.primary:not(:disabled):hover { filter: brightness(.95); }
+.secondary:not(:disabled):hover { background: var(--ui-surface-2); }
+.actions a { min-height: 48px; font-size: 14px; }
+.fieldLabel { display: block; margin: 0 0 8px; font-size: 12px; font-weight: 600; color: var(--ui-text-2); }
+.targets { display: grid; grid-template-columns: 1.25fr 1fr 1fr; gap: 4px; padding: 4px; margin-bottom: 18px; border: 1px solid var(--ui-border); border-radius: 10px; background: var(--ui-surface-2); }
+.target { min-height: 40px; border: 0; border-radius: 7px; background: transparent; color: var(--ui-text-2); font: inherit; font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap; padding: 6px; }
+.target[aria-pressed=true] { background: var(--ui-surface); color: var(--ui-primary); font-weight: 700; box-shadow: 0 1px 4px rgb(0 0 0 / 8%); }
+.selectionHeader { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-bottom: 10px; font-size: 12px; }
+.selectionHeader strong { font-weight: 600; }
+.selectionHeader span { color: var(--ui-primary); font-weight: 600; }
+.list { flex: 1 1 auto; min-height: 72px; max-height: 32dvh; overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--ui-border); border-radius: 10px; }
+.row { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 8px 12px; border-bottom: 1px solid var(--ui-border); font-size: 13px; cursor: pointer; }
+.row:last-child { border-bottom: 0; }
+.row input { width: 18px; height: 18px; margin: 0; flex-shrink: 0; accent-color: var(--ui-primary); }
+.row:has(input:checked) { background: var(--ui-primary-soft, var(--ui-surface-2)); }
+.selectAll { background: var(--ui-surface-2); font-weight: 600; }
+.school { margin-left: auto; color: var(--ui-text-3); font-size: 11px; }
+.help { margin: 12px 0 0; color: var(--ui-text-3); font-size: 11px; line-height: 1.8; word-break: keep-all; }
+.saveButtons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.fieldLabel, .targets, .selectionHeader, .help, .phoneCard, .actions { flex-shrink: 0; }
