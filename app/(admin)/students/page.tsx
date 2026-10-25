@@ -21,6 +21,7 @@ type Student = {
   phone: string
   parent_phone: string
   reg_date: string
+  is_test: boolean
 }
 
 type Class = { id: number; name: string; active: boolean }
@@ -38,6 +39,7 @@ const BLANK: Omit<Student, 'id'> = {
   school: '', school_type: null,
   phone: '', parent_phone: '',
   reg_date: kstDateStr(),
+  is_test: false,
 }
 
 const pu = '#7C3AED', pubg = '#F3E8FF'
@@ -78,6 +80,7 @@ export default function StudentsPage() {
   const [loadError, setLoadError] = useState('')
   const { mobileMode, isMobileScreen } = useMobileMode()
   const [contactModal, setContactModal] = useState(false)
+  const [showTestStudents, setShowTestStudents] = useState(false)
   const [students, setStudents] = useState<Student[]>([])
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [contactTarget, setContactTarget] = useState('both')
@@ -217,6 +220,7 @@ export default function StudentsPage() {
       school_type: s.school_type ?? null,
       phone: s.phone ?? '', parent_phone: s.parent_phone ?? '',
       reg_date: s.reg_date ?? kstDateStr(),
+      is_test: s.is_test ?? false,
     })
     const entries = ssMap[s.id] ?? []
     setSchoolElementary(entries.find(e => e.school_type === '초등')?.school_name ?? '')
@@ -230,6 +234,7 @@ export default function StudentsPage() {
   async function save() {
     if (!form.name.trim())   return toast('이름을 입력하세요.', false)
     if (!form.birth_year)    return toast('출생연도를 입력하세요.', false)
+    if (!form.reg_date || form.reg_date > kstDateStr()) return toast('등록일은 오늘 또는 이전 날짜로 입력하세요.', false)
     setSaving(true)
 
     const entries: SchoolEntry[] = ([
@@ -247,6 +252,7 @@ export default function StudentsPage() {
       phone: form.phone.trim(),
       parent_phone: form.parent_phone.trim(),
       reg_date: form.reg_date,
+      is_test: form.is_test,
     }
 
     const isNew = !editId
@@ -267,7 +273,10 @@ export default function StudentsPage() {
       )
       if (seErr) {
         // 새로 등록한 학생인데 학교 이력 저장에 실패하면 반쪽짜리(고아) 학생 레코드가 남지 않도록 롤백
-        if (isNew) await supabase.from('students').delete().eq('id', studentId!)
+        if (isNew) {
+          const { error: markError } = await supabase.from('students').update({ is_test:true }).eq('id', studentId!)
+          if (!markError) await supabase.from('students').delete().eq('id', studentId!)
+        }
         toast('학교 이력 저장 실패: ' + seErr.message, false); setSaving(false); return
       }
     }
@@ -300,7 +309,8 @@ export default function StudentsPage() {
   }
 
   async function remove(id: number, name: string) {
-    if (!confirm(`${name} 학생을 삭제하시겠습니까?`)) return
+    const student = students.find(s => s.id === id)
+    if (!confirm(student?.is_test ? `${name} 테스트 학생을 삭제하시겠습니까? 통계에는 포함되지 않습니다.` : `${name} 학생을 퇴원 처리하시겠습니까? 연결된 자료가 삭제되며 통계용 등록일·퇴원일만 보관합니다. 되돌릴 수 없습니다. 잘못 등록한 학생은 먼저 수정에서 테스트 학생으로 지정하세요.`)) return
 
     const { data: ps } = await supabase
       .from('parent_students')
@@ -322,7 +332,8 @@ export default function StudentsPage() {
       }
     }
 
-    toast(name + ' 삭제됨', false)
+    setDetailStu(null)
+    toast(name + (student?.is_test ? ' 테스트 학생 삭제됨' : ' 퇴원 처리됨'))
     await fetchAll()
   }
 
@@ -337,7 +348,7 @@ export default function StudentsPage() {
     const matchStage  = stageFlt.length === 0 || (!!s.school_type && stageFlt.includes(s.school_type as SchoolKey))
     const matchSchool = schoolNameFlt.length === 0 || schoolNameFlt.includes(s.school)
     const matchClass  = clsFlt.length === 0 || clsFlt.some(f => f === 'none' ? (csMap[s.id] ?? []).length === 0 : (csMap[s.id] ?? []).includes(Number(f)))
-    return matchSearch && matchAge && matchSchool && matchStage && matchClass
+    return (showTestStudents || !s.is_test) && matchSearch && matchAge && matchSchool && matchStage && matchClass
   })
 
   const selectedStudents = filtered.filter(s => selectedIds.includes(s.id))
@@ -458,6 +469,7 @@ export default function StudentsPage() {
           </span>
         </div>
         {/* 검색 */}
+        {isAdmin && <label style={{ display:'flex',alignItems:'center',gap:8,minHeight:44,fontSize:12,color:tx2 }}><input type="checkbox" checked={showTestStudents} onChange={e => setShowTestStudents(e.target.checked)} />테스트 학생 포함</label>}
         <div style={{ display:'flex',gap:20,alignItems:'center',marginBottom:12,flexWrap:'wrap' }}>
           <div className="sbox" style={{ maxWidth:320 }}>
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke={tx3}><circle cx="11" cy="11" r="8" strokeWidth={2}/><path strokeWidth={2} d="M21 21l-4.35-4.35"/></svg>
@@ -595,6 +607,7 @@ export default function StudentsPage() {
                       <td>
                         <div style={{ display:'flex',alignItems:'center',gap:6 }}>
                           <span style={{ fontWeight:600 }}>{s.name}</span>
+                          {s.is_test && <span className="badge" style={{ background:rbg,color:re }}>테스트</span>}
                           {stColor && (
                             <span className="badge" style={{ background:stColor.bg,color:stColor.color }}>{s.school_type}</span>
                           )}
@@ -626,7 +639,7 @@ export default function StudentsPage() {
                         <td onClick={e => e.stopPropagation()}>
                           <div style={{ display:'flex',gap:5 }}>
                             <button className="bout" onClick={() => openEdit(s)}>수정</button>
-                            <button className="bdng" onClick={() => remove(s.id, s.name)}>삭제</button>
+                            <button className="bdng" onClick={() => remove(s.id, s.name)}>{s.is_test ? '삭제' : '퇴원'}</button>
                           </div>
                         </td>
                       )}
@@ -736,6 +749,7 @@ export default function StudentsPage() {
               </div>
 
               {/* 등록일 */}
+              <label style={{ display:'flex',alignItems:'center',gap:8,minHeight:44,fontSize:13,color:tx2 }}><input type="checkbox" checked={form.is_test} onChange={e => setForm(f => ({ ...f,is_test:e.target.checked }))} />테스트 학생 (학생 추이 통계 제외)</label>
               <div style={{ marginBottom:14 }}>
                 <label className="lb">학원 등록일</label>
                 <input type="date" className="fi" value={form.reg_date} onChange={e => setForm(f => ({...f, reg_date:e.target.value}))}/>
@@ -898,6 +912,7 @@ export default function StudentsPage() {
               {isAdmin && (
                 <button className="bout" onClick={() => { setDetailStu(null); openEdit(detailStu) }}>수정</button>
               )}
+              {isAdmin && <button className="bdng" onClick={() => remove(detailStu.id,detailStu.name)}>{detailStu.is_test ? '테스트 삭제' : '퇴원 처리'}</button>}
               <button className="bgold" onClick={() => setDetailStu(null)}>닫기</button>
             </div>
           </div>

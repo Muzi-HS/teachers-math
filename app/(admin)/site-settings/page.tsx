@@ -1,9 +1,12 @@
 'use client'
 import { useState } from 'react'
+import dynamic from 'next/dynamic'
 import { useMobileMode } from '@/context/MobileModeContext'
 import SeasonTab from './SeasonTab'
 import SpecialClassTab from './SpecialClassTab'
 import SeminarTab from './SeminarTab'
+
+const BackupTab = dynamic(() => import('./BackupTab'))
 
 const navy = 'var(--ui-primary)'
 const bd = 'var(--ui-border)'
@@ -13,6 +16,7 @@ const TABS = [
   { key: 'season', label: '계절 효과' },
   { key: 'special', label: '특강 관리' },
   { key: 'seminar', label: '학부모 설명회' },
+  { key: 'backup', label: '백업·복구' },
 ] as const
 type TabKey = typeof TABS[number]['key']
 
@@ -25,10 +29,10 @@ export default function SiteSettingsPage() {
       <div style={{ maxWidth: 820, margin: '0 auto' }}>
         <div style={{ marginBottom: mobileMode ? 14 : 20 }}>
           <h1 style={{ fontSize: mobileMode ? 17 : 21, fontWeight: 700, color: tx }}>사이트 설정</h1>
-          <p style={{ fontSize: 13, color: tx2, marginTop: 4 }}>홈페이지에 표시되는 계절 효과, 특강·설명회 배너/팝업을 관리합니다</p>
+          <p style={{ fontSize: 13, color: tx2, marginTop: 4 }}>홈페이지 표시 설정과 데이터 백업·복구를 관리합니다</p>
         </div>
 
-        <div style={{ display: 'flex', gap: 6, marginBottom: 20, borderBottom: `1px solid ${bd}` }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 20, borderBottom: `1px solid ${bd}` }}>
           {TABS.map(t => (
             <button
               key={t.key}
@@ -47,6 +51,7 @@ export default function SiteSettingsPage() {
         {tab === 'season' && <SeasonTab />}
         {tab === 'special' && <SpecialClassTab />}
         {tab === 'seminar' && <SeminarTab />}
+        {tab === 'backup' && <BackupTab />}
       </div>
     </div>
   )

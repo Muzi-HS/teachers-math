@@ -45,3 +45,11 @@ next-env.d.ts
 
 # Local development output
 /dev-output.txt
+
+# Backups and private recovery credentials
+/backups/
+scripts/backup/backups/
+**/config.private.json
+*.tar.gz.age
+*.agekey
+__pycache__/

@@ -1,6 +1,13 @@
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
+  outputFileTracingIncludes: {
+    '/api/backups': [
+      './scripts/backup/backup.py', './scripts/backup/verify.py',
+      './scripts/backup/config.example.json', './scripts/backup/Run-Backup.ps1',
+      './docs/backup-recovery.md',
+    ],
+  },
   images: {
     // 로컬 public 폴더 이미지는 별도 설정 불필요
     // 외부 이미지 도메인이 생기면 여기에 추가
