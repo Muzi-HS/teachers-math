@@ -1,4 +1,5 @@
 'use client'
+import { attendanceLabel, type AttendanceStatus } from '@/lib/record-attendance'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
@@ -13,7 +14,7 @@ const bd='var(--ui-border)', bg='var(--ui-bg)', re='var(--ui-danger)', rbg='var(
 type Rec = {
   id: number; date: string; content: string; homework: string
   hw_rate: number; hw_cor: number
-  late: boolean; has_test: boolean; class_id: number | null
+  attendance_status?: AttendanceStatus; late: boolean; has_test: boolean; class_id: number | null
   record_test_items?: { test_id: number; t_total: number; t_cor: number; t_score: number; tests: { name: string } | null }[]
 }
 
@@ -140,10 +141,7 @@ export default function StudentRecords() {
                   {r.class_id != null && classNames[r.class_id] && (
                     <span style={{ background: bg, color: tx2, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>{classNames[r.class_id]}</span>
                   )}
-                  {r.late
-                    ? <span style={{ background: rbg, color: re, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>지각</span>
-                    : <span style={{ background: gbg, color: gr, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>정시 등원</span>
-                  }
+                  {<span style={{ background: attendanceLabel(r) === '정시' ? gbg : rbg, color: attendanceLabel(r) === '정시' ? gr : re, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>{attendanceLabel(r)}</span>}
                   {r.has_test && <span style={{ background: 'var(--ui-surface-2)', color: navy, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>시험</span>}
                 </div>
 

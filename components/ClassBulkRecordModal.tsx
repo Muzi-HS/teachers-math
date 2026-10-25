@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { attendanceOptions, type AttendanceStatus } from '@/lib/record-attendance'
 import { kstDateStr } from '@/lib/kst'
 import { IconChat, IconBook, IconPencil, IconX } from '@/components/icons'
 import AutoGrowTextarea from '@/components/AutoGrowTextarea'
@@ -17,13 +18,13 @@ type RecForm = {
   student_id: number; content: string; homework: string
   hw_rate: number | ''; hw_cor: number | ''; attitude: number
   hw_rate_na: boolean; hw_not_submitted: boolean; hw_cor_na: boolean
-  late: boolean; has_test: boolean; testItems: TestItem[]; feedback: string
+  attendance_status: AttendanceStatus; late: boolean; has_test: boolean; testItems: TestItem[]; feedback: string
 }
 
 const BLANK_REC = (sid: number): RecForm => ({
   student_id: sid, content: '', homework: '', hw_rate: '', hw_cor: '', attitude: 10,
   hw_rate_na: false, hw_not_submitted: false, hw_cor_na: false,
-  late: false, has_test: false, testItems: [], feedback: ''
+  attendance_status: 'on_time', late: false, has_test: false, testItems: [], feedback: ''
 })
 
 const navy = 'var(--ui-primary)', navyM = 'var(--ui-surface-2)'
@@ -104,7 +105,19 @@ export default function ClassBulkRecordModal({
       .from('student_checkins').select('student_id, late')
       .eq('date', date).in('student_id', students.map(s => s.id))
     for (const c of (checkins ?? [])) {
-      if (forms[c.student_id]) forms[c.student_id] = { ...forms[c.student_id], late: c.late }
+      if (forms[c.student_id]) forms[c.student_id] = { ...forms[c.student_id], late: c.late, attendance_status: c.late ? 'late' : 'on_time' }
+    }
+
+    // 학부모 신청은 새 기록의 기본 근태로 반영합니다. 저장된 기록은 아래에서 우선합니다.
+    const { data: notices, error: noticeError } = await supabase
+      .from('attendance_notices').select('student_id,type')
+      .eq('date', date).in('student_id', students.map(s => s.id))
+    if (noticeError) toast('학부모 신청을 불러오지 못했습니다. 근태를 확인하세요.', false)
+    for (const n of notices ?? []) {
+      if (forms[n.student_id] && (n.type === 'absence' || n.type === 'late')) {
+        const status = forms[n.student_id].attendance_status === 'absence' ? 'absence' : n.type
+        forms[n.student_id] = { ...forms[n.student_id], attendance_status: status, late: status === 'late' }
+      }
     }
 
     // 반관리 '수업 준비'에서 미리 입력해둔 오늘의 진도를 자동 반영 — 아직 저장된
@@ -141,7 +154,7 @@ export default function ClassBulkRecordModal({
           student_id: r.student_id, content: r.content ?? '', homework: r.homework ?? '',
           hw_rate: r.hw_rate < 0 ? 0 : r.hw_rate, hw_cor: r.hw_cor < 0 ? 0 : r.hw_cor,
           hw_rate_na: r.hw_rate === -1, hw_not_submitted: r.hw_rate === -2, hw_cor_na: r.hw_cor < 0,
-          attitude: r.attitude ?? 10, late: r.late, has_test: r.has_test,
+          attitude: r.attitude ?? 10, attendance_status: r.attendance_status ?? (r.late ? 'late' : 'on_time'), late: r.late, has_test: r.has_test,
           testItems: itemsByRec[r.id] ?? [], feedback: r.feedback ?? '',
         }
         showT[r.student_id] = r.has_test
@@ -233,7 +246,7 @@ export default function ClassBulkRecordModal({
       const blank = !f || (
         !f.content && !f.homework && !f.feedback &&
         f.attitude === 10 && f.hw_rate === '' && f.hw_cor === '' &&
-        !f.late && !f.has_test && !f.hw_rate_na && !f.hw_not_submitted && !f.hw_cor_na &&
+        (!f.attendance_status || f.attendance_status === 'on_time') && !f.late && !f.has_test && !f.hw_rate_na && !f.hw_not_submitted && !f.hw_cor_na &&
         (!f.testItems || f.testItems.length === 0)
       )
       if (blank && !existingId) continue
@@ -244,7 +257,7 @@ export default function ClassBulkRecordModal({
         hw_rate: f.hw_rate_na ? -1 : f.hw_not_submitted ? -2 : (f.hw_rate === '' ? 0 : f.hw_rate),
         hw_cor: f.hw_cor_na ? -1 : (f.hw_cor === '' ? 0 : f.hw_cor),
         attitude: f.attitude,
-        late: f.late, has_test: f.has_test, feedback: f.feedback, is_draft: false,
+        attendance_status: f.attendance_status ?? (f.late ? 'late' : 'on_time'), late: f.attendance_status ? f.attendance_status === 'late' : f.late, has_test: f.has_test, feedback: f.feedback, is_draft: false,
       }
 
       let recId: number
@@ -506,10 +519,9 @@ export default function ClassBulkRecordModal({
                     </div>
                   </div>
                   <div className="bcr-fg">
-                    <label className="bcr-lb">지각 여부</label>
-                    <div className="bcr-rg">
-                      <label><input type="radio" name={`bLt${sid}`} checked={!f.late} onChange={() => setBF(sid, 'late', false)} />정시</label>
-                      <label><input type="radio" name={`bLt${sid}`} checked={f.late} onChange={() => setBF(sid, 'late', true)} /><span style={{ color: re }}>지각</span></label>
+                    <label className="bcr-lb">근태</label>
+                    <div className="bcr-rg" style={{ flexWrap: 'wrap' }}>
+                      {attendanceOptions.map(option => <label key={option.value}><input type="radio" name={`bLt${sid}`} checked={(f.attendance_status ?? (f.late ? 'late' : 'on_time')) === option.value} onChange={() => { setBF(sid, 'attendance_status', option.value); setBF(sid, 'late', option.value === 'late') }} />{option.label}</label>)}
                     </div>
                   </div>
                 </div>

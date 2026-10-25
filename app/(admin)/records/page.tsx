@@ -1,4 +1,5 @@
 'use client'
+import { attendanceLabel, type AttendanceStatus } from '@/lib/record-attendance'
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useSearchParams } from 'next/navigation'
@@ -18,7 +19,7 @@ type Rec = {
   id: number; student_id: number; date: string; class_id: number | null
   content: string; homework: string
   hw_rate: number; hw_cor: number; attitude: number
-  late: boolean; has_test: boolean; feedback: string
+  attendance_status?: AttendanceStatus; late: boolean; has_test: boolean; feedback: string
   parent_comment: string | null; parent_comment_at: string | null
   parent_comment_read_at: string | null
   push_sent: boolean; push_sent_at: string | null; viewed_at: string | null
@@ -669,10 +670,7 @@ export default function RecordsPage() {
                             {cls && <span className="badge" style={{ background: navyM, color: navy, whiteSpace: 'nowrap' }}>{cls.name}</span>}
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', marginTop: 4 }}>
-                            {r.late
-                              ? <span className="badge" style={{ background: rbg, color: re }}>지각</span>
-                              : <span className="badge" style={{ background: gbg, color: gr }}>정시 등원</span>
-                            }
+                            {<span className="badge" style={{ background: attendanceLabel(r) === '정시' ? gbg : rbg, color: attendanceLabel(r) === '정시' ? gr : re }}>{attendanceLabel(r)}</span>}
                             {r.has_test && <span className="badge" style={{ background: navyM, color: navy }}>시험</span>}
                             {(() => {
                               const ps = recordStatus(r)

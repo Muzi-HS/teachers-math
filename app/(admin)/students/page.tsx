@@ -234,7 +234,7 @@ export default function StudentsPage() {
   async function save() {
     if (!form.name.trim())   return toast('이름을 입력하세요.', false)
     if (!form.birth_year)    return toast('출생연도를 입력하세요.', false)
-    if (!form.reg_date || form.reg_date > kstDateStr()) return toast('등록일은 오늘 또는 이전 날짜로 입력하세요.', false)
+    if (!form.reg_date) return toast('등록일을 입력하세요.', false)
     setSaving(true)
 
     const entries: SchoolEntry[] = ([

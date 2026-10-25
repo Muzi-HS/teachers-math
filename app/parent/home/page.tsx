@@ -1,4 +1,5 @@
 'use client'
+import { attendanceLabel, type AttendanceStatus } from '@/lib/record-attendance'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
@@ -22,7 +23,7 @@ function attitudeLabel(value: number) { return value >= 8 ? '우수' : value >= 
 type Rec = {
   id: number; date: string; content: string; homework: string
   hw_rate: number; hw_cor: number; attitude: number
-  late: boolean; has_test: boolean; feedback: string; class_id: number | null
+  attendance_status?: AttendanceStatus; late: boolean; has_test: boolean; feedback: string; class_id: number | null
 }
 type EventRow = { id: number; title: string; start_date: string }
 function formatEventDate(ds: string): string {
@@ -132,9 +133,7 @@ export default function ParentHome() {
                 <span style={{ fontSize: 11, color: tx2 }}>최근 수업</span>
                 <b style={{ fontSize: 14, color: tx }}>{formatEventDate(rec.date)}</b>
                 {className && <span style={{ background: bg, color: tx2, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>{className}</span>}
-                {rec.late
-                  ? <span style={{ background: rbg, color: re, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>지각</span>
-                  : <span style={{ background: gbg, color: gr, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>정시 등원</span>}
+                {<span style={{ background: attendanceLabel(rec) === '정시' ? gbg : rbg, color: attendanceLabel(rec) === '정시' ? gr : re, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>{attendanceLabel(rec)}</span>}
               </div>
 
               <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>

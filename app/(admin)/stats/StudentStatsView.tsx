@@ -1,4 +1,5 @@
 'use client'
+import { attendanceLabel, type AttendanceStatus } from '@/lib/record-attendance'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
@@ -11,7 +12,7 @@ type Rec = {
   id:number; student_id:number; date:string
   content:string; homework:string
   hw_rate:number; hw_cor:number; attitude:number
-  late:boolean; has_test:boolean; feedback:string
+  attendance_status?: AttendanceStatus; late: boolean; has_test:boolean; feedback:string
   record_test_items?: { test_id:number; t_total:number; t_cor:number; t_score:number; tests:{name:string}|null }[]
 }
 
@@ -304,10 +305,7 @@ export default function StudentStatsView(){
                     <div className="rch">
                       <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
                         <b style={{fontSize:13,color:tx}}>{r.date}</b>
-                        {r.late
-                          ?<span className="badge" style={{background:rbg,color:re}}>지각</span>
-                          :<span className="badge" style={{background:gbg,color:gr}}>정시</span>
-                        }
+                        {<span className="badge" style={{background:rbg,color:re}}>{attendanceLabel(r)}</span>}
                         {r.has_test&&<span className="badge" style={{background:navyM,color:navy}}>시험</span>}
                       </div>
                     </div>
