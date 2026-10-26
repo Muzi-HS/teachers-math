@@ -10,6 +10,7 @@ import { usePublicHolidays } from '@/lib/use-public-holidays'
 import CompactMonthCalendar from '@/components/CompactMonthCalendar'
 import AdminScheduleCalendar from './AdminScheduleCalendar'
 import ScheduleUpcoming from '@/components/ScheduleUpcoming'
+import AttendanceReply from '@/components/AttendanceReply'
 
 type Evt = {
     id: number
@@ -32,6 +33,8 @@ type AttNotice = {
     date: string
     type: 'absence' | 'late'
     reason: string | null
+    admin_reply?: string | null
+    replied_at?: string | null
 }
 
 // 반별 휴강 등록 — class_cancellations 테이블
@@ -573,6 +576,7 @@ export default function SchedulePage() {
                           <span style={{ fontSize: 12, color: tx3, whiteSpace: 'nowrap', marginLeft: 'auto', flexShrink: 0 }}>{n.date.slice(5).replace('-', '/')}</span>
                         </div>
                         {n.reason && <p style={{ fontSize: 12, color: tx2, lineHeight: 1.6, margin: '8px 0 0', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{n.reason}</p>}
+                        <AttendanceReply notice={n} canReply={role === 'admin'} onSaved={reply => setAttNotices(rows => rows.map(row => row.id === n.id ? { ...row, ...reply } : row))} />
                     </div>
                 ))}
             </div>
