@@ -207,7 +207,7 @@ function AdminInquiriesPageInner() {
     .iq-list-item:hover{background:${bg};}
     .iq-list-item.active{background:${navyM};}
     .iq-av{width:38px;height:38px;border-radius:50%;background:${navyM};display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:${navy};flex-shrink:0;}
-    .iq-bubble{max-width:72%;padding:9px 13px;border-radius:14px;font-size:13px;line-height:1.55;white-space:pre-wrap;word-break:break-word;}
+    .iq-bubble{min-width:0;max-width:100%;padding:9px 13px;border-radius:14px;font-size:13px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere;box-sizing:border-box;}
     .iq-fi{width:100%;min-width:0;padding:9px 11px;border:1.5px solid ${bd};border-radius:8px;font-size:16px;font-family:inherit;color:${tx};outline:none;background:#fff;box-sizing:border-box;}
     .iq-fi:focus{border-color:${navy};}
     .iq-sbox{display:flex;align-items:center;gap:7px;padding:8px 12px;background:#fff;border:1px solid ${bd};border-radius:8px;}
@@ -321,7 +321,7 @@ function AdminInquiriesPageInner() {
                   const isAdmin = m.sender_type === 'admin'
                   const isEditing = editingId === m.id
                   return (
-                    <div key={m.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isAdmin ? 'flex-end' : 'flex-start' }}>
+                    <div key={m.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isAdmin ? 'flex-end' : 'flex-start', width: '100%', minWidth: 0, flexShrink: 0 }}>
                       {isEditing ? (
                         <div style={{ width: '72%' }}>
                           <textarea className="iq-fi" rows={2} style={{ resize: 'vertical' }} value={editText} onChange={e => setEditText(e.target.value)} autoFocus />
@@ -332,7 +332,7 @@ function AdminInquiriesPageInner() {
                         </div>
                       ) : (
                         <>
-                          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, flexDirection: isAdmin ? 'row-reverse' : 'row' }}>
+                          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, flexDirection: isAdmin ? 'row-reverse' : 'row', width: 'fit-content', maxWidth: 'min(85%, 640px)', minWidth: 0 }}>
                             <div className="iq-bubble" style={{ background: isAdmin ? navy : bg, color: isAdmin ? '#fff' : tx, borderBottomRightRadius: isAdmin ? 3 : 14, borderBottomLeftRadius: isAdmin ? 14 : 3 }}>
                               {m.content}
                             </div>
