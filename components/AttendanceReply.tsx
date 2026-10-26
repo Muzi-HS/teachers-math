@@ -30,9 +30,6 @@ export default function AttendanceReply({ notice, canReply, onSaved }: {
     {notice.replied_at && <small style={{ color: 'var(--ui-text-3)' }}>{new Date(notice.replied_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}</small>}
     {canReply && !editing && <button className="bout" style={{ marginLeft: 8 }} onClick={() => { setDraft(notice.admin_reply ?? ''); setError(''); setEditing(true) }}>{notice.admin_reply ? '답변 수정' : '답변하기'}</button>}
     {canReply && editing && <div style={{ marginTop: 8 }}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
-        {['확인했습니다.', '네, 조심히 오세요.', '푹 쉬고 건강한 모습으로 만나요.'].map(text => <button key={text} className="bout" disabled={saving} onClick={() => setDraft(text)}>{text}</button>)}
-      </div>
       <textarea className="fi" aria-label="학부모에게 보낼 답변" placeholder="학부모님께 전달할 답변을 입력하세요" maxLength={1000} rows={2} value={draft} disabled={saving} onChange={e => setDraft(e.target.value)} />
       <p style={{ color: 'var(--ui-text-3)', margin: '6px 0' }}>저장하면 학부모 홈의 등록 내역에 표시됩니다.</p>
       <div style={{ display: 'flex', gap: 8 }}><button className="bgold" disabled={saving || !draft.trim()} onClick={() => void save()}>{saving ? '저장 중...' : '답변 저장'}</button><button className="bout" disabled={saving} onClick={() => setEditing(false)}>취소</button></div>
