@@ -91,6 +91,7 @@ async function setup() {
     '../supabase/parent_student_session_gateway_migration.sql',
     '../supabase/parent_student_directory_and_rewards_gateway_migration.sql',
     '../supabase/notices_inquiries_gateway_migration.sql',
+    '../supabase/attendance_notice_inquiries_migration.sql',
   ]) {
     await db.exec(readFileSync(new URL(file, import.meta.url), 'utf8'))
   }
@@ -193,6 +194,25 @@ test('attendance notices can only be created/edited/deleted for my own child', a
     [token1, null, 10, '2026-03-02', 'absence', '몸살'],
   )).rows[0]
   assert.equal(created.student_id, 10)
+  const inquiry = await db.query('SELECT * FROM client_inquiry_messages($1)', [token1])
+  assert.equal(inquiry.rows.length, 1)
+  assert.equal(inquiry.rows[0].sender_type, 'parent')
+  assert.match(inquiry.rows[0].content, /결석 등록/)
+  assert.match(inquiry.rows[0].content, /Child A/)
+  assert.match(inquiry.rows[0].content, /2026-03-02/)
+  assert.match(inquiry.rows[0].content, /몸살/)
+  assert.equal((await db.query('SELECT * FROM client_inquiry_messages($1)', [token2])).rows.length, 0)
+
+  // Saving an unchanged notice does not duplicate its automatic message.
+  await db.query('SELECT client_upsert_attendance_notice($1,$2,$3,$4,$5,$6)',
+    [token1, created.id, 10, '2026-03-02', 'absence', '몸살'])
+  assert.equal((await db.query('SELECT * FROM client_inquiry_messages($1)', [token1])).rows.length, 1)
+  await db.query('SELECT client_upsert_attendance_notice($1,$2,$3,$4,$5,$6)',
+    [token1, created.id, 10, '2026-03-03', 'late', null])
+  const updatedMessages = await db.query('SELECT * FROM client_inquiry_messages($1)', [token1])
+  assert.equal(updatedMessages.rows.length, 2)
+  assert.match(updatedMessages.rows[1].content, /지각 등록 수정/)
+  assert.match(updatedMessages.rows[1].content, /사유 미입력/)
 
   // 다른 학부모는 이 항목을 수정/삭제할 수 없다
   await assert.rejects(db.query(
@@ -206,4 +226,18 @@ test('attendance notices can only be created/edited/deleted for my own child', a
   await db.query('SELECT client_delete_attendance_notice($1,$2)', [token1, created.id])
   const afterOwnDelete = await db.query('SELECT * FROM client_attendance_notices($1)', [token1])
   assert.equal(afterOwnDelete.rows.length, 0)
+  const finalMessages = await db.query('SELECT * FROM client_inquiry_messages($1)', [token1])
+  assert.equal(finalMessages.rows.length, 3)
+  assert.match(finalMessages.rows[2].content, /지각 등록 취소/)
+})
+
+test('attendance and its automatic inquiry are saved atomically', async t => {
+  const db = await setup()
+  t.after(() => db.close())
+  await db.exec(`ALTER TABLE inquiry_messages ADD CONSTRAINT reject_message CHECK (content = 'rejected')`)
+  await db.exec('SET ROLE anon')
+  const token = await loginParent(db, '01011112222', '1234')
+  await assert.rejects(db.query('SELECT client_upsert_attendance_notice($1,$2,$3,$4,$5,$6)',
+    [token, null, 10, '2026-03-02', 'absence', '몸살']))
+  assert.equal((await db.query('SELECT * FROM client_attendance_notices($1)', [token])).rows.length, 0)
 })

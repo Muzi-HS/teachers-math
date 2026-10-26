@@ -3,8 +3,9 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { useParentChild } from '@/app/parent/layout'
+import Link from 'next/link'
 
-type Notice = { id: number; student_id: number; date: string; type: 'absence' | 'late'; reason: string | null; admin_reply?: string | null; replied_at?: string | null }
+type Notice = { id: number; student_id: number; date: string; type: 'absence' | 'late'; reason: string | null }
 
 export default function ParentAttendance({ selectedChild }: { selectedChild: number }) {
   const { parent } = useAuth()
@@ -19,22 +20,7 @@ export default function ParentAttendance({ selectedChild }: { selectedChild: num
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    const token = parent?.sessionToken
-    if (!token) return
-    let active = true
-    const load = async () => {
-      const { data, error: loadError } = await supabase.rpc('client_attendance_notices', { p_token: token })
-      if (!active) return
-      if (loadError) { setError('등록 내역을 불러오지 못했습니다. 다시 확인해주세요.'); return }
-      setNotices((data ?? []) as Notice[])
-    }
-    void load()
-    const onFocus = () => { void load() }
-    window.addEventListener('focus', onFocus)
-    const timer = window.setInterval(() => { if (!document.hidden) void load() }, 30000)
-    return () => { active = false; window.clearInterval(timer); window.removeEventListener('focus', onFocus) }
-  }, [parent?.sessionToken])
+  useEffect(() => { if (parent?.sessionToken) refresh(parent.sessionToken) }, [parent?.sessionToken])
   async function refresh(token: string) {
     const { data } = await supabase.rpc('client_attendance_notices', { p_token: token })
     setNotices((data ?? []) as Notice[])
@@ -66,7 +52,7 @@ export default function ParentAttendance({ selectedChild }: { selectedChild: num
       fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push-admin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}` },
-        body: JSON.stringify({ title: '지각·결석 등록', body: `${name} 학생의 ${kind === 'absence' ? '결석' : '지각'}이 등록되었습니다.`, link: '/schedule' }),
+        body: JSON.stringify({ title: '지각·결석 등록', body: `${name} 학생의 ${kind === 'absence' ? '결석' : '지각'}이 등록되었습니다.`, link: `/inquiries?parentId=${parent.parentId}` }),
       }).catch(() => {})
     }
   }
@@ -80,21 +66,15 @@ export default function ParentAttendance({ selectedChild }: { selectedChild: num
   const fieldStyle = { width: '100%', padding: '11px 12px', border: '1px solid #DDE8DF', borderRadius: 9, boxSizing: 'border-box' as const, font: 'inherit' }
   return <>
     <button onClick={() => start()} style={{ flex: 1, minHeight: 42, background: '#fff', border: '1px solid #E1E9E1', borderRadius: 8, color: '#203F30', fontSize: 12, fontFamily: 'inherit', cursor: 'pointer' }}>지각·결석 등록</button>
+    <p style={{ flexBasis: '100%', fontSize: 11, color: '#6A7B6E', margin: '4px 0' }}>등록 내용은 문의하기로 자동 전달됩니다. <Link href="/parent/inquiries" style={{ color: '#2B6B45', fontWeight: 600 }}>문의·답변 확인</Link></p>
     {visible.length > 0 && <div style={{ flexBasis: '100%', marginTop: 4 }}>
       <p style={{ fontSize: 12, fontWeight: 700, color: '#203F30', margin: '4px 0 8px' }}>지각·결석 등록 내역</p>
-      <p style={{ fontSize: 11, color: '#6A7B6E' }}>학원 답변은 이곳에서 확인할 수 있습니다. 신청 내용을 수정하면 다시 확인을 받습니다.</p>
-      {visible.map(n => <div key={n.id} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, padding: '10px 12px', marginBottom: 6, background: '#F6F8F4', borderRadius: 9, fontSize: 12, color: '#203F30' }}>
+      {visible.map(n => <div key={n.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', marginBottom: 6, background: '#F6F8F4', borderRadius: 9, fontSize: 12, color: '#203F30' }}>
         <b>{n.type === 'absence' ? '결석' : '지각'}</b><span>{n.date}</span><span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.reason}</span>
         <button onClick={() => start(n)} style={{ border: 0, background: 'none', color: '#2B6B45', cursor: 'pointer' }}>수정</button>
         <button onClick={() => remove(n.id)} style={{ border: 0, background: 'none', color: '#C2483C', cursor: 'pointer' }}>삭제</button>
-        <div style={{ flexBasis: '100%', borderTop: '1px solid #E1E9E1', paddingTop: 8 }}>
-          <b style={{ color: n.admin_reply ? '#2B6B45' : '#6A7B6E' }}>{n.admin_reply ? '학원 답변' : '답변 대기'}</b>
-          {n.admin_reply && <p style={{ margin: '6px 0 0', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', lineHeight: 1.6 }}>{n.admin_reply}</p>}
-          {n.replied_at && <small>{new Date(n.replied_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}</small>}
-        </div>
       </div>)}
     </div>}
-    {error && !open && <p role="alert" style={{ color: '#C2483C', fontSize: 12 }}>{error}</p>}
     {open && <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div role="dialog" aria-modal="true" aria-label="지각·결석 등록" onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 400, padding: 20, boxShadow: '0 8px 40px rgba(0,0,0,.2)', display: 'grid', gap: 14 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><strong>{editingId ? '지각·결석 수정' : '지각·결석 등록'}</strong><button aria-label="닫기" onClick={() => setOpen(false)} style={{ border: 0, background: 'none', fontSize: 22, cursor: 'pointer' }}>×</button></div>
