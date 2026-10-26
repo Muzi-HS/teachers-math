@@ -127,7 +127,7 @@ export default function ParentHome() {
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <ParentAttendance selectedChild={selChild} />
-                <button onClick={() => router.push('/parent/inquiries')} style={{ flex: 1, minHeight: 42, background: '#fff', border: `1px solid ${bd}`, borderRadius: 8, color: tx2, fontSize: 12, fontFamily: 'inherit', cursor: 'pointer' }}>문의하기</button>
+                <button onClick={() => router.push('/parent/inquiries')} style={{ flex: 1, minHeight: 42, background: '#fff', border: `1px solid ${bd}`, borderRadius: 8, color: tx, fontSize: 12, fontFamily: 'inherit', cursor: 'pointer' }}>문의하기</button>
               </div>
             </>
           ) : <>
@@ -212,7 +212,7 @@ export default function ParentHome() {
               <ParentAttendance selectedChild={selChild} />
               <button onClick={() => router.push('/parent/inquiries')} style={{
                 flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 42,
-                background: '#fff', border: `1px solid ${bd}`, borderRadius: 8, color: tx2, fontSize: 12, fontFamily: 'inherit', cursor: 'pointer',
+                background: '#fff', border: `1px solid ${bd}`, borderRadius: 8, color: tx, fontSize: 12, fontFamily: 'inherit', cursor: 'pointer',
               }}>문의하기</button>
             </div>
 
