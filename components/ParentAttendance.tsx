@@ -91,6 +91,8 @@ export default function ParentAttendance({ selectedChild }: { selectedChild: num
   }
   const visible = notices.filter(n => n.student_id === studentId && n.date.startsWith(month)).sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id)
   const fieldStyle = { width: '100%', padding: '11px 12px', border: '1px solid #DDE8DF', borderRadius: 9, boxSizing: 'border-box' as const, font: 'inherit' }
+  const monthControlStyle = { height: 44, minHeight: 44, boxSizing: 'border-box' as const, border: '1px solid #DDE8DF', borderRadius: 8, background: '#fff', color: '#203F30', font: 'inherit', margin: 0 }
+  const monthButtonStyle = { ...monthControlStyle, width: 44, flexShrink: 0, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, lineHeight: 1, cursor: 'pointer' }
   return <>
     <button onClick={() => start()} style={{ flex: 1, minHeight: 42, background: '#fff', border: '1px solid #E1E9E1', borderRadius: 8, color: '#203F30', fontSize: 12, fontFamily: 'inherit', cursor: 'pointer' }}>지각·결석 등록</button>
     {open && <dialog ref={historyDialog} aria-labelledby="attendance-dialog-title" onClose={() => setOpen(false)} onClick={e => { if (e.target === e.currentTarget) setOpen(false) }} style={{ position: 'fixed', inset: 0, margin: 'auto', padding: 0, border: '1px solid #E1E9E1', borderRadius: 16, width: 'calc(100% - 32px)', maxWidth: 440, maxHeight: '85dvh', color: '#203F30', background: '#fff', overflow: 'hidden' }}>
@@ -109,10 +111,10 @@ export default function ParentAttendance({ selectedChild }: { selectedChild: num
         </div>
         <div key={historyOpen ? `history-${studentId}-${month}` : 'form'} style={{ padding: 20, overflowY: 'auto', overscrollBehavior: 'contain', minHeight: 0, display: 'grid', gap: 14 }}>
           {historyOpen ? <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <button aria-label="이전 달" onClick={() => moveMonth(-1)} style={{ minWidth: 36, minHeight: 40, border: '1px solid #E1E9E1', borderRadius: 8, background: '#fff', cursor: 'pointer' }}>‹</button>
-            <input aria-label="조회 월" type="month" value={month} onChange={e => { if (e.target.value) setMonth(e.target.value) }} style={{ ...fieldStyle, flex: 1, minWidth: 0, width: 'auto', textAlign: 'center' }} />
-            <button aria-label="다음 달" onClick={() => moveMonth(1)} style={{ minWidth: 36, minHeight: 40, border: '1px solid #E1E9E1', borderRadius: 8, background: '#fff', cursor: 'pointer' }}>›</button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button aria-label="이전 달" onClick={() => moveMonth(-1)} style={monthButtonStyle}>‹</button>
+            <input aria-label="조회 월" type="month" value={month} onChange={e => { if (e.target.value) setMonth(e.target.value) }} style={{ ...monthControlStyle, flex: 1, minWidth: 0, width: 'auto', padding: '0 12px', fontSize: 14, textAlign: 'center' }} />
+            <button aria-label="다음 달" onClick={() => moveMonth(1)} style={monthButtonStyle}>›</button>
           </div>
           {!loadingHistory && !historyError && <p aria-live="polite" style={{ fontSize: 12, margin: '12px 0 0', color: '#6A7B6E' }}>결석 {visible.filter(n => n.type === 'absence').length}건 · 지각 {visible.filter(n => n.type === 'late').length}건</p>}
             {loadingHistory ? <p role="status" style={{ fontSize: 13 }}>불러오는 중...</p> : historyError ? <div><p role="alert" style={{ color: '#C2483C', fontSize: 12 }}>{historyError}</p><button onClick={() => { if (parent?.sessionToken) void refresh(parent.sessionToken) }}>다시 시도</button></div> : visible.length === 0 ? <p style={{ padding: '24px 0', textAlign: 'center', color: '#6A7B6E', fontSize: 13 }}>선택한 월의 등록 내역이 없습니다.</p> : visible.map(n => <div key={n.id} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, padding: '12px', marginBottom: 10, background: '#F6F8F4', borderRadius: 9, fontSize: 12, color: '#203F30' }}>
