@@ -10,6 +10,7 @@ import { notificationSetupIssue } from '@/lib/notification-settings'
 import ForegroundNotification from '@/components/ForegroundNotification'
 import { MobileModeProvider } from '@/context/MobileModeContext'
 import { supabase } from '@/lib/supabase'
+import ParentChildSelect from '@/components/ParentChildSelect'
 
 const navy='var(--ui-primary)', navyDk='var(--ui-primary)', bd='var(--ui-border)', bg='var(--ui-bg)', tx2='var(--ui-text-2)'
 
@@ -180,13 +181,13 @@ function ParentLayoutContent({ children }: { children: React.ReactNode }) {
     if (initDone.current) return
     // Mark initialization after the scheduled update so a cancelled effect can retry.
 
-    // 자녀 1명이면 자동 선택
-    const onlyChildId = parent?.children?.length === 1 ? parent.children[0].id : null
+    // 첫 번째 자녀를 기본 선택
+    const firstChildId = parent?.children?.[0]?.id ?? null
 
     // FCM 토큰 등록 (백그라운드)
     const timer = window.setTimeout(() => {
       initDone.current = true
-      if (onlyChildId != null) setSelChild(onlyChildId)
+      if (firstChildId != null) setSelChild(firstChildId)
       setReady(true)
       if (parent?.parentId) void registerFCMToken(parent.parentId)
     }, 0)
@@ -288,7 +289,13 @@ function ParentLayoutContent({ children }: { children: React.ReactNode }) {
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-          <span style={{ fontSize: 11, color: '#627668', whiteSpace: 'nowrap' }}>{childList.find(c => c.id === selChild)?.name ?? ''} 학부모님</span>
+          {pathname === '/parent/home' ? (
+            <span style={{ fontSize: 11, color: '#627668', whiteSpace: 'nowrap' }}>학부모님</span>
+          ) : (
+            <div style={{ maxWidth: 'min(36vw, 180px)', minWidth: 0 }}>
+              <ParentChildSelect childList={childList} value={selChild} onChange={setSelChild} />
+            </div>
+          )}
           <button
             onClick={logout} aria-label="로그아웃"
             style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#819085', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '50%' }}
@@ -298,27 +305,6 @@ function ParentLayoutContent({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      {/* 자녀 선택 탭 (다자녀인 경우만) */}
-      {childList.length > 1 && (
-        <div style={{ background: '#fff', borderBottom: '1px solid #EBF0EC', padding: '10px 16px', flexShrink: 0 }}>
-          <div style={{ display: 'flex', gap: 4, background: '#E9EFEA', padding: 4, borderRadius: 9, maxWidth: 640, margin: '0 auto' }}>
-            {childList.map(c => (
-              <button key={c.id} onClick={() => setSelChild(c.id)} style={{
-                flex: 1, minWidth: 0, minHeight: 40, border: 0, borderRadius: 6, fontSize: 12,
-                fontWeight: selChild === c.id ? 700 : 500,
-                background: selChild === c.id ? '#fff' : 'transparent',
-                color: selChild === c.id ? '#1C5939' : '#667C6D',
-                boxShadow: selChild === c.id ? '0 1px 4px rgba(28,89,57,.04)' : 'none',
-                cursor: 'pointer', fontFamily: "'Noto Sans KR',sans-serif", whiteSpace: 'nowrap',
-              }}>
-                {c.name}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* 본문 */}
       <main className="parent-main" style={{ flex: 1, padding: '16px 16px calc(88px + env(safe-area-inset-bottom))', maxWidth: 640, width: '100%', margin: '0 auto' }}>
         {notifPerm && notifPerm !== 'granted' && !notifBannerDismissed && (
           <div style={{

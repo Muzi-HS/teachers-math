@@ -8,6 +8,7 @@ import { useParentChild } from '../layout'
 import { RecordComment, groupCommentsByRecord } from '@/lib/records'
 import TodayClassBanner from '@/components/TodayClassBanner'
 import ParentAttendance from '@/components/ParentAttendance'
+import ParentChildSelect from '@/components/ParentChildSelect'
 import { IconArrowUp, IconInbox, IconSend, IconCalendar } from '@/components/icons'
 
 // 새 학부모 시안(parent-preview)의 정확한 색상을 그대로 사용한다 — 사이트 테마 토큰 대신
@@ -36,7 +37,7 @@ function formatEventDate(ds: string): string {
 // 지각·결석 등록·문의는 여기서 바로 문의 탭으로 이어지도록 한다.
 export default function ParentHome() {
   const { parent } = useAuth()
-  const { selChild } = useParentChild()
+  const { selChild, setSelChild, children } = useParentChild()
   const router = useRouter()
   const [rec, setRec] = useState<Rec | null>(null)
   const [className, setClassName] = useState<string | null>(null)
@@ -103,9 +104,14 @@ export default function ParentHome() {
   return (
     <div>
 
-      <div style={{ marginBottom: 16 }}>
-        <p style={{ fontSize: 11, color: tx3, margin: '0 0 4px' }}>우리 아이의</p>
-        <p style={{ fontSize: 20, fontWeight: 700, color: tx, margin: 0 }}>최근 수업기록</p>
+      <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <div style={{ flexShrink: 0 }}>
+          <p style={{ fontSize: 11, color: tx3, margin: '0 0 4px' }}>우리 아이의</p>
+          <p style={{ fontSize: 20, fontWeight: 700, color: tx, margin: 0 }}>최근 수업기록</p>
+        </div>
+        <div style={{ maxWidth: '48%', minWidth: 0 }}>
+          <ParentChildSelect childList={children} value={selChild} onChange={setSelChild} />
+        </div>
       </div>
 
       {!selChild ? (
