@@ -7,11 +7,13 @@ import StudyRecords from './StudyRecords'
 import StudyDial from './StudyDial'
 import GiantsRingDial from './student-preview/GiantsRingDial'
 import { useStudentTheme } from '@/context/StudentThemeContext'
+import { isGiantsTheme, isUniversityTheme } from '@/lib/student-theme'
+import UniversityDial from './UniversityDial'
 import styles from './Study.module.css'
 
 export default function StudyTimer() {
  const { theme } = useStudentTheme()
- const Dial = theme === 'green' ? StudyDial : GiantsRingDial
+ const Dial = isGiantsTheme(theme) ? GiantsRingDial : isUniversityTheme(theme) ? UniversityDial : StudyDial
  const { student } = useAuth()
  const token = student?.sessionToken
  const [session, setSession] = useState<StudySession | null>(null)

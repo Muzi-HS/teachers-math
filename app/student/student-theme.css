@@ -73,3 +73,106 @@
 .student-shell[data-student-theme^='giants'] .student-page-title{font-family:Giants,sans-serif;font-weight:400!important}
 @media(max-width:380px){.student-shell .student-header{padding-left:12px!important;padding-right:12px!important}.student-shell .student-header>div{gap:5px!important}.student-giants-badge{font-size:10px;padding-left:5px}}
 .student-shell[data-student-theme^='giants'] [aria-label='집중 타이머']{background:var(--student-card-bg)}.student-shell[data-student-theme^='giants'] [aria-label='집중 타이머'] h3{font-family:Giants,sans-serif;font-weight:400}
+
+/* University palettes apply only inside student shells and theme previews. */
+
+
+
+.student-shell[data-student-theme^='university-']{
+--ui-bg:var(--campus-bg);--ui-surface:var(--student-card-bg);--ui-surface-2:var(--campus-soft);--ui-border:var(--campus-line);--ui-text:var(--campus-ink);--ui-text-2:var(--campus-muted);--ui-text-3:var(--campus-muted);--ui-primary:var(--campus-primary);--ui-primary-hover:var(--campus-hover);--ui-accent:var(--campus-primary);--ui-accent-text:var(--campus-ink);--ui-accent-bg:var(--campus-soft);--ui-focus:var(--campus-primary);
+--student-card-bg:rgb(255 255 255 / 85%);
+--study-card-bg:var(--student-card-bg);
+--study-launch-bg:var(--student-card-bg);
+--study-launch-hover-bg:var(--student-card-bg);
+--student-1c5939:var(--campus-primary);
+--student-203f30:var(--campus-ink);
+--student-235f3f:var(--campus-ink);
+--student-23633f:var(--campus-primary);
+--student-2a5338:var(--campus-ink);
+--student-2b6b45:var(--campus-primary);
+--student-326244:var(--campus-ink);
+--student-347653:var(--campus-primary);
+--student-456650:var(--campus-ink);
+--student-6a7b6e:var(--campus-muted);
+--student-768478:var(--campus-muted);
+--student-819085:var(--campus-muted);
+--student-dde8df:var(--campus-line);
+--student-e9efea:var(--student-card-bg);
+--student-edf4eb:var(--student-card-bg);
+
+ --study-203f30: var(--campus-ink);
+ --study-294431: var(--campus-ink);
+ --study-2a5338: var(--campus-ink);
+ --study-326244: var(--campus-ink);
+ --study-347653: var(--campus-primary);
+ --study-37694c: var(--campus-primary);
+ --study-456650: var(--campus-ink);
+ --study-527363: var(--campus-ink);
+ --study-54765a: var(--campus-ink);
+ --study-658274: var(--campus-muted);
+ --study-6a7b6e: var(--campus-muted);
+ --study-6a9268: var(--campus-primary);
+ --study-6b9360: var(--campus-primary);
+ --study-768478: var(--campus-muted);
+ --study-89a384: var(--campus-muted);
+ --study-8ab99a: var(--campus-muted);
+ --study-abc7a7: var(--campus-muted);
+ --study-cbdcc8: var(--campus-soft);
+ --study-cddbd0: var(--campus-soft);
+ --study-d4e2d1: var(--campus-soft);
+ --study-d6e3d3: var(--campus-soft);
+ --study-dde8df: var(--campus-soft);
+ --study-e0e7d9: var(--campus-soft);
+ --study-e5eee2: var(--campus-soft);
+ --study-e9efea: var(--campus-soft);
+ --study-eaf2e8: var(--campus-soft);
+ --study-edf2eb: var(--campus-soft);
+ --study-edf4eb: var(--campus-soft);
+ --study-f2f7ef: var(--campus-soft);
+ --study-f4f6ea: var(--campus-soft);
+ --study-f4f7ed: var(--campus-soft);
+ --study-f4f7f3: var(--campus-soft);
+ --study-f6f8f5: var(--campus-soft);
+ --study-f6f9f5: var(--campus-soft);
+}
+
+.student-university-badge{display:inline-flex;align-items:center;gap:4px;border-left:1px solid #ffffff45;padding-left:7px;font-size:10px;font-weight:700;letter-spacing:.8px;color:#fff;white-space:nowrap}
+.student-university-badge svg{width:23px;height:23px;flex-shrink:0}
+.student-shell[data-student-theme^='university-'] .student-header{background:var(--campus-primary)!important;border-bottom:3px solid var(--campus-gold)!important;color:#fff}
+.student-shell[data-student-theme^='university-'] .student-header button,.student-shell[data-student-theme^='university-'] .student-header span{color:#fff!important}
+.student-shell[data-student-theme^='university-'] .student-header img{filter:brightness(0) invert(1)}
+.student-shell[data-student-theme^='university-'] .student-main{background:radial-gradient(ellipse at 100% 0,var(--campus-soft),transparent 65%)}
+.student-shell[data-student-theme^='university-'] .student-nav{border-top-color:var(--campus-line)!important}
+.student-shell[data-student-theme^='university-'] [aria-label='집중 타이머']{background:var(--campus-paper)}
+@media(max-width:380px){.student-university-badge{font-size:8px;letter-spacing:0;padding-left:4px;gap:2px}.student-university-badge svg{width:18px;height:18px}.student-shell[data-student-theme^='university-'] .student-header>div{gap:4px!important}.student-shell[data-student-theme^='university-'] .student-header>div>span:first-of-type{font-size:11px!important}}
+:where(.university-art){display:block;width:48px;height:48px;background-position:center;background-size:contain;background-repeat:no-repeat;flex-shrink:0}
+[data-student-theme='university-snu']{--campus-primary:#293582;--campus-hover:#202a68;--campus-ink:#20294c;--campus-muted:#747991;--campus-bg:#f3f4f8;--campus-soft:#e9ebf4;--campus-line:#dfe2ec;--campus-paper:#fafaff;--campus-gold:#b5a27d;--campus-shadow:#2531680d;--campus-art:url('/themes/universities/snu-emblem.png')}
+[data-student-theme='university-yonsei']{--campus-primary:#002967;--campus-hover:#001e4c;--campus-ink:#132b4a;--campus-muted:#6b7a91;--campus-bg:#f2f5f9;--campus-soft:#e5edf6;--campus-line:#dce4ee;--campus-paper:#fafcff;--campus-gold:#91afd2;--campus-shadow:#16345a0d;--campus-art:url('/themes/universities/yonsei-eagle.svg')}
+[data-student-theme='university-korea']{--campus-primary:#8d002a;--campus-hover:#6b0020;--campus-ink:#3d252d;--campus-muted:#8c7779;--campus-bg:#f7f4ef;--campus-soft:#f1e8e3;--campus-line:#e7dcd5;--campus-paper:#fcf9f3;--campus-gold:#c6b89e;--campus-shadow:#6b1b300d;--campus-art:url('/themes/universities/korea-tiger.png')}
+.student-university-badge .university-art{width:24px;height:26px;filter:brightness(0) invert(1)}
+.student-shell[data-student-theme^='university-'] .student-main{position:relative;isolation:isolate;background:transparent}
+.student-shell[data-student-theme^='university-'] .student-main::before{content:'';position:absolute;inset:0;z-index:-1;pointer-events:none;background:var(--campus-art) center 240px/min(85%,440px) auto no-repeat;opacity:.055;mix-blend-mode:multiply}
+.student-shell[data-student-theme^='university-'][data-student-screen='/student/study'] .student-main::before,.student-shell[data-student-theme^='university-'][data-student-screen='/student/themes'] .student-main::before{display:none}
+.student-shell[data-student-theme^='university-']{--student-card-bg:rgb(255 255 255 / 94%)}
+@media(max-width:380px){.student-university-badge .university-art{width:20px;height:22px}}
+.student-shell[data-student-theme='university-yonsei'] .student-main::before{filter:grayscale(1)}
+.student-shell[data-student-theme='university-yonsei'] .student-university-badge .university-art,.student-shell[data-student-theme='university-korea'] .student-university-badge .university-art{filter:none;background-color:transparent;border:0;border-radius:0;width:32px;height:34px}
+@media(max-width:380px){.student-shell[data-student-theme='university-yonsei'] .student-university-badge .university-art,.student-shell[data-student-theme='university-korea'] .student-university-badge .university-art{width:26px;height:29px}}
+/* Keep the brand readable without crowding the account controls on small screens. */
+.student-shell[data-student-theme^='university-'] .student-header>div:first-child{flex:1;min-width:0}
+.student-shell[data-student-theme^='university-'] .student-header>div:first-child>span:first-of-type{flex-shrink:1!important;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.student-shell[data-student-theme^='university-'] .student-university-badge{flex-shrink:0}
+.student-shell[data-student-theme^='university-'] .student-theme-entry{max-width:110px;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:380px){.student-shell[data-student-theme^='university-'] .student-header>div:last-child{gap:6px!important}.student-shell[data-student-theme^='university-'] .student-theme-entry{max-width:78px}}
+/* Match the shield silhouette while retaining its original colors and lettering. */
+.university-art[data-university='university-korea']:is([data-emblem='crest'],[data-emblem='dial']){mask:url('/themes/universities/korea-shield-mask.svg') center/contain no-repeat}
+/* Header mascots use transparent silhouettes rather than a crest or backing tile. */
+.student-shell[data-student-theme='university-yonsei'] .student-university-badge .university-art,.student-shell[data-student-theme='university-korea'] .student-university-badge .university-art{background-image:none!important;background-color:#fff;mask:var(--campus-art) center/contain no-repeat;filter:none;border:0}
+.student-shell[data-student-theme='university-korea'] .student-university-badge .university-art{background-color:#e8decb}
+/* Background crests are independent of the header mascot silhouettes. */
+[data-student-theme='university-snu']{--campus-background-art:url('/themes/universities/snu-emblem.png')}
+[data-student-theme='university-yonsei']{--campus-background-art:url('/themes/universities/yonsei-seal-hires.png')}
+[data-student-theme='university-korea']{--campus-background-art:url('/themes/universities/korea-shield.png')}
+.student-shell[data-student-theme^='university-'] .student-main::before{background-image:var(--campus-background-art);background-size:min(68%,340px) auto;background-position:center 260px;opacity:.035;filter:grayscale(1)}
+/* Compensate for the padding in the Yonsei seal source when used as a page watermark. */
+.student-shell[data-student-theme='university-yonsei'] .student-main::before{background-size:min(112%,580px) auto;background-position:center 160px}

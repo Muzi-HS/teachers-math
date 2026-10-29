@@ -10,6 +10,9 @@ import { NotificationSetupGuidance } from '@/components/NotificationSetupGuidanc
 import { notificationSetupIssue } from '@/lib/notification-settings'
 import ForegroundNotification from '@/components/ForegroundNotification'
 import { StudentThemeProvider, useStudentTheme } from '@/context/StudentThemeContext'
+import { isGiantsTheme, isUniversityTheme, UNIVERSITY_THEMES } from '@/lib/student-theme'
+import UniversityEmblem from '@/components/UniversityEmblem'
+import UniversityBrandPanel from '@/components/UniversityBrandPanel'
 import './student-theme.css'
 
 const navy='var(--ui-primary)', navyDk='var(--ui-primary)', bd='var(--ui-border)', bg='var(--ui-bg)', tx2='var(--ui-text-2)'
@@ -188,7 +191,8 @@ function StudentLayoutContent({ children }: { children: React.ReactNode }) {
           <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--student-203f30, #203f30)', letterSpacing: -.2, flexShrink: 0, whiteSpace: 'nowrap' }}>
             티처스 수학학원
           </span>
-          {theme !== 'green' && <span className="student-giants-badge">GIANTS</span>}
+          {isGiantsTheme(theme) && <span className="student-giants-badge">GIANTS</span>}
+          {isUniversityTheme(theme) && <span className="student-university-badge"><UniversityEmblem theme={theme} />{UNIVERSITY_THEMES[theme].short}</span>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
           <button className="student-theme-entry" onClick={() => router.push('/student/themes')} aria-label={`${student?.name ?? ''} 학생, 내 테마 선택`}>{student?.name ?? ''} 학생</button>
@@ -232,6 +236,7 @@ function StudentLayoutContent({ children }: { children: React.ReactNode }) {
             }}>×</button>
           </div>
         )}
+        {isUniversityTheme(theme) && pathname === '/student/home' && <UniversityBrandPanel theme={theme} />}
         {children}
       </main>
 

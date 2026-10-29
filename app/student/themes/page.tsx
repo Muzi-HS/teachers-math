@@ -3,13 +3,15 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useStudentTheme } from '@/context/StudentThemeContext'
-import type { StudentTheme } from '@/lib/student-theme'
+import { isGiantsTheme, isUniversityTheme, UNIVERSITY_THEMES, type StudentTheme } from '@/lib/student-theme'
+import UniversityBrandPanel from '@/components/UniversityBrandPanel'
 import s from './themes.module.css'
 
 const choices: { id: StudentTheme; name: string }[] = [
   { id: 'green', name: '기본 그린' },
   { id: 'giants-light', name: '자이언츠 라이트' },
   { id: 'giants-uniform', name: '자이언츠 유니폼' },
+  ...Object.entries(UNIVERSITY_THEMES).map(([id, item]) => ({ id: id as StudentTheme, name: item.name })),
 ]
 export default function StudentThemes() {
   const { theme, loading, error, save } = useStudentTheme()
@@ -25,9 +27,11 @@ export default function StudentThemes() {
   return <div className={s.page}>
     <Link href="/student/home" className={s.back}>← 학생 홈</Link>
     <h1>내 테마</h1><p className={s.description}>나의 공부 공간을 좋아하는 분위기로 꾸며보세요.</p>
+    <Link href="/preview/universities" className={s.previewLink}>대학교 테마 · 홈과 타이머 미리보기 ↗</Link>
     <div className={s.cards} role="group" aria-label="학생 테마 선택">
-      {choices.map(item => <button type="button" key={item.id} className={s.card} data-theme={item.id} aria-pressed={selected === item.id} disabled={saving || loading} onClick={() => { setSelection(item.id); setMessage('') }}>
-        <div className={s.swatchHeader} aria-hidden="true"><i /><span>티처스 수학학원</span>{item.id !== 'green' && <em>GIANTS</em>}</div>
+      {choices.map(item => <button type="button" key={item.id} className={s.card} data-theme={item.id} data-student-theme={item.id} aria-pressed={selected === item.id} disabled={saving || loading} onClick={() => { setSelection(item.id); setMessage('') }}>
+        <div className={s.swatchHeader} aria-hidden="true"><i /><span>티처스 수학학원</span>{isGiantsTheme(item.id) && <em>GIANTS</em>}{isUniversityTheme(item.id) && <em className={s.universityLabel}>{UNIVERSITY_THEMES[item.id].short}</em>}</div>
+        {isUniversityTheme(item.id) && <div className={s.campusPreview} aria-hidden="true"><UniversityBrandPanel theme={item.id} /></div>}
         <div className={s.swatchBody}><strong>{item.name}</strong>{selected === item.id && <span className={s.check} aria-hidden="true">✓</span>}</div>
       </button>)}
     </div>

@@ -1,0 +1,56 @@
+/* Shared by the real student pages and the public design preview. */
+.brandPanel{position:relative;isolation:isolate;overflow:hidden;min-height:192px;padding:28px 24px;margin:0 0 20px;border:1px solid var(--campus-line);border-radius:4px 4px 18px 18px;background:var(--campus-primary);color:#fff;box-shadow:0 8px 24px var(--campus-shadow)}
+.brandCopy{position:relative;z-index:2;max-width:calc(100% - 78px)}
+.collection{display:block;font-size:8px;letter-spacing:2.4px;opacity:.7;margin-bottom:16px}
+.brandCopy>strong{display:block;font-family:Georgia,'Times New Roman',serif;font-size:48px;font-weight:400;line-height:1;letter-spacing:1px}
+.brandEnglish{display:block;font-size:7px;letter-spacing:1px;margin-top:9px;opacity:.8;line-height:1.7;max-width:100%;overflow-wrap:anywhere}
+.brandRule{height:1px;width:35px;background:var(--campus-gold);margin:19px 0 12px}
+.brandCopy p{font-size:11px;font-weight:400;margin:0;line-height:1.8;letter-spacing:-.2px;word-break:keep-all;overflow-wrap:break-word;text-wrap:pretty}
+.brandPennant{position:absolute;z-index:3;right:20px;top:0;width:70px;min-height:124px;display:flex;flex-direction:column;align-items:center;padding:18px 9px 26px;background:var(--campus-paper);color:var(--campus-primary);clip-path:polygon(0 0,100% 0,100% 80%,50% 100%,0 80%);border-top:3px solid var(--campus-gold)}
+.brandPennant>span:first-child{width:48px;height:60px}
+.brandPanel[data-campus='university-yonsei'] .brandPennant>span:first-child{width:58px;height:60px}
+.brandPennant>span:last-child{font-family:Georgia,serif;font-size:8px;letter-spacing:.5px;margin-top:9px;text-align:center;line-height:1.5}
+.brandWatermark{position:absolute;z-index:0;right:-30px;bottom:-75px;width:240px;height:260px;filter:brightness(0) invert(1);opacity:.065;transform:rotate(-10deg)}
+.dial{max-width:340px;margin:24px auto;text-align:center;color:var(--campus-ink)}
+.dialLabel{display:inline-block;border:1px solid var(--campus-line);padding:7px 14px;border-radius:30px;font-size:10px;margin:0 0 22px;letter-spacing:.2px}
+.dialFace{position:relative;aspect-ratio:1;background:#fff;border-radius:50%;box-shadow:0 8px 24px var(--campus-shadow),inset 0 0 0 1px var(--campus-line)}
+.ring{display:block;width:100%;height:auto}
+.dialCenter{position:absolute;inset:23%;pointer-events:none}
+.dialCenter>span:first-child{position:absolute;inset:0;width:100%;height:100%;mix-blend-mode:multiply}
+.dialCenter[data-campus='university-yonsei']>span:first-child{background-size:128% auto}
+.dialReadout{margin-top:22px;display:flex;flex-direction:column;align-items:center;gap:6px}
+.dialReadout>span{font-size:8px;letter-spacing:2px;color:var(--campus-primary);font-weight:700}
+.dialReadout strong{font-family:Georgia,'Times New Roman',serif;font-size:clamp(36px,9vw,49px);font-weight:400;line-height:1.45;font-variant-numeric:tabular-nums;letter-spacing:1px}
+.dialReadout small{font-size:10px;color:var(--campus-muted);max-width:260px;line-height:1.8;word-break:keep-all;text-wrap:pretty}
+.ticket{border:1px solid var(--campus-line);border-radius:5px 5px 16px 16px;overflow:hidden;background:var(--campus-paper);color:var(--campus-ink);box-shadow:0 8px 26px var(--campus-shadow)}
+.ticket[data-used=true]{opacity:.75;filter:grayscale(.7)}
+.ticketHeader{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 44px minmax(0,1fr);align-items:center;gap:12px;min-height:76px;background:var(--campus-primary);color:#fff;padding:20px 24px;border-bottom:3px solid var(--campus-gold)}
+.ticketHeader>span:first-child{font-family:Georgia,serif;font-size:clamp(18px,5vw,24px);letter-spacing:1px;line-height:1.1;overflow-wrap:anywhere}
+.ticketHeader i{display:block;font-family:Arial,sans-serif;font-size:7px;font-style:normal;letter-spacing:2px;margin-top:7px;opacity:.7}
+.ticketHeader>span:last-child{text-align:right;font-size:8px;letter-spacing:1px;line-height:1.8;opacity:.7}
+.ticketCrest{width:44px;height:50px;background-color:transparent}
+.ticketBody{position:relative;isolation:isolate;padding:25px 24px 28px;overflow:hidden}
+.watermark{position:absolute;width:230px;height:240px;right:-26px;top:25px;opacity:.085;z-index:-1;mix-blend-mode:multiply}
+.ticketStatus{display:flex;justify-content:space-between;gap:10px;font-size:9px;color:var(--campus-muted)}
+.ticketStatus b{color:var(--campus-primary);white-space:nowrap;font-weight:500}
+.achievement{display:flex;align-items:center;flex-wrap:wrap;gap:16px 20px;margin:28px 0 22px}
+.achievement strong{font-family:Georgia,serif;font-size:86px;font-weight:400;letter-spacing:-5px;line-height:1;color:var(--campus-primary)}
+.achievement em{font-size:20px;font-weight:400;letter-spacing:0;font-style:italic;margin-left:7px}
+.achievement>span{border-left:1px solid var(--campus-line);padding-left:16px;font-size:8px;line-height:2.2;letter-spacing:.7px}
+.ticketBody h3{font-size:16px;font-weight:600;margin:12px 0 8px;letter-spacing:-.5px;line-height:1.7;word-break:keep-all;text-wrap:pretty}
+.ticketBody p{font-size:10px;color:var(--campus-muted);margin:0;line-height:1.8}
+.ticketStub{position:relative;border-top:1px dashed var(--campus-line);padding:20px 24px;background:#fff}
+.ticketStub::before,.ticketStub::after{content:'';position:absolute;top:-8px;width:16px;height:16px;border-radius:50%;background:var(--campus-bg);border:1px solid var(--campus-line)}
+.ticketStub::before{left:-9px}.ticketStub::after{right:-9px}
+.ticketStub>span{font-size:9px;color:var(--campus-muted)}
+.ticketStub>div{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:10px 0}
+.ticketStub code{font-size:22px;letter-spacing:3px;overflow-wrap:anywhere;min-width:0}
+.ticketStub button{border:1px solid var(--campus-line);border-radius:6px;background:var(--campus-paper);color:var(--campus-primary);padding:10px 12px;min-height:44px;font-size:10px;white-space:nowrap;cursor:pointer}
+.ticketStub button:disabled{cursor:default;opacity:.65}
+.ticketStub button:focus-visible{outline:3px solid var(--campus-primary);outline-offset:3px}
+.ticketStub p{font-size:9px;color:var(--campus-muted);line-height:1.7}
+.ticketStub small{display:flex;justify-content:space-between;border-top:1px solid var(--campus-line);padding-top:14px;margin-top:20px;font-size:7px;letter-spacing:1.5px;color:var(--campus-muted)}
+.feedback{font-size:11px;color:var(--campus-primary);min-height:16px;margin:6px 0}
+@media(max-width:360px){.brandPanel{padding:24px 18px}.brandCopy>strong{font-size:40px}.brandPennant{right:14px;width:58px}.brandPennant>span:first-child{width:40px;height:52px}.brandEnglish{font-size:6px;letter-spacing:.7px}.brandCopy p{font-size:10px}.dialReadout strong{font-size:36px}.achievement{gap:14px}.achievement strong{font-size:72px}}
+:global([data-student-theme='university-yonsei']) .watermark,:global([data-student-theme='university-korea']) .watermark{filter:grayscale(1);opacity:.06;right:-12px}
+@media(max-width:360px){.brandPanel[data-campus='university-yonsei'] .brandPennant>span:first-child{width:48px;height:52px}}

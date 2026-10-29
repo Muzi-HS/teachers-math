@@ -48,7 +48,7 @@ function request(token, body, origin = 'https://school.example') {
   return { headers: new Headers({ ...(token ? { Authorization: `Bearer ${token}` } : {}), Origin: origin }), nextUrl: { origin: 'https://school.example' }, json: async () => body }
 }
 test('only recognized themes are accepted', () => {
-  for (const theme of ['green', 'giants-light', 'giants-uniform']) assert.ok(themeModule.isStudentTheme(theme))
+  for (const theme of ['green', 'giants-light', 'giants-uniform', 'university-snu', 'university-yonsei', 'university-korea']) assert.ok(themeModule.isStudentTheme(theme))
   for (const theme of [null, 'navy', {}, '../other']) assert.equal(themeModule.isStudentTheme(theme), false)
 })
 test('missing, expired and parent sessions cannot access student preferences', async () => {
@@ -73,6 +73,14 @@ test('preferences are private, account scoped, and survive a new request', async
 test('cross-origin writes and invalid theme values are rejected', async () => {
   assert.equal((await POST(request(tokenA, { theme: 'green' }, 'https://other.example'))).status, 403)
   assert.equal((await POST(request(tokenA, { theme: 'invalid' }))).status, 400)
+})
+
+test('all university themes persist through the existing account preference API', async () => {
+  for (const theme of ['university-snu', 'university-yonsei', 'university-korea']) {
+    assert.equal((await POST(request(tokenB, { theme }))).status, 200)
+    assert.deepEqual(await (await GET(request(tokenB))).json(), { theme })
+    assert.deepEqual(await (await GET(request(tokenA))).json(), { theme: 'giants-light' })
+  }
 })
 test('failed saves report failure and preserve the saved preference', async () => {
   failUpload = true
