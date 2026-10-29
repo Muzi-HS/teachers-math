@@ -13,7 +13,7 @@ export default function UniversityCoupon({ theme, milestone, code, used = false,
   }
   return <div>
     <article className={s.ticket} data-used={used} aria-label={`${milestone}일 연속 달성 쿠폰${preview ? ' · 예시' : ''} · ${used ? '사용 완료' : '사용 가능'}`}>
-      <header className={s.ticketHeader}><span>{university.short} <i>STUDY CLUB</i></span><UniversityEmblem theme={theme} variant="crest" className={s.ticketCrest} /><span>{preview ? 'SAMPLE' : 'REWARD'}<br />TICKET</span></header>
+      <header className={s.ticketHeader}><span>{university.short} <i>STUDY CLUB</i></span><span>{preview ? 'SAMPLE' : 'REWARD'}<br />TICKET</span></header>
       <div className={s.ticketBody}>
         <UniversityEmblem theme={theme} variant="crest" className={s.watermark} />
         <div className={s.ticketStatus}><span>매일의 노력이, 나의 미래로.</span><b>{used ? '사용 완료' : preview ? '미리보기' : '사용 가능'}</b></div>

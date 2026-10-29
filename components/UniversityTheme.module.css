@@ -23,12 +23,10 @@
 .dialReadout strong{font-family:Georgia,'Times New Roman',serif;font-size:clamp(36px,9vw,49px);font-weight:400;line-height:1.45;font-variant-numeric:tabular-nums;letter-spacing:1px}
 .dialReadout small{font-size:10px;color:var(--campus-muted);max-width:260px;line-height:1.8;word-break:keep-all;text-wrap:pretty}
 .ticket{border:1px solid var(--campus-line);border-radius:5px 5px 16px 16px;overflow:hidden;background:var(--campus-paper);color:var(--campus-ink);box-shadow:0 8px 26px var(--campus-shadow)}
-.ticket[data-used=true]{opacity:.75;filter:grayscale(.7)}
-.ticketHeader{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 44px minmax(0,1fr);align-items:center;gap:12px;min-height:76px;background:var(--campus-primary);color:#fff;padding:20px 24px;border-bottom:3px solid var(--campus-gold)}
+.ticketHeader{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:16px;min-height:76px;background:var(--campus-primary);color:#fff;padding:20px 24px;border-bottom:3px solid var(--campus-gold)}
 .ticketHeader>span:first-child{font-family:Georgia,serif;font-size:clamp(18px,5vw,24px);letter-spacing:1px;line-height:1.1;overflow-wrap:anywhere}
 .ticketHeader i{display:block;font-family:Arial,sans-serif;font-size:7px;font-style:normal;letter-spacing:2px;margin-top:7px;opacity:.7}
 .ticketHeader>span:last-child{text-align:right;font-size:8px;letter-spacing:1px;line-height:1.8;opacity:.7}
-.ticketCrest{width:44px;height:50px;background-color:transparent}
 .ticketBody{position:relative;isolation:isolate;padding:25px 24px 28px;overflow:hidden}
 .watermark{position:absolute;width:230px;height:240px;right:-26px;top:25px;opacity:.085;z-index:-1;mix-blend-mode:multiply}
 .ticketStatus{display:flex;justify-content:space-between;gap:10px;font-size:9px;color:var(--campus-muted)}
