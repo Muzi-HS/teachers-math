@@ -2,6 +2,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { clearClientSession, validateClientSession } from '@/lib/client-session'
 
 type TeacherSession = {
   userId: string
@@ -105,29 +106,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const raw = restoreAutoLogin('parent_auto_login', 'parent_session')
         if (raw) {
           const parsed = JSON.parse(raw)
-          if (parsed?.sessionToken) {
+          if (parsed?.sessionToken && await validateClientSession('parent', parsed.parentId, parsed.sessionToken)) {
             setParent(parsed)
             setLoading(false)
             return
           }
-          sessionStorage.removeItem('parent_session')
-          localStorage.removeItem('parent_auto_login')
+          clearClientSession('parent')
+          window.alert('로그인 유지 기간이 만료되었습니다. 다시 로그인해 주세요.')
         }
-      } catch {}
+      } catch {
+        window.alert('로그인 상태를 확인하지 못했습니다. 인터넷 연결을 확인한 후 새로고침해 주세요.')
+        setLoading(false)
+        return
+      }
 
       // 3. 학생 세션 확인 (sessionStorage, 없으면 자동 로그인 localStorage에서 복원)
       try {
         const raw = restoreAutoLogin('student_auto_login', 'student_session')
         if (raw) {
           const parsed = JSON.parse(raw)
-          if (parsed?.sessionToken) {
+          if (parsed?.sessionToken && await validateClientSession('student', parsed.studentId, parsed.sessionToken)) {
             setStudent(parsed)
           } else {
-            sessionStorage.removeItem('student_session')
-            localStorage.removeItem('student_auto_login')
+            clearClientSession('student')
+            window.alert('로그인 유지 기간이 만료되었습니다. 다시 로그인해 주세요.')
           }
         }
-      } catch {}
+      } catch {
+        window.alert('로그인 상태를 확인하지 못했습니다. 인터넷 연결을 확인한 후 새로고침해 주세요.')
+      }
 
       setLoading(false)
     }
@@ -154,6 +161,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => subscription.unsubscribe()
   }, [])
+
+  // Recheck long-lived tabs when returning to the app and while it is visible.
+  useEffect(() => {
+    const kind = parent ? 'parent' : student ? 'student' : null
+    const session = parent ?? student
+    if (!kind || !session) return
+    const id = parent?.parentId ?? student!.studentId
+    let cancelled = false
+    let checking = false
+    async function check() {
+      if (document.visibilityState !== 'visible' || checking) return
+      checking = true
+      try {
+        const valid = await validateClientSession(kind!, id, session!.sessionToken)
+        if (cancelled || valid) return
+        clearClientSession(kind!)
+        setParent(null)
+        setStudent(null)
+        window.alert('로그인 유지 기간이 만료되었습니다. 다시 로그인해 주세요.')
+        router.replace('/')
+      } catch {
+        // Temporary network failures must not erase a saved login.
+      } finally { checking = false }
+    }
+    void check()
+    const timer = window.setInterval(() => { void check() }, 5 * 60 * 1000)
+    document.addEventListener('visibilitychange', check)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', check)
+    }
+  }, [parent, student, router])
 
   function loginAsTeacher(t: TeacherSession) {
     setTeacher(t)
