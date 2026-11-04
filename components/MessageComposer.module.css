@@ -41,7 +41,9 @@
 .list input:disabled { cursor:not-allowed; }
 .list small { display:block; font-size:11px; color:var(--ui-text-3); margin-top:4px; line-height:1.5; }
 .badge, .classBadge { display:inline-flex; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:500; background:var(--ui-surface-2); color:var(--ui-primary); white-space:nowrap; }
-.badge { margin-left:6px; }
+.studentName { display:flex; align-items:center; flex-wrap:wrap; gap:6px; }
+.studentName strong { word-break:keep-all; }
+.badge { flex-shrink:0; line-height:1.5; }
 .badge[data-stage='초등'], .classBadge { background:var(--ui-success-bg); color:var(--ui-success); }
 .badge[data-stage='고등'] { background:#F3E8FF; color:#7C3AED; }
 .classBadges { display:flex; flex-wrap:wrap; gap:4px; }
@@ -73,11 +75,10 @@
 .mobile .list th, .mobile .list td { padding:10px 8px; }
 .mobile .list .checkCell { width:36px; }
 .mobile .list input { width:18px; height:18px; }
-.mobile .list .badge { display:table; margin:4px 0 0; }
 .mobile .sendBar { align-items:stretch; flex-direction:column; }
 .mobile .sendBar .primary { min-height:44px; }
 .mobile.inDialog { padding:16px 14px; }
-.selectAll { display:flex; align-items:center; justify-content:center; flex-direction:column; gap:5px; min-height:36px; cursor:pointer; }
+.selectAll { display:flex; align-items:center; justify-content:center; min-height:24px; cursor:pointer; }
 .rowSelect { display:flex; align-items:center; justify-content:center; cursor:pointer; }
 .dialogBackdrop { position:fixed; inset:0; z-index:1200; background:rgb(0 0 0 / 45%); display:flex; align-items:center; justify-content:center; padding:16px; }
 .dialog { background:var(--ui-bg); border-radius:12px; width:960px; max-width:100%; max-height:92dvh; overflow:auto; overscroll-behavior:contain; box-shadow:0 20px 60px rgb(0 0 0 / 15%); }
