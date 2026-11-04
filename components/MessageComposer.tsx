@@ -90,6 +90,9 @@ export default function MessageComposer({ noticeId, noticeTitle, onClose }: { no
   const selectedStudents = students.filter(s => selected.includes(s.id) && parentPhone(s.parent_phone))
   const phones = [...new Set(selectedStudents.map(s => parentPhone(s.parent_phone)!))]
   const missing = students.filter(s => !parentPhone(s.parent_phone)).length
+  const selectableIds = filtered.filter(s => parentPhone(s.parent_phone)).map(s => s.id)
+  const allFilteredSelected = selectableIds.length > 0 && selectableIds.every(id => selected.includes(id))
+  const someFilteredSelected = selectableIds.some(id => selected.includes(id))
   function toggle(id: number) { setSelected(ids => ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id]); setOpened(false) }
   function filter(label: string, values: string[], chosen: string[], update: (values: string[]) => void) {
     return <fieldset><legend>{label}</legend><div className={styles.pills}><button type="button" aria-pressed={!chosen.length} onClick={() => update([])}>전체</button>{values.map(value => <button type="button" key={value} data-stage={label === '학교급' ? value : undefined} data-class={label === '소속 반' || undefined} aria-pressed={chosen.includes(value)} onClick={() => update(chosen.includes(value) ? chosen.filter(v => v !== value) : [...chosen, value])}>{label === '소속 반' ? classes.find(c => String(c.id) === value)?.name : label === '학교급' ? ({ '초등': '초등학교', '중등': '중학교', '고등': '고등학교' }[value] ?? value) : value}{label === '나이' ? '세' : ''}</button>)}</div></fieldset>
@@ -110,14 +113,12 @@ export default function MessageComposer({ noticeId, noticeTitle, onClose }: { no
       {filter('나이', [...new Set(students.map(age).filter(Boolean))].sort((a,b) => Number(a)-Number(b)), ages, setAges)}
       {filter('소속 반', classes.map(c => String(c.id)), classIds, setClassIds)}
       <div className={styles.actions}>
-        <button onClick={() => { setSelected(ids => [...new Set([...ids, ...filtered.filter(s => parentPhone(s.parent_phone)).map(s => s.id)])]); setOpened(false) }}>검색 결과 전체 선택</button>
-        <button onClick={() => setSelected(ids => ids.filter(id => !filtered.some(s => s.id === id)))}>검색 결과 선택 해제</button>
         <button onClick={() => setSelected([])}>모든 선택 해제</button>
       </div>
       <p>검색 결과 {filtered.length}명 · 선택 {selectedStudents.length}명 · 발송 번호 {phones.length}개 (중복 제거)</p>
       {missing > 0 && <p>학부모 휴대폰 번호가 없거나 올바르지 않은 학생 {missing}명은 선택할 수 없습니다.</p>}
-      <div className={styles.list}><table><thead><tr><th className={styles.checkCell}>선택</th><th>이름</th>{!mobileMode && <><th>나이</th><th>학교</th></>}<th>학부모 연락처</th>{!mobileMode && <th>소속 반</th>}</tr></thead><tbody>{filtered.map(s => <tr key={s.id} data-selected={selected.includes(s.id)}>
-        <td className={styles.checkCell}><input aria-label={`${s.name} 학부모 선택`} type="checkbox" checked={selected.includes(s.id)} disabled={!parentPhone(s.parent_phone)} onChange={() => toggle(s.id)} /></td>
+      <div className={styles.list}><table><thead><tr><th className={styles.checkCell}><label className={styles.selectAll}><input type="checkbox" aria-label="검색 결과 전체 선택" disabled={!selectableIds.length} checked={allFilteredSelected} ref={node => { if (node) node.indeterminate = someFilteredSelected && !allFilteredSelected }} onChange={() => { setSelected(ids => allFilteredSelected ? ids.filter(id => !selectableIds.includes(id)) : [...new Set([...ids, ...selectableIds])]); setOpened(false) }} /><span>선택</span></label></th><th>이름</th>{!mobileMode && <><th>나이</th><th>학교</th></>}<th>학부모 연락처</th>{!mobileMode && <th>소속 반</th>}</tr></thead><tbody>{filtered.map(s => <tr key={s.id} data-selected={selected.includes(s.id)}>
+        <td className={styles.checkCell}><label className={styles.rowSelect}><input aria-label={`${s.name} 학부모 선택`} type="checkbox" checked={selected.includes(s.id)} disabled={!parentPhone(s.parent_phone)} onChange={() => toggle(s.id)} /></label></td>
         <td><strong>{s.name}</strong>{s.school_type && <span className={styles.badge} data-stage={s.school_type}>{s.school_type}</span>}{mobileMode && <small>{s.school || '학교 미등록'}{age(s) && ` · ${age(s)}세`}</small>}</td>
         {!mobileMode && <><td>{age(s) ? `${age(s)}세` : '-'}</td><td>{s.school || '-'}</td></>}
         <td className={styles.phone}>{parentPhone(s.parent_phone) || <span className={styles.muted}>번호 확인 필요</span>}</td>
@@ -146,4 +147,12 @@ export default function MessageComposer({ noticeId, noticeTitle, onClose }: { no
       }}>문자 앱 열기</button></div>
     </div></div>}
   </section>
+}
+
+export function MessageComposerDialog({ onClose }: { onClose: () => void }) {
+  return <div className={styles.dialogBackdrop}>
+    <div role="dialog" aria-modal="true" aria-label="학부모에게 메시지 보내기" className={styles.dialog}>
+      <MessageComposer onClose={onClose} />
+    </div>
+  </div>
 }

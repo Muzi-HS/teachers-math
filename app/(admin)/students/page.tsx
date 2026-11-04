@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ContactSaveDialog, PhoneContactDialog } from '@/components/StudentContactDialogs'
 import contactStyles from '@/components/StudentContactDialogs.module.css'
 import { StudentContactDetails, PinSettingsCard } from '@/components/StudentContactDetails'
+import { MessageComposerDialog } from '@/components/MessageComposer'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { can } from '@/lib/permissions'
@@ -80,6 +81,7 @@ export default function StudentsPage() {
   const [loadError, setLoadError] = useState('')
   const { mobileMode, isMobileScreen } = useMobileMode()
   const [contactModal, setContactModal] = useState(false)
+  const [messageModal, setMessageModal] = useState(false)
   const [showTestStudents, setShowTestStudents] = useState(false)
   const [students, setStudents] = useState<Student[]>([])
   const [selectedIds, setSelectedIds] = useState<number[]>([])
@@ -448,18 +450,26 @@ export default function StudentsPage() {
       )}
 
       {/* 헤더 */}
-      <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:mobileMode?14:20 }}>
+      <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:12,marginBottom:mobileMode?14:20 }}>
         <div>
           <h1 style={{ fontSize:mobileMode?17:21,fontWeight:700,color:tx }}>학생 관리</h1>
           {(!mobileMode || role === 'teacher') && <p style={{ fontSize:12,color:tx2,marginTop:4 }}>{role === 'teacher' ? '배정된 반의 학생 정보와 연락처를 확인할 수 있습니다.' : '학원에 등록된 전체 학생'}</p>}
         </div>
+        <div style={{ display:'flex',alignItems:'center',flexWrap:'wrap',gap:8 }}>
+        {canContacts && <button className="bout" style={{ padding:'7px 12px',fontSize:12,minHeight:mobileMode?40:undefined }} onClick={() => setMessageModal(true)}>
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden="true"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          메시지 보내기
+        </button>}
         {isAdmin && (
           <button className="bgold" onClick={openAdd}>
             <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth={2} d="M12 5v14M5 12h14"/></svg>
             학생 등록
           </button>
         )}
+        </div>
       </div>
+
+      {messageModal && canContacts && <MessageComposerDialog onClose={() => setMessageModal(false)} />}
 
       {/* 카드 */}
       <div style={{ background:'#fff',borderRadius:12,border:`1px solid ${bd}`,padding:mobileMode?14:22,boxShadow:'0 1px 4px rgba(0,0,0,.06)' }}>
