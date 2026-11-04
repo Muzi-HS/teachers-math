@@ -1,0 +1,21 @@
+.composer { padding:24px; max-width:1000px; margin:0 auto; color:var(--ui-text,#202b3d); }
+.composer header { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.composer h1 { font-size:22px; margin:0 0 14px; }
+.composer p { font-size:13px; line-height:1.7; }
+.composer button { border:1px solid var(--ui-border,#d8dee8); border-radius:8px; padding:10px 12px; background:var(--ui-surface,#fff); color:inherit; cursor:pointer; font:inherit; font-size:13px; }
+.composer button:disabled { opacity:.45; cursor:not-allowed; }
+.composer button[aria-pressed=true], .composer .primary { background:var(--ui-primary,#21395d); color:white; }
+.composer input:not([type=checkbox]), .composer textarea { width:100%; box-sizing:border-box; padding:12px; border:1px solid var(--ui-border,#d8dee8); border-radius:8px; font:inherit; background:var(--ui-surface,#fff); color:inherit; }
+.composer fieldset { border:0; padding:8px 0; display:flex; flex-wrap:wrap; gap:6px; }
+.composer legend { font-size:13px; font-weight:600; padding-top:8px; }
+.actions { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
+.list { max-height:360px; overflow:auto; border:1px solid var(--ui-border,#d8dee8); border-radius:10px; padding:8px; }
+.list label { display:flex; gap:12px; align-items:center; padding:10px; border-bottom:1px solid var(--ui-border,#eee); font-size:13px; }
+.list input { width:18px; height:18px; flex-shrink:0; }
+.list small { display:block; margin-top:5px; }
+.body { display:block; font-size:14px; font-weight:600; margin-top:20px; }
+.body textarea { display:block; margin-top:8px; resize:vertical; }
+.overlay { position:fixed; inset:0; background:#0008; z-index:1300; display:flex; align-items:center; justify-content:center; padding:16px; }
+.confirm { background:var(--ui-surface,#fff); border-radius:14px; padding:24px; max-width:560px; width:100%; max-height:85dvh; overflow:auto; }
+.preview { white-space:pre-wrap; overflow-wrap:anywhere; max-height:150px; overflow:auto; padding:12px; background:var(--ui-bg,#f3f5f8); border-radius:8px; font-size:13px; }
+@media(max-width:600px) { .composer { padding:16px; } .composer h1 { font-size:19px; } .composer button { min-height:44px; } }

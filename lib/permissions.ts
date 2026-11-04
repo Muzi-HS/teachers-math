@@ -55,6 +55,7 @@ export const can = {
 
 // 메뉴 항목별 접근 가능 여부 (사이드바 렌더링 및 라우트 가드용)
 export const menuAccess: Record<string, (role: Role) => boolean> = {
+  messages:   (r) => r === 'admin' || r === 'teacher',
   dashboard:  (r) => r === 'admin',
   classes:    (r) => r === 'admin' || r === 'teacher' || r === 'assistant',
   students:   (r) => r === 'admin' || r === 'teacher',

@@ -12,6 +12,7 @@ import { resolveNoticeTargetIds, studentIdsOfClass as resolveStudentIdsOfClass }
 import { saveNotice } from '@/lib/notice-save'
 import { navy, navyDk, navyM, gold, goldL, bg, bd, tx, tx2, tx3, re, rbg, gr, gbg } from '@/lib/ui-tokens'
 import BoardRow from '@/components/notices/BoardRow'
+import MessageComposer from '@/components/MessageComposer'
 
 type Notice = {
   id: number
@@ -61,6 +62,7 @@ export default function NoticesPage() {
   const [loading, setLoading] = useState(true)
   const [modal,   setModal]   = useState(false)
   const [detail,  setDetail]  = useState<Notice | null>(null)
+  const [messageNotice, setMessageNotice] = useState<Notice | null>(null)
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
   const [form,    setForm]    = useState({ ...EMPTY })
   const [editId,  setEditId]  = useState<number | null>(null)
@@ -590,13 +592,20 @@ export default function NoticesPage() {
               ))}
             </div>
 
-            <div style={{ padding: '10px 22px 18px', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <div style={{ padding: '10px 22px 18px', display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'flex-end' }}>
+              {detail.parent_visible && (role === 'admin' || role === 'teacher') && <button className="btn-outline" onClick={() => setMessageNotice(detail)}>미열람 학부모에게 문자 보내기</button>}
               {canWrite && <button className="btn-outline" onClick={() => openEdit(detail)}>편집</button>}
               <button className="btn-gold" onClick={() => setDetail(null)}>닫기</button>
             </div>
           </div>
         </div>
       )}
+
+      {messageNotice && <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }}>
+        <div role="dialog" aria-modal="true" aria-label="공지 미열람 학부모 메시지" style={{ background: 'var(--ui-surface, #fff)', borderRadius: 14, width: 900, maxWidth: '100%', maxHeight: '94dvh', overflowY: 'auto' }}>
+          <MessageComposer key={messageNotice.id} noticeId={messageNotice.id} noticeTitle={messageNotice.title} onClose={() => setMessageNotice(null)} />
+        </div>
+      </div>}
 
       {/* ── 작성/수정 모달 ── */}
       {modal && (
