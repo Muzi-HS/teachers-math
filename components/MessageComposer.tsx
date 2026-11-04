@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { kstNow } from '@/lib/kst'
 import { parentPhone, smsComposeUrl, unreadStudentIds } from '@/lib/sms-compose'
 import styles from './MessageComposer.module.css'
+import { useMobileMode } from '@/context/MobileModeContext'
 
 type Student = { id: number; name: string; school: string | null; school_type: string | null; birth_year: number | null; parent_phone: string | null }
 type Class = { id: number; name: string; active?: boolean }
@@ -24,6 +25,7 @@ async function allRows<T>(page: (from: number, to: number) => PromiseLike<{ data
 
 export default function MessageComposer({ noticeId, noticeTitle, onClose }: { noticeId?: number; noticeTitle?: string; onClose?: () => void }) {
   const { role } = useAuth()
+  const { mobileMode } = useMobileMode()
   const allowed = role === 'admin' || role === 'teacher'
   const [students, setStudents] = useState<Student[]>([])
   const [classes, setClasses] = useState<Class[]>([])
@@ -90,20 +92,23 @@ export default function MessageComposer({ noticeId, noticeTitle, onClose }: { no
   const missing = students.filter(s => !parentPhone(s.parent_phone)).length
   function toggle(id: number) { setSelected(ids => ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id]); setOpened(false) }
   function filter(label: string, values: string[], chosen: string[], update: (values: string[]) => void) {
-    return <fieldset><legend>{label}</legend><button type="button" aria-pressed={!chosen.length} onClick={() => update([])}>전체</button>{values.map(value => <button type="button" key={value} aria-pressed={chosen.includes(value)} onClick={() => update(chosen.includes(value) ? chosen.filter(v => v !== value) : [...chosen, value])}>{label === '반' ? classes.find(c => String(c.id) === value)?.name : value}{label === '나이' ? '세' : ''}</button>)}</fieldset>
+    return <fieldset><legend>{label}</legend><div className={styles.pills}><button type="button" aria-pressed={!chosen.length} onClick={() => update([])}>전체</button>{values.map(value => <button type="button" key={value} data-stage={label === '학교급' ? value : undefined} data-class={label === '소속 반' || undefined} aria-pressed={chosen.includes(value)} onClick={() => update(chosen.includes(value) ? chosen.filter(v => v !== value) : [...chosen, value])}>{label === '소속 반' ? classes.find(c => String(c.id) === value)?.name : label === '학교급' ? ({ '초등': '초등학교', '중등': '중학교', '고등': '고등학교' }[value] ?? value) : value}{label === '나이' ? '세' : ''}</button>)}</div></fieldset>
   }
 
   if (!allowed) return <p>관리자와 담당 선생님만 메시지를 보낼 수 있습니다.</p>
-  return <section className={styles.composer}>
-    <header><h1>{noticeId !== undefined ? '공지 미열람 학부모에게 메시지 보내기' : '메시지 보내기'}</h1>{onClose && <button onClick={onClose} aria-label="메시지 창 닫기">닫기</button>}</header>
-    {noticeTitle && <p>공지: <strong>{noticeTitle}</strong></p>}
-    <p>선택한 학생의 학부모 번호로 문자 앱을 엽니다. 휴대폰에서 수신번호와 내용을 확인한 후 전송해주세요.</p>
+  return <section className={`${styles.composer} ${mobileMode ? styles.mobile : ''} ${onClose ? styles.inDialog : ''}`}>
+    <header><div><h1>메시지 보내기</h1><p>{noticeId !== undefined ? '공지를 읽지 않은 학생의 학부모에게 안내합니다.' : '학생을 선택하고 학부모에게 보낼 내용을 작성하세요.'}</p></div>{onClose && <button onClick={onClose} aria-label="메시지 창 닫기">닫기</button>}</header>
+    {noticeTitle && <p className={styles.notice}>공지: <strong>{noticeTitle}</strong></p>}
+    <div className={styles.card}>
+    <div className={styles.cardHeading}><h2>{noticeId !== undefined ? '미열람 학생' : role === 'teacher' ? '담당 학생' : '전체 학생'} <span>{filtered.length}명</span></h2><span>학부모 수신 대상 선택</span></div>
     {loading ? <p role="status">수신 대상 불러오는 중...</p> : error ? <p role="alert">{error} <button onClick={() => setAttempt(a => a + 1)}>다시 시도</button></p> : <>
-      <input aria-label="학생 이름 검색" placeholder="학생 이름 검색" value={search} onChange={e => setSearch(e.target.value)} />
-      {filter('학교 구분', [...new Set(students.map(s => s.school_type).filter((v): v is string => !!v))].sort(), stage, setStage)}
-      {filter('학교', [...new Set(students.map(s => s.school).filter((v): v is string => !!v))].sort(), schools, setSchools)}
+      <div className={styles.searchRow}><div className={styles.searchBox}><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><input aria-label="학생 이름 검색" placeholder="학생 이름 검색..." value={search} onChange={e => setSearch(e.target.value)} /></div>
+        {(search || stage.length > 0 || schools.length > 0 || ages.length > 0 || classIds.length > 0) && <button className={styles.reset} onClick={() => { setSearch(''); setStage([]); setSchools([]); setAges([]); setClassIds([]) }}>필터 초기화</button>}
+      </div>
+      {filter('학교급', ['초등', '중등', '고등'], stage, values => { setStage(values); setSchools([]) })}
+      {stage.length > 0 && filter('학교', [...new Set(students.filter(s => stage.includes(s.school_type ?? '')).map(s => s.school).filter((v): v is string => !!v))].sort(), schools, setSchools)}
       {filter('나이', [...new Set(students.map(age).filter(Boolean))].sort((a,b) => Number(a)-Number(b)), ages, setAges)}
-      {filter('반', classes.map(c => String(c.id)), classIds, setClassIds)}
+      {filter('소속 반', classes.map(c => String(c.id)), classIds, setClassIds)}
       <div className={styles.actions}>
         <button onClick={() => { setSelected(ids => [...new Set([...ids, ...filtered.filter(s => parentPhone(s.parent_phone)).map(s => s.id)])]); setOpened(false) }}>검색 결과 전체 선택</button>
         <button onClick={() => setSelected(ids => ids.filter(id => !filtered.some(s => s.id === id)))}>검색 결과 선택 해제</button>
@@ -111,15 +116,22 @@ export default function MessageComposer({ noticeId, noticeTitle, onClose }: { no
       </div>
       <p>검색 결과 {filtered.length}명 · 선택 {selectedStudents.length}명 · 발송 번호 {phones.length}개 (중복 제거)</p>
       {missing > 0 && <p>학부모 휴대폰 번호가 없거나 올바르지 않은 학생 {missing}명은 선택할 수 없습니다.</p>}
-      <div className={styles.list}>{filtered.length ? filtered.map(s => <label key={s.id}>
-        <input type="checkbox" checked={selected.includes(s.id)} disabled={!parentPhone(s.parent_phone)} onChange={() => toggle(s.id)} />
-        <span><strong>{s.name}</strong> · {s.school || '학교 미등록'} · {age(s) ? `${age(s)}세` : '나이 미등록'}<small>{parentPhone(s.parent_phone) || '학부모 번호 확인 필요'}</small></span>
-      </label>) : <p>해당하는 학생이 없습니다.</p>}</div>
-      <label className={styles.body}>메시지 내용<textarea rows={6} value={body} onChange={e => { setBody(e.target.value); setOpened(false) }} placeholder="학부모님께 보낼 내용을 입력하세요." /></label>
-      <p>필터를 바꿔도 선택은 유지됩니다. 같은 번호에는 같은 내용을 한 번만 전달합니다.</p>
-      <button className={styles.primary} disabled={!phones.length || !body.trim()} onClick={() => setConfirm(true)}>선택 학부모 {phones.length}개 번호로 일괄 전송 준비</button>
-      {opened && <p role="status">문자 앱 연결을 요청했습니다. 실제 발송 여부는 문자 앱에서 확인해주세요.</p>}
+      <div className={styles.list}><table><thead><tr><th className={styles.checkCell}>선택</th><th>이름</th>{!mobileMode && <><th>나이</th><th>학교</th></>}<th>학부모 연락처</th>{!mobileMode && <th>소속 반</th>}</tr></thead><tbody>{filtered.map(s => <tr key={s.id} data-selected={selected.includes(s.id)}>
+        <td className={styles.checkCell}><input aria-label={`${s.name} 학부모 선택`} type="checkbox" checked={selected.includes(s.id)} disabled={!parentPhone(s.parent_phone)} onChange={() => toggle(s.id)} /></td>
+        <td><strong>{s.name}</strong>{s.school_type && <span className={styles.badge} data-stage={s.school_type}>{s.school_type}</span>}{mobileMode && <small>{s.school || '학교 미등록'}{age(s) && ` · ${age(s)}세`}</small>}</td>
+        {!mobileMode && <><td>{age(s) ? `${age(s)}세` : '-'}</td><td>{s.school || '-'}</td></>}
+        <td className={styles.phone}>{parentPhone(s.parent_phone) || <span className={styles.muted}>번호 확인 필요</span>}</td>
+        {!mobileMode && <td><div className={styles.classBadges}>{classes.filter(c => members.some(m => m.class_id === c.id && m.student_id === s.id)).map(c => <span className={styles.classBadge} key={c.id}>{c.name}</span>)}</div></td>}
+      </tr>)}</tbody></table>{!filtered.length && <p className={styles.empty}>해당하는 학생이 없습니다.</p>}</div>
+      <p className={styles.hint}>필터를 바꿔도 선택은 유지됩니다. 같은 학부모 번호는 중복 제거됩니다.</p>
     </>}
+    </div>
+    {!loading && !error && <div className={styles.card}>
+      <div className={styles.cardHeading}><h2>메시지 작성</h2><span>수신번호 {phones.length}개</span></div>
+      <label className={styles.body}>메시지 내용<textarea rows={6} value={body} onChange={e => { setBody(e.target.value); setOpened(false) }} placeholder="학부모님께 보낼 내용을 입력하세요." /></label>
+      <div className={styles.sendBar}><p className={styles.hint}>휴대폰 문자 앱에서 수신번호와 내용을 확인한 후 전송해주세요.</p><button className={styles.primary} disabled={!phones.length || !body.trim()} onClick={() => setConfirm(true)}>일괄 전송 준비 · {phones.length}개 번호</button></div>
+      {opened && <p role="status" className={styles.hint}>문자 앱 연결을 요청했습니다. 실제 발송 여부는 문자 앱에서 확인해주세요.</p>}
+    </div>}
     {confirm && <div className={styles.overlay}><div role="dialog" aria-modal="true" aria-label="문자 전송 확인" className={styles.confirm}>
       <h2>문자 앱으로 보내기</h2><p>선택 학생 {selectedStudents.length}명 · 수신번호 {phones.length}개</p>
       <div className={styles.preview}>{selectedStudents.map(s => <div key={s.id}>{s.name} · {parentPhone(s.parent_phone)}</div>)}</div>
