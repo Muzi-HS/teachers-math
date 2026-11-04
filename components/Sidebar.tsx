@@ -49,6 +49,7 @@ const EXPANDED_W = 176
 
 // 접혔을 때(아이콘 레일)는 좁은 폭에 맞춰 원래 라벨보다 짧은 이름으로 보여준다
 const SHORT_LABEL: Record<string, string> = {
+  messages: '메시지',
   'site-settings': '설정',
   analytics: '분석',
   notices: '공지',
