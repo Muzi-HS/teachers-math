@@ -15,7 +15,7 @@ import PageHeader from '@/components/ui/PageHeader'
 import Button from '@/components/ui/Button'
 
 type Class_   = { id:number; name:string; days:string; time:string }
-type Student  = { id:number; name:string }
+type Student  = { id:number; name:string; is_test:boolean }
 type InqMsg   = { id:number; parent_id:number; content:string; created_at:string }
 type UnreadRecComment = { id:number; student_id:number; date:string; parent_comment:string; parent_comment_at:string; parent_comment_read_at:string|null }
 type TodayAtt = { id:number; student_id:number; type:'absence'|'late'; reason:string|null }
@@ -57,7 +57,7 @@ export default function DashboardPage(){
     const [{ data:cls },{ data:cs },{ data:stu },{ data:inq, count:inqCount },{ data:par },{ data:comments },{ data:att }] = await Promise.all([
       supabase.from('classes').select('id,name,days,time').order('name'),
       supabase.from('class_students').select('class_id,student_id'),
-      supabase.from('students').select('id,name'),
+      supabase.from('students').select('id,name,is_test'),
       supabase.from('staff_inquiry_messages').select('id,parent_id,content,created_at',{count:'exact'}).eq('sender_type','parent').eq('is_read',false).order('created_at',{ascending:false}).limit(10),
       supabase.from('parents').select('id, parent_students(students(name))'),
       supabase.from('staff_records').select('id,student_id,date,parent_comment,parent_comment_at,parent_comment_read_at')
@@ -65,8 +65,10 @@ export default function DashboardPage(){
       supabase.from('attendance_notices').select('id,student_id,type,reason').eq('date',kstDateStr()),
     ])
     setClasses(cls??[])
+    const countedStudentIds = new Set((stu??[]).filter(s => !s.is_test).map(s => s.id))
     const map:Record<number,number[]>={}
     for(const r of (cs??[])) {
+      if(!countedStudentIds.has(r.student_id)) continue
       if(!map[r.class_id]) map[r.class_id]=[]
       map[r.class_id].push(r.student_id)
     }
@@ -179,7 +181,7 @@ export default function DashboardPage(){
         <Card className="stat-card" style={{ padding: '14px 16px' }}>
           <p style={{ fontSize: 11, color: 'var(--ui-text-3)', margin: '0 0 6px' }}>전체 학생</p>
           <p style={{ fontSize: 24, fontWeight: 700, color: 'var(--ui-primary)', margin: 0 }}>
-            {students.length}<span style={{ fontSize: 13, fontWeight: 400, color: 'var(--ui-text-2)' }}>명</span>
+            {students.filter(s => !s.is_test).length}<span style={{ fontSize: 13, fontWeight: 400, color: 'var(--ui-text-2)' }}>명</span>
           </p>
         </Card>
       </div>
