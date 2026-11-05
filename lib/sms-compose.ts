@@ -3,6 +3,10 @@ export function parentPhone(value: string | null | undefined): string | null {
   return /^01[016789]\d{7,8}$/.test(phone) ? phone : null
 }
 
+export function recipientPhone(student: { phone?: string | null; parent_phone?: string | null }, target: 'parent' | 'student', isNotice = false): string | null {
+  return parentPhone(isNotice || target === 'parent' ? student.parent_phone : student.phone)
+}
+
 export function unreadStudentIds(studentIds: number[], targets: number[], reads: number[]): number[] {
   const targetSet = new Set(targets)
   const readSet = new Set(reads)

@@ -11,6 +11,15 @@ vm.runInNewContext(ts.transpileModule(readFileSync(new URL('../lib/sms-compose.t
 }).outputText, context)
 const { parentPhone, unreadStudentIds, smsComposeUrl } = context.exports
 
+test('student and parent recipients use separate numbers; notices always target parents', () => {
+  const student = { phone: '010-1111-2222', parent_phone: '010-3333-4444' }
+  assert.equal(context.exports.recipientPhone(student, 'student'), '01011112222')
+  assert.equal(context.exports.recipientPhone(student, 'parent'), '01033334444')
+  assert.equal(context.exports.recipientPhone(student, 'student', true), '01033334444')
+  assert.equal(context.exports.recipientPhone({ ...student, phone: null }, 'student'), null)
+  assert.equal(context.exports.recipientPhone({ ...student, parent_phone: null }, 'student', true), null)
+})
+
 test('normalizes parent mobile numbers and rejects missing or malformed numbers', () => {
   assert.equal(parentPhone('010-1234-5678'), '01012345678')
   assert.equal(parentPhone('+82 10 1234 5678'), '01012345678')
