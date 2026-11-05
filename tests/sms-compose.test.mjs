@@ -35,7 +35,9 @@ test('compose links deduplicate recipients and preserve Korean and special chara
   const message = '공지 확인 부탁드립니다.\nA&B? #1'
   const phones = ['010-1234-5678', '01012345678', '01022223333']
   assert.equal(smsComposeUrl(phones, message, false), `sms:01012345678;01022223333?body=${encodeURIComponent(message)}`)
-  assert.equal(smsComposeUrl(phones, message, true), `sms:01012345678,01022223333&body=${encodeURIComponent(message)}`)
+  assert.equal(smsComposeUrl(phones, message, true), `sms://open?addresses=01012345678,01022223333&body=${encodeURIComponent(message)}`)
+  assert.equal(smsComposeUrl(['010-1234-5678', '01012345678'], message, true), `sms:01012345678&body=${encodeURIComponent(message)}`)
+  assert.equal(smsComposeUrl(['01012345678'], message, false), `sms:01012345678?body=${encodeURIComponent(message)}`)
   assert.throws(() => smsComposeUrl([], message, false))
   assert.throws(() => smsComposeUrl(phones, '  ', false))
 })

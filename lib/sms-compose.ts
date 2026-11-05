@@ -16,5 +16,10 @@ export function unreadStudentIds(studentIds: number[], targets: number[], reads:
 export function smsComposeUrl(phones: string[], body: string, ios: boolean): string {
   const recipients = [...new Set(phones.map(parentPhone).filter((p): p is string => p !== null))]
   if (!recipients.length || !body.trim()) throw new Error('수신번호와 내용을 확인해주세요.')
+  // iOS Messages can discard recipients in the standard comma-separated path.
+  // Its multi-recipient composer accepts them through the addresses parameter.
+  if (ios && recipients.length > 1) {
+    return `sms://open?addresses=${recipients.join(',')}&body=${encodeURIComponent(body)}`
+  }
   return `sms:${recipients.join(ios ? ',' : ';')}${ios ? '&' : '?'}body=${encodeURIComponent(body)}`
 }
