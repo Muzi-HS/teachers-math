@@ -39,6 +39,23 @@ export default function DashboardPage(){
   const [pendingClasses, setPendingClasses] = useState<ClassBulkSendStatus[]>([])
   const [pendingLoading, setPendingLoading] = useState(true)
   const [pendingError, setPendingError] = useState(false)
+  const [pendingResetting, setPendingResetting] = useState(false)
+  const [pendingResetError, setPendingResetError] = useState(false)
+
+  async function resetPendingList() {
+    if (pendingResetting || !confirm('현재 미발송 목록을 모두 비우시겠습니까? 수업기록과 실제 발송 상태는 유지되며, 모든 선생님의 대시보드에 적용됩니다.')) return
+    setPendingResetting(true)
+    setPendingResetError(false)
+    try {
+      const { error } = await supabase.rpc('reset_dashboard_pending_sends')
+      if (error) throw error
+      setPendingClasses(await loadPendingClassSends())
+    } catch {
+      setPendingResetError(true)
+    } finally {
+      setPendingResetting(false)
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -230,11 +247,15 @@ export default function DashboardPage(){
 
       {/* 미발송 반 목록 */}
       <Card style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
           <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--ui-primary)', margin: 0 }}>미발송 반 목록</p>
           {!pendingLoading && !pendingError && <Badge tone="accent">{pendingClasses.length}건</Badge>}
+          <Button type="button" size="sm" variant="ghost" style={{ marginLeft: 'auto' }} onClick={resetPendingList} disabled={pendingLoading || pendingError || pendingResetting || pendingClasses.length === 0}>
+            {pendingResetting ? '초기화 중...' : '초기화'}
+          </Button>
         </div>
-        <p style={{ fontSize: 11, color: 'var(--ui-text-3)', margin: '0 0 10px' }}>수업기록이 있고 &apos;일괄 발송&apos; 버튼을 누르지 않은 반입니다. 날짜별로 표시하며, 학부모의 푸시 알림 수신 여부는 무관합니다.</p>
+        <p style={{ fontSize: 11, color: 'var(--ui-text-3)', margin: '0 0 10px' }}>수업기록이 있고 &apos;일괄 발송&apos; 버튼을 누르지 않은 반입니다. 초기화하면 현재 항목을 목록에서 비우며 새 수업기록은 다시 표시됩니다.</p>
+        {pendingResetError && <p role="alert" style={{ fontSize: 13, color: 'var(--ui-danger)' }}>목록 초기화에 실패했습니다. 다시 시도해주세요.</p>}
         {pendingLoading ? <p style={{ fontSize: 13, color: 'var(--ui-text-3)' }}>불러오는 중...</p>
           : pendingError ? <p role="alert" style={{ fontSize: 13, color: 'var(--ui-danger)' }}>미발송 반 목록을 불러오지 못했습니다. 새로고침해주세요.</p>
           : pendingClasses.length === 0 ? <p style={{ fontSize: 13, color: 'var(--ui-text-2)', display: 'flex', alignItems: 'center', gap: 8, background: 'var(--ui-bg)', padding: 12, borderRadius: 8 }}><IconCheck size={16} /> 일괄 발송 대기 중인 반이 없습니다.</p>
