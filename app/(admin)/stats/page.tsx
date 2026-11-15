@@ -16,9 +16,10 @@ function StatsTabs() {
   const router = useRouter()
   const { role } = useAuth()
   const { mobileMode } = useMobileMode()
+  if (role !== 'admin') return null
   const requested = params.get('tab')
-  const tab = requested === 'ranking' || (requested === 'study' && (role === 'admin' || role === 'teacher')) || ((requested === 'analytics' || requested === 'coupons' || requested === 'enrollment') && role === 'admin') ? requested : requested === 'stats' ? 'stats' : role === 'admin' ? 'analytics' : 'stats'
-  const tabs = [...(role === 'admin' ? [{ id: 'analytics', label: '접속 통계' }, { id: 'enrollment', label: '학생 추이' }] : []), { id: 'stats', label: '학생 통계' }, { id: 'ranking', label: '숙제 이행률 통계' }, ...((role === 'admin' || role === 'teacher') ? [{ id: 'study', label: '공부시간 통계' }] : []), ...(role === 'admin' ? [{ id: 'coupons', label: '쿠폰' }] : [])]
+  const tab = requested === 'ranking' || (requested === 'study' && role === 'admin') || ((requested === 'analytics' || requested === 'coupons' || requested === 'enrollment') && role === 'admin') ? requested : requested === 'stats' ? 'stats' : role === 'admin' ? 'analytics' : 'stats'
+  const tabs = [...(role === 'admin' ? [{ id: 'analytics', label: '접속 통계' }, { id: 'enrollment', label: '학생 추이' }] : []), { id: 'stats', label: '학생 통계' }, { id: 'ranking', label: '숙제 이행률 통계' }, ...(role === 'admin' ? [{ id: 'study', label: '공부시간 통계' }] : []), ...(role === 'admin' ? [{ id: 'coupons', label: '쿠폰' }] : [])]
   return <div style={{ padding: mobileMode ? '16px 14px 88px' : '28px 32px', color: 'var(--ui-text)' }}>
     <header style={{ marginBottom: 20 }}><h1 style={{ fontSize: mobileMode ? 17 : 21, fontWeight: 700 }}>통계</h1><p style={{ fontSize: 13, color: 'var(--ui-text-2)', marginTop: 4 }}>학생 현황과 학습·운영 통계를 확인하세요</p></header>
     <div aria-label="통계 메뉴" style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--ui-surface-2)', borderRadius: 12, marginBottom: 20, width: 'fit-content', maxWidth: '100%', flexWrap: 'wrap' }}>

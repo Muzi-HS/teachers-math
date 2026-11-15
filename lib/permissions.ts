@@ -37,8 +37,8 @@ export const can = {
   // 테스트 관리 — admin, teacher, assistant 모두 전체 기능
   manageTests:      (role: Role) => role === 'admin' || role === 'teacher' || role === 'assistant',
 
-  // 통계 — admin, teacher, assistant 모두 전체 기능
-  viewStats:        (role: Role) => role === 'admin' || role === 'teacher' || role === 'assistant',
+  // 통계 — 관리자만 접근
+  viewStats:        (role: Role) => role === 'admin',
 
   // 선생님 계정 관리 — admin만
   manageTeachers:   (role: Role) => role === 'admin',
@@ -63,7 +63,7 @@ export const menuAccess: Record<string, (role: Role) => boolean> = {
   tests:      (r) => r === 'admin' || r === 'teacher' || r === 'assistant',
   notices:    (r) => r !== 'parent' && r !== 'student', // parent/student는 각자 별도 화면에서 열람
   schedule:   (r) => r !== 'parent' && r !== 'student', // parent/student는 각자 별도 화면에서 열람
-  stats:      (r) => r === 'admin' || r === 'teacher' || r === 'assistant',
+  stats:      (r) => r === 'admin',
   teachers:   (r) => r === 'admin',                                        // 선생님 관리 — admin만
   attendance: (r) => r === 'admin' || r === 'teacher' || r === 'assistant', // 출근부 — admin+teacher+assistant
   'app-qr':   (r) => r === 'admin' || r === 'teacher' || r === 'assistant', // 교직원 앱 설치

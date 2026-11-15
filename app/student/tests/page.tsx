@@ -216,8 +216,8 @@ export default function StudentTestsPage() {
       .student-exams .exam-progress{height:6px;background:var(--ui-border);border-radius:99px;overflow:hidden;margin:12px 0 4px}
       .student-exams .exam-progress-fill{height:100%;background:var(--ui-accent);border-radius:99px;transition:width .2s}
       .student-exams .exam-status-line{font-size:12.5px;color:var(--ui-text-2);display:flex;align-items:center;gap:6px;margin:6px 0 14px}
-      .student-exams .exam-answers{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
-      .student-exams .exam-choice{width:50px;height:50px;border-radius:50%;font-size:19px;font-weight:700;padding:0;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+      .student-exams .exam-answers{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:clamp(4px,2vw,10px);margin-top:12px;max-width:290px}
+      .student-exams .exam-choice{width:100%;max-width:50px;height:auto;aspect-ratio:1;min-width:0;border-radius:50%;font-size:19px;font-weight:700;padding:0;flex-shrink:0;display:flex;align-items:center;justify-content:center}
       .student-exams .exam-choice[aria-pressed=true]{box-shadow:0 0 0 3px var(--ui-focus-ring)}
       .student-exams .exam-error{background:var(--ui-danger-bg);color:var(--ui-danger);padding:12px 14px;border-radius:10px;font-size:13px}
       .student-exams .exam-result{text-align:center;padding:30px 20px}

@@ -13,6 +13,9 @@ import { useMobileMode } from '@/context/MobileModeContext'
 import { createContactVCard, downloadContact, downloadVCards, studentContactName } from '@/lib/contact-vcard'
 import { navy, navyDk, navyM, gold, goldL, bg, bd, tx, tx2, tx3, re, rbg, gr, gbg } from '@/lib/ui-tokens'
 
+const STATUS_LABELS = { enrolled: '재원생', withdrawn: '퇴원생', prospective: '예비재원생' } as const
+type StudentStatus = keyof typeof STATUS_LABELS
+
 type Student = {
   id: number
   name: string
@@ -22,12 +25,13 @@ type Student = {
   phone: string
   parent_phone: string
   reg_date: string
+  enrollment_status: StudentStatus
   is_test: boolean
 }
 
 type Class = { id: number; name: string; active: boolean }
 type TeacherDirectory = {
-  students: Pick<Student, 'id' | 'name' | 'birth_year' | 'school' | 'school_type' | 'reg_date' | 'phone' | 'parent_phone'>[]
+  students: Pick<Student, 'id' | 'name' | 'birth_year' | 'school' | 'school_type' | 'reg_date' | 'phone' | 'parent_phone' | 'enrollment_status'>[]
   classes: Class[]
   memberships: { student_id:number; class_id:number }[]
   schools: { student_id:number; school_type:SchoolKey; school_name:string }[]
@@ -40,6 +44,7 @@ const BLANK: Omit<Student, 'id'> = {
   school: '', school_type: null,
   phone: '', parent_phone: '',
   reg_date: kstDateStr(),
+  enrollment_status: 'enrolled',
   is_test: false,
 }
 
@@ -82,6 +87,7 @@ export default function StudentsPage() {
   const { mobileMode, isMobileScreen } = useMobileMode()
   const [contactModal, setContactModal] = useState(false)
   const [messageModal, setMessageModal] = useState(false)
+  const [statusFilter, setStatusFilter] = useState<StudentStatus>('enrolled')
   const [showTestStudents, setShowTestStudents] = useState(false)
   const [students, setStudents] = useState<Student[]>([])
   const [selectedIds, setSelectedIds] = useState<number[]>([])
@@ -208,7 +214,7 @@ export default function StudentsPage() {
 
   function openAdd() {
     setEditId(null)
-    setForm({ ...BLANK })
+    setForm({ ...BLANK, enrollment_status: statusFilter })
     setSchoolElementary(''); setSchoolMiddle(''); setSchoolHigh('')
     setNoSchoolMap({ '초등': false, '중등': false, '고등': false })
     setNoPhone(false)
@@ -222,6 +228,7 @@ export default function StudentsPage() {
       school_type: s.school_type ?? null,
       phone: s.phone ?? '', parent_phone: s.parent_phone ?? '',
       reg_date: s.reg_date ?? kstDateStr(),
+      enrollment_status: s.enrollment_status ?? 'enrolled',
       is_test: s.is_test ?? false,
     })
     const entries = ssMap[s.id] ?? []
@@ -254,6 +261,7 @@ export default function StudentsPage() {
       phone: form.phone.trim(),
       parent_phone: form.parent_phone.trim(),
       reg_date: form.reg_date,
+      enrollment_status: form.enrollment_status,
       is_test: form.is_test,
     }
 
@@ -284,6 +292,7 @@ export default function StudentsPage() {
     }
 
     toast(form.name + (editId ? ' 수정됨' : ' 등록됨'))
+    setStatusFilter(form.enrollment_status)
     setSaving(false); setModal(false)
     await fetchAll()
   }
@@ -312,7 +321,17 @@ export default function StudentsPage() {
 
   async function remove(id: number, name: string) {
     const student = students.find(s => s.id === id)
-    if (!confirm(student?.is_test ? `${name} 테스트 학생을 삭제하시겠습니까? 통계에는 포함되지 않습니다.` : `${name} 학생을 퇴원 처리하시겠습니까? 연결된 자료가 삭제되며 통계용 등록일·퇴원일만 보관합니다. 되돌릴 수 없습니다. 잘못 등록한 학생은 먼저 수정에서 테스트 학생으로 지정하세요.`)) return
+    if (!student || role !== 'admin') return
+    if (!student.is_test) {
+      if (!confirm(`${name} 학생을 퇴원생으로 변경하시겠습니까? 학생 자료는 보관됩니다.`)) return
+      const { error } = await supabase.from('students').update({ enrollment_status: 'withdrawn' }).eq('id', id)
+      if (error) return toast('퇴원 처리 실패: ' + error.message, false)
+      setDetailStu(null)
+      toast(name + ' 퇴원 처리됨')
+      await fetchAll()
+      return
+    }
+    if (!confirm(`${name} 테스트 학생을 삭제하시겠습니까?`)) return
 
     const { data: ps } = await supabase
       .from('parent_students')
@@ -350,7 +369,7 @@ export default function StudentsPage() {
     const matchStage  = stageFlt.length === 0 || (!!s.school_type && stageFlt.includes(s.school_type as SchoolKey))
     const matchSchool = schoolNameFlt.length === 0 || schoolNameFlt.includes(s.school)
     const matchClass  = clsFlt.length === 0 || clsFlt.some(f => f === 'none' ? (csMap[s.id] ?? []).length === 0 : (csMap[s.id] ?? []).includes(Number(f)))
-    return (showTestStudents || !s.is_test) && matchSearch && matchAge && matchSchool && matchStage && matchClass
+    return (s.enrollment_status ?? 'enrolled') === statusFilter && (showTestStudents || !s.is_test) && matchSearch && matchAge && matchSchool && matchStage && matchClass
   })
 
   const selectedStudents = filtered.filter(s => selectedIds.includes(s.id))
@@ -471,6 +490,9 @@ export default function StudentsPage() {
 
       {messageModal && canContacts && <MessageComposerDialog onClose={() => setMessageModal(false)} />}
 
+      <div aria-label="학생 재원 상태" style={{ display:'flex',gap:8,flexWrap:'wrap',marginBottom:14 }}>
+        {(Object.entries(STATUS_LABELS) as [StudentStatus, string][]).map(([status, label]) => <button type="button" key={status} className={`pill${statusFilter === status ? ' active' : ''}`} aria-pressed={statusFilter === status} style={statusFilter === status ? { background:navy,color:'#fff' } : undefined} onClick={() => { setStatusFilter(status); setSelectedIds([]) }}>{label} {students.filter(s => (s.enrollment_status ?? 'enrolled') === status && (showTestStudents || !s.is_test)).length}명</button>)}
+      </div>
       {/* 카드 */}
       <div style={{ background:'#fff',borderRadius:12,border:`1px solid ${bd}`,padding:mobileMode?14:22,boxShadow:'0 1px 4px rgba(0,0,0,.06)' }}>
         <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16 }}>
@@ -758,6 +780,12 @@ export default function StudentsPage() {
                 </div>
               </div>
 
+              <div style={{ marginBottom:14 }}>
+                <label className="lb" htmlFor="enrollment-status">재원 상태</label>
+                <select id="enrollment-status" className="fi" value={form.enrollment_status} onChange={e => setForm(f => ({ ...f,enrollment_status:e.target.value as StudentStatus }))}>
+                  {Object.entries(STATUS_LABELS).map(([value,label]) => <option key={value} value={value}>{label}</option>)}
+                </select>
+              </div>
               {/* 등록일 */}
               <label style={{ display:'flex',alignItems:'center',gap:8,minHeight:44,fontSize:13,color:tx2 }}><input type="checkbox" checked={form.is_test} onChange={e => setForm(f => ({ ...f,is_test:e.target.checked }))} />테스트 학생 (학생 추이 통계 제외)</label>
               <div style={{ marginBottom:14 }}>
