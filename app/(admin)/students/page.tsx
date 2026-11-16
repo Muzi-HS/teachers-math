@@ -13,7 +13,8 @@ import { useMobileMode } from '@/context/MobileModeContext'
 import { createContactVCard, downloadContact, downloadVCards, studentContactName } from '@/lib/contact-vcard'
 import { navy, navyDk, navyM, gold, goldL, bg, bd, tx, tx2, tx3, re, rbg, gr, gbg } from '@/lib/ui-tokens'
 
-const STATUS_LABELS = { enrolled: '재원생', withdrawn: '퇴원생', prospective: '예비재원생' } as const
+const STATUS_LABELS = { enrolled: '재원생', prospective: '예비재원생', withdrawn: '퇴원생' } as const
+const STATUS_COLORS = { enrolled: { background:gbg,color:gr }, prospective: { background:goldL,color:gold }, withdrawn: { background:rbg,color:re } }
 type StudentStatus = keyof typeof STATUS_LABELS
 
 type Student = {
@@ -408,7 +409,7 @@ export default function StudentsPage() {
     .flatMap(type => [...new Set(
       students.filter(s => s.school_type === type && s.school).map(s => s.school)
     )].sort())
-  const hasActiveFilter = search !== '' || ageFlt.length > 0 || schoolNameFlt.length > 0 || stageFlt.length > 0 || clsFlt.length > 0
+  const hasActiveFilter = search !== '' || ageFlt.length > 0 || schoolNameFlt.length > 0 || stageFlt.length > 0 || clsFlt.length > 0 || statusFilter !== 'enrolled'
 
   function toggleIn<T>(setFn: (fn: (arr: T[]) => T[]) => void, val: T) {
     setFn(arr => arr.includes(val) ? arr.filter(v => v !== val) : [...arr, val])
@@ -425,6 +426,7 @@ export default function StudentsPage() {
 
   function resetFilters() {
     setSearch(''); setAgeFlt([]); setSchoolNameFlt([]); setStageFlt([]); setClsFlt([])
+    setStatusFilter('enrolled'); setSelectedIds([])
   }
 
   function getStudentClasses(stuId: number) {
@@ -490,14 +492,11 @@ export default function StudentsPage() {
 
       {messageModal && canContacts && <MessageComposerDialog onClose={() => setMessageModal(false)} />}
 
-      <div aria-label="학생 재원 상태" style={{ display:'flex',gap:8,flexWrap:'wrap',marginBottom:14 }}>
-        {(Object.entries(STATUS_LABELS) as [StudentStatus, string][]).map(([status, label]) => <button type="button" key={status} className={`pill${statusFilter === status ? ' active' : ''}`} aria-pressed={statusFilter === status} style={statusFilter === status ? { background:navy,color:'#fff' } : undefined} onClick={() => { setStatusFilter(status); setSelectedIds([]) }}>{label} {students.filter(s => (s.enrollment_status ?? 'enrolled') === status && (showTestStudents || !s.is_test)).length}명</button>)}
-      </div>
       {/* 카드 */}
       <div style={{ background:'#fff',borderRadius:12,border:`1px solid ${bd}`,padding:mobileMode?14:22,boxShadow:'0 1px 4px rgba(0,0,0,.06)' }}>
         <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16 }}>
           <span style={{ fontSize:14,fontWeight:600,color:tx }}>
-            {role === 'teacher' ? '담당 학생' : '전체 학생'} <span style={{ fontSize:12,color:tx3,fontWeight:400 }}>{filtered.length}명</span>
+            {role === 'teacher' ? '담당 학생' : '전체 학생'} <span style={{ fontSize:12,color:tx3,fontWeight:400 }}>{students.filter(s => (s.enrollment_status ?? 'enrolled') === 'enrolled' && !s.is_test).length}명</span>
           </span>
         </div>
         {/* 검색 */}
@@ -602,6 +601,13 @@ export default function StudentsPage() {
           </div>
         </div>
 
+        <div className="fgrp" style={{ marginBottom:18 }} aria-label="학생 재원 상태">
+          <p className="fgrp-lb">상태</p>
+          <div style={{ display:'flex',gap:6,flexWrap:'wrap' }}>
+            {(Object.entries(STATUS_LABELS) as [StudentStatus, string][]).map(([status, label]) => <button type="button" key={status} className={`pill${statusFilter === status ? ' active' : ''}`} aria-pressed={statusFilter === status} style={statusFilter === status ? { background:navy,color:'#fff' } : undefined} onClick={() => { setStatusFilter(status); setSelectedIds([]) }}>{label}</button>)}
+          </div>
+        </div>
+        <p style={{ fontSize:12,color:tx3,marginBottom:12 }}>조회 결과 {filtered.length}명</p>
         {canContacts && isMobileScreen && <div style={{ display:'flex',justifyContent:'flex-end',marginBottom:12 }}><button className="bout" style={{ minHeight:44 }} disabled={loading || !filtered.length} onClick={() => { setSelectedIds([]); setContactModal(true) }}>연락처 저장</button></div>}
         {contactModal && canContacts && isMobileScreen && <ContactSaveDialog
           students={filtered} selectedIds={selectedIds} target={contactTarget}
@@ -627,6 +633,7 @@ export default function StudentsPage() {
                   {!mobileMode && canContacts && <th>학생 연락처</th>}
                   {canContacts && <th>{mobileMode ? '연락처' : '학부모 연락처'}</th>}
                   {!mobileMode && <th>소속 반</th>}
+                  <th>상태</th>
                   {!mobileMode && isAdmin && <th>관리</th>}
                 </tr>
               </thead>
@@ -667,11 +674,12 @@ export default function StudentsPage() {
                           </div>
                         </td>
                       )}
+                      <td><span className="badge" style={STATUS_COLORS[s.enrollment_status ?? 'enrolled']}>{STATUS_LABELS[s.enrollment_status ?? 'enrolled']}</span></td>
                       {!mobileMode && isAdmin && (
                         <td onClick={e => e.stopPropagation()}>
                           <div style={{ display:'flex',gap:5 }}>
                             <button className="bout" onClick={() => openEdit(s)}>수정</button>
-                            <button className="bdng" onClick={() => remove(s.id, s.name)}>{s.is_test ? '삭제' : '퇴원'}</button>
+                            {(s.is_test || s.enrollment_status !== 'withdrawn') && <button className="bdng" onClick={() => remove(s.id, s.name)}>{s.is_test ? '삭제' : '퇴원'}</button>}
                           </div>
                         </td>
                       )}
@@ -950,7 +958,7 @@ export default function StudentsPage() {
               {isAdmin && (
                 <button className="bout" onClick={() => { setDetailStu(null); openEdit(detailStu) }}>수정</button>
               )}
-              {isAdmin && <button className="bdng" onClick={() => remove(detailStu.id,detailStu.name)}>{detailStu.is_test ? '테스트 삭제' : '퇴원 처리'}</button>}
+              {isAdmin && (detailStu.is_test || detailStu.enrollment_status !== 'withdrawn') && <button className="bdng" onClick={() => remove(detailStu.id,detailStu.name)}>{detailStu.is_test ? '테스트 삭제' : '퇴원 처리'}</button>}
               <button className="bgold" onClick={() => setDetailStu(null)}>닫기</button>
             </div>
           </div>
