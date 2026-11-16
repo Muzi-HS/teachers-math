@@ -88,7 +88,7 @@ export default function StudentsPage() {
   const { mobileMode, isMobileScreen } = useMobileMode()
   const [contactModal, setContactModal] = useState(false)
   const [messageModal, setMessageModal] = useState(false)
-  const [showTestStudents, setShowTestStudents] = useState(false)
+  const [statusFilter, setStatusFilter] = useState<StudentStatus>('enrolled')
   const [students, setStudents] = useState<Student[]>([])
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [contactTarget, setContactTarget] = useState('both')
@@ -368,7 +368,7 @@ export default function StudentsPage() {
     const matchStage  = stageFlt.length === 0 || (!!s.school_type && stageFlt.includes(s.school_type as SchoolKey))
     const matchSchool = schoolNameFlt.length === 0 || schoolNameFlt.includes(s.school)
     const matchClass  = clsFlt.length === 0 || clsFlt.some(f => f === 'none' ? (csMap[s.id] ?? []).length === 0 : (csMap[s.id] ?? []).includes(Number(f)))
-    return (showTestStudents || !s.is_test) && matchSearch && matchAge && matchSchool && matchStage && matchClass
+    return (s.enrollment_status ?? 'enrolled') === statusFilter && matchSearch && matchAge && matchSchool && matchStage && matchClass
   })
 
   const selectedStudents = filtered.filter(s => selectedIds.includes(s.id))
@@ -407,7 +407,7 @@ export default function StudentsPage() {
     .flatMap(type => [...new Set(
       students.filter(s => s.school_type === type && s.school).map(s => s.school)
     )].sort())
-  const hasActiveFilter = search !== '' || ageFlt.length > 0 || schoolNameFlt.length > 0 || stageFlt.length > 0 || clsFlt.length > 0
+  const hasActiveFilter = search !== '' || ageFlt.length > 0 || schoolNameFlt.length > 0 || stageFlt.length > 0 || clsFlt.length > 0 || statusFilter !== 'enrolled'
 
   function toggleIn<T>(setFn: (fn: (arr: T[]) => T[]) => void, val: T) {
     setFn(arr => arr.includes(val) ? arr.filter(v => v !== val) : [...arr, val])
@@ -423,6 +423,7 @@ export default function StudentsPage() {
   }
 
   function resetFilters() {
+    setStatusFilter('enrolled')
     setSearch(''); setAgeFlt([]); setSchoolNameFlt([]); setStageFlt([]); setClsFlt([])
     setSelectedIds([])
   }
@@ -498,7 +499,6 @@ export default function StudentsPage() {
           </span>
         </div>
         {/* 검색 */}
-        {isAdmin && <label style={{ display:'flex',alignItems:'center',gap:8,minHeight:44,fontSize:12,color:tx2 }}><input type="checkbox" checked={showTestStudents} onChange={e => setShowTestStudents(e.target.checked)} />테스트 학생 포함</label>}
         <div style={{ display:'flex',gap:20,alignItems:'center',marginBottom:12,flexWrap:'wrap' }}>
           <div className="sbox" style={{ maxWidth:320 }}>
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke={tx3}><circle cx="11" cy="11" r="8" strokeWidth={2}/><path strokeWidth={2} d="M21 21l-4.35-4.35"/></svg>
@@ -509,6 +509,12 @@ export default function StudentsPage() {
           )}
         </div>
 
+        <div className="fgrp" style={{ marginBottom:14 }} aria-label="학생 재원 상태">
+          <p className="fgrp-lb">상태</p>
+          <div style={{ display:'flex',gap:6,flexWrap:'wrap' }}>
+            {(Object.entries(STATUS_LABELS) as [StudentStatus, string][]).map(([status, label]) => <button type="button" key={status} className={`pill${statusFilter === status ? ' active' : ''}`} aria-pressed={statusFilter === status} style={statusFilter === status ? { background:navy,color:'#fff' } : undefined} onClick={() => { setStatusFilter(status); setSelectedIds([]) }}>{label}</button>)}
+          </div>
+        </div>
         {/* 학교급 (중복 선택 가능) */}
         <div className="fgrp" style={{ marginBottom:14 }}>
           <p className="fgrp-lb">학교급</p>
