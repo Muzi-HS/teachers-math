@@ -88,7 +88,6 @@ export default function StudentsPage() {
   const { mobileMode, isMobileScreen } = useMobileMode()
   const [contactModal, setContactModal] = useState(false)
   const [messageModal, setMessageModal] = useState(false)
-  const [statusFilter, setStatusFilter] = useState<StudentStatus>('enrolled')
   const [showTestStudents, setShowTestStudents] = useState(false)
   const [students, setStudents] = useState<Student[]>([])
   const [selectedIds, setSelectedIds] = useState<number[]>([])
@@ -215,7 +214,7 @@ export default function StudentsPage() {
 
   function openAdd() {
     setEditId(null)
-    setForm({ ...BLANK, enrollment_status: statusFilter })
+    setForm({ ...BLANK })
     setSchoolElementary(''); setSchoolMiddle(''); setSchoolHigh('')
     setNoSchoolMap({ '초등': false, '중등': false, '고등': false })
     setNoPhone(false)
@@ -262,7 +261,7 @@ export default function StudentsPage() {
       phone: form.phone.trim(),
       parent_phone: form.parent_phone.trim(),
       reg_date: form.reg_date,
-      enrollment_status: form.enrollment_status,
+      enrollment_status: form.enrollment_status === 'withdrawn' ? 'withdrawn' : form.reg_date > kstDateStr() ? 'prospective' : 'enrolled',
       is_test: form.is_test,
     }
 
@@ -293,7 +292,6 @@ export default function StudentsPage() {
     }
 
     toast(form.name + (editId ? ' 수정됨' : ' 등록됨'))
-    setStatusFilter(form.enrollment_status)
     setSaving(false); setModal(false)
     await fetchAll()
   }
@@ -370,7 +368,7 @@ export default function StudentsPage() {
     const matchStage  = stageFlt.length === 0 || (!!s.school_type && stageFlt.includes(s.school_type as SchoolKey))
     const matchSchool = schoolNameFlt.length === 0 || schoolNameFlt.includes(s.school)
     const matchClass  = clsFlt.length === 0 || clsFlt.some(f => f === 'none' ? (csMap[s.id] ?? []).length === 0 : (csMap[s.id] ?? []).includes(Number(f)))
-    return (s.enrollment_status ?? 'enrolled') === statusFilter && (showTestStudents || !s.is_test) && matchSearch && matchAge && matchSchool && matchStage && matchClass
+    return (showTestStudents || !s.is_test) && matchSearch && matchAge && matchSchool && matchStage && matchClass
   })
 
   const selectedStudents = filtered.filter(s => selectedIds.includes(s.id))
@@ -409,7 +407,7 @@ export default function StudentsPage() {
     .flatMap(type => [...new Set(
       students.filter(s => s.school_type === type && s.school).map(s => s.school)
     )].sort())
-  const hasActiveFilter = search !== '' || ageFlt.length > 0 || schoolNameFlt.length > 0 || stageFlt.length > 0 || clsFlt.length > 0 || statusFilter !== 'enrolled'
+  const hasActiveFilter = search !== '' || ageFlt.length > 0 || schoolNameFlt.length > 0 || stageFlt.length > 0 || clsFlt.length > 0
 
   function toggleIn<T>(setFn: (fn: (arr: T[]) => T[]) => void, val: T) {
     setFn(arr => arr.includes(val) ? arr.filter(v => v !== val) : [...arr, val])
@@ -426,7 +424,7 @@ export default function StudentsPage() {
 
   function resetFilters() {
     setSearch(''); setAgeFlt([]); setSchoolNameFlt([]); setStageFlt([]); setClsFlt([])
-    setStatusFilter('enrolled'); setSelectedIds([])
+    setSelectedIds([])
   }
 
   function getStudentClasses(stuId: number) {
@@ -601,12 +599,6 @@ export default function StudentsPage() {
           </div>
         </div>
 
-        <div className="fgrp" style={{ marginBottom:18 }} aria-label="학생 재원 상태">
-          <p className="fgrp-lb">상태</p>
-          <div style={{ display:'flex',gap:6,flexWrap:'wrap' }}>
-            {(Object.entries(STATUS_LABELS) as [StudentStatus, string][]).map(([status, label]) => <button type="button" key={status} className={`pill${statusFilter === status ? ' active' : ''}`} aria-pressed={statusFilter === status} style={statusFilter === status ? { background:navy,color:'#fff' } : undefined} onClick={() => { setStatusFilter(status); setSelectedIds([]) }}>{label}</button>)}
-          </div>
-        </div>
         <p style={{ fontSize:12,color:tx3,marginBottom:12 }}>조회 결과 {filtered.length}명</p>
         {canContacts && isMobileScreen && <div style={{ display:'flex',justifyContent:'flex-end',marginBottom:12 }}><button className="bout" style={{ minHeight:44 }} disabled={loading || !filtered.length} onClick={() => { setSelectedIds([]); setContactModal(true) }}>연락처 저장</button></div>}
         {contactModal && canContacts && isMobileScreen && <ContactSaveDialog
@@ -790,15 +782,17 @@ export default function StudentsPage() {
 
               <div style={{ marginBottom:14 }}>
                 <label className="lb" htmlFor="enrollment-status">재원 상태</label>
-                <select id="enrollment-status" className="fi" value={form.enrollment_status} onChange={e => setForm(f => ({ ...f,enrollment_status:e.target.value as StudentStatus }))}>
-                  {Object.entries(STATUS_LABELS).map(([value,label]) => <option key={value} value={value}>{label}</option>)}
-                </select>
+                {editId ? <select id="enrollment-status" className="fi" value={form.enrollment_status === 'withdrawn' ? 'withdrawn' : 'active'} onChange={e => setForm(f => ({ ...f,enrollment_status:e.target.value === 'withdrawn' ? 'withdrawn' : f.reg_date > kstDateStr() ? 'prospective' : 'enrolled' }))}>
+                  <option value="active">등록일 기준 자동 (재원생 / 예비재원생)</option>
+                  <option value="withdrawn">퇴원생</option>
+                </select> : <p id="enrollment-status" style={{ fontSize:13,color:tx2 }}>{form.reg_date > kstDateStr() ? '예비재원생' : '재원생'}</p>}
+                <p style={{ fontSize:11,color:tx3,marginTop:6 }}>미래 등록일은 예비재원생으로 등록되며, 등록일이 되면 자동으로 재원생으로 전환됩니다.</p>
               </div>
               {/* 등록일 */}
               <label style={{ display:'flex',alignItems:'center',gap:8,minHeight:44,fontSize:13,color:tx2 }}><input type="checkbox" checked={form.is_test} onChange={e => setForm(f => ({ ...f,is_test:e.target.checked }))} />테스트 학생 (학생 추이 통계 제외)</label>
               <div style={{ marginBottom:14 }}>
                 <label className="lb">학원 등록일</label>
-                <input type="date" className="fi" value={form.reg_date} onChange={e => setForm(f => ({...f, reg_date:e.target.value}))}/>
+                <input type="date" className="fi" value={form.reg_date} onChange={e => setForm(f => ({...f, reg_date:e.target.value, enrollment_status:f.enrollment_status === 'withdrawn' ? 'withdrawn' : e.target.value > kstDateStr() ? 'prospective' : 'enrolled'}))}/>
               </div>
 
               {!editId && form.parent_phone && (
