@@ -13,14 +13,14 @@ import { useMobileMode } from '@/context/MobileModeContext'
 import { createContactVCard, downloadContact, downloadVCards, studentContactName } from '@/lib/contact-vcard'
 import { navy, navyDk, navyM, gold, goldL, bg, bd, tx, tx2, tx3, re, rbg, gr, gbg } from '@/lib/ui-tokens'
 
-const STATUS_LABELS = { enrolled: '재원생', prospective: '예비재원생', withdrawn: '퇴원생' } as const
+const STATUS_LABELS = { enrolled: '재원생', prospective: '예비재원생', withdrawn: '퇴원생', test: '테스트 학생' } as const
 const STATUS_COLORS = { enrolled: { background:gbg,color:gr }, prospective: { background:goldL,color:gold }, withdrawn: { background:rbg,color:re } }
-type StudentStatus = keyof typeof STATUS_LABELS
+type StudentStatus = Exclude<keyof typeof STATUS_LABELS, 'test'>
 
 type Student = {
   id: number
   name: string
-  birth_year: number
+  birth_year: number | null
   school: string           // 현재(최상위) 학교 이름 - school_history 중 최상위 항목 캐시
   school_type: string | null   // 현재(최상위) 학교 구분 '초등' | '중등' | '고등' | null
   phone: string
@@ -41,7 +41,7 @@ type TeacherDirectory = {
 type SchoolEntry = { school_type: SchoolKey; school_name: string }
 
 const BLANK: Omit<Student, 'id'> = {
-  name: '', birth_year: kstNow().getFullYear() - 15,
+  name: '', birth_year: null,
   school: '', school_type: null,
   phone: '', parent_phone: '',
   reg_date: kstDateStr(),
@@ -88,7 +88,7 @@ export default function StudentsPage() {
   const { mobileMode, isMobileScreen } = useMobileMode()
   const [contactModal, setContactModal] = useState(false)
   const [messageModal, setMessageModal] = useState(false)
-  const [statusFilter, setStatusFilter] = useState<StudentStatus>('enrolled')
+  const [statusFilter, setStatusFilter] = useState<keyof typeof STATUS_LABELS>('enrolled')
   const [students, setStudents] = useState<Student[]>([])
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [contactTarget, setContactTarget] = useState('both')
@@ -208,13 +208,14 @@ export default function StudentsPage() {
     setTimeout(() => setNotif(null), 3000)
   }
 
-  function ageOf(birth: number) {
+  function ageOf(birth: number | null) {
+    if (!birth) return 0
     return kstNow().getFullYear() - birth + 1
   }
 
   function openAdd() {
     setEditId(null)
-    setForm({ ...BLANK })
+    setForm({ ...BLANK, reg_date:kstDateStr() })
     setSchoolElementary(''); setSchoolMiddle(''); setSchoolHigh('')
     setNoSchoolMap({ '초등': false, '중등': false, '고등': false })
     setNoPhone(false)
@@ -242,7 +243,7 @@ export default function StudentsPage() {
 
   async function save() {
     if (!form.name.trim())   return toast('이름을 입력하세요.', false)
-    if (!form.birth_year)    return toast('출생연도를 입력하세요.', false)
+    if (!form.birth_year || !Number.isInteger(form.birth_year) || form.birth_year < 1900 || form.birth_year > kstNow().getFullYear()) return toast('출생연도를 4자리로 입력하세요.', false)
     if (!form.reg_date) return toast('등록일을 입력하세요.', false)
     setSaving(true)
 
@@ -361,6 +362,8 @@ export default function StudentsPage() {
   const canFull = can.viewFullStudent(role!)
   const canContacts = can.viewStudentContacts(role!)
   const formAge = form.birth_year ? ageOf(form.birth_year) : 0
+  const editingStudent = students.find(s => s.id === editId)
+  const statusLocked = !!editingStudent && !editingStudent.is_test && editingStudent.enrollment_status !== 'withdrawn'
 
   const filtered = students.filter(s => {
     const matchSearch = s.name.includes(search) || (s.school ?? '').includes(search)
@@ -368,7 +371,7 @@ export default function StudentsPage() {
     const matchStage  = stageFlt.length === 0 || (!!s.school_type && stageFlt.includes(s.school_type as SchoolKey))
     const matchSchool = schoolNameFlt.length === 0 || schoolNameFlt.includes(s.school)
     const matchClass  = clsFlt.length === 0 || clsFlt.some(f => f === 'none' ? (csMap[s.id] ?? []).length === 0 : (csMap[s.id] ?? []).includes(Number(f)))
-    return (s.enrollment_status ?? 'enrolled') === statusFilter && matchSearch && matchAge && matchSchool && matchStage && matchClass
+    return (statusFilter === 'test' ? s.is_test : !s.is_test && (s.enrollment_status ?? 'enrolled') === statusFilter) && matchSearch && matchAge && matchSchool && matchStage && matchClass
   })
 
   const selectedStudents = filtered.filter(s => selectedIds.includes(s.id))
@@ -400,7 +403,7 @@ export default function StudentsPage() {
     }
   }
 
-  const ageOptions       = [...new Set(students.map(s => ageOf(s.birth_year)))].sort((a, b) => a - b)
+  const ageOptions       = [...new Set(students.filter(s => s.birth_year).map(s => ageOf(s.birth_year)))].sort((a, b) => a - b)
   const activeClasses    = classes.filter(c => c.active !== false)
   const schoolNameOptions = stageFlt.length === 0 ? [] : SCHOOL_TYPES
     .filter(type => stageFlt.includes(type))
@@ -436,6 +439,8 @@ export default function StudentsPage() {
     <div style={{ padding: mobileMode ? '16px 14px 88px' : '28px 32px', fontFamily: "'Noto Sans KR',sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
+        .student-table th,.student-table td{white-space:nowrap;}
+        .student-table td{line-height:1.6;}
         table{width:100%;border-collapse:collapse;}
         th{padding:9px 12px;text-align:left;font-size:11px;font-weight:600;color:${tx3};letter-spacing:.5px;background:${bg};border-bottom:1px solid ${bd};}
         td{padding:11px 12px;border-bottom:1px solid ${bd};font-size:13px;color:${tx};}
@@ -443,16 +448,16 @@ export default function StudentsPage() {
         tr:hover td{background:${navyM};cursor:pointer;}
         .bgold{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:none;background:${gold};color:${navyDk};font-family:inherit;}
         .bgold:hover{background:${goldL};}
-        .bout{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid ${bd};background:transparent;color:${tx2};font-family:inherit;}
+        .bout{white-space:nowrap;flex-shrink:0;display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid ${bd};background:transparent;color:${tx2};font-family:inherit;}
         .bout:hover{border-color:${navy};color:${navy};}
-        .bdng{display:inline-flex;align-items:center;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;border:none;background:${rbg};color:${re};font-family:inherit;}
+        .bdng{white-space:nowrap;flex-shrink:0;display:inline-flex;align-items:center;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;border:none;background:${rbg};color:${re};font-family:inherit;}
         .sbox{display:flex;align-items:center;gap:7px;padding:7px 12px;background:#fff;border:1px solid ${bd};border-radius:8px;flex:1;min-width:160px;}
         .sbox input{border:none;outline:none;font-size:13px;font-family:inherit;color:${tx};background:transparent;width:100%;}
         .fsel{padding:7px 11px;border:1px solid ${bd};border-radius:8px;font-size:12px;font-family:inherit;color:${tx2};background:#fff;outline:none;cursor:pointer;}
         .fi{width:100%;padding:9px 11px;border:1.5px solid ${bd};border-radius:8px;font-size:13px;font-family:inherit;color:${tx};outline:none;background:#fff;transition:border-color .2s;box-sizing:border-box;}
         .fi:focus{border-color:${navy};}
         .lb{display:block;font-size:12px;font-weight:500;color:${tx2};margin-bottom:5px;}
-        .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;}
+        .badge{white-space:nowrap;flex-shrink:0;display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;}
         .school-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid ${bd};}
         .school-row:last-child{border-bottom:none;}
         .fgrp{display:flex;flex-direction:column;gap:6px;}
@@ -512,7 +517,7 @@ export default function StudentsPage() {
         <div className="fgrp" style={{ marginBottom:14 }} aria-label="학생 재원 상태">
           <p className="fgrp-lb">상태</p>
           <div style={{ display:'flex',gap:6,flexWrap:'wrap' }}>
-            {(Object.entries(STATUS_LABELS) as [StudentStatus, string][]).map(([status, label]) => <button type="button" key={status} className={`pill${statusFilter === status ? ' active' : ''}`} aria-pressed={statusFilter === status} style={statusFilter === status ? { background:navy,color:'#fff' } : undefined} onClick={() => { setStatusFilter(status); setSelectedIds([]) }}>{label}</button>)}
+            {(Object.entries(STATUS_LABELS) as [keyof typeof STATUS_LABELS, string][]).map(([status, label]) => <button type="button" key={status} className={`pill${statusFilter === status ? ' active' : ''}`} aria-pressed={statusFilter === status} style={statusFilter === status ? { background:navy,color:'#fff' } : undefined} onClick={() => { setStatusFilter(status); setSelectedIds([]) }}>{label}</button>)}
           </div>
         </div>
         {/* 학교급 (중복 선택 가능) */}
@@ -622,7 +627,7 @@ export default function StudentsPage() {
           </div>
         ) : (
           <div style={{ overflowX:'auto' }}>
-            <table>
+            <table className="student-table" style={{ minWidth:mobileMode ? 480 : 1000 }}>
               <thead>
                 <tr>
                   <th>이름</th>
@@ -650,7 +655,7 @@ export default function StudentsPage() {
                           )}
                         </div>
                       </td>
-                      {!mobileMode && <td style={{ color:tx2 }}>{ageOf(s.birth_year)}세</td>}
+                      {!mobileMode && <td style={{ color:tx2 }}>{s.birth_year ? `${ageOf(s.birth_year)}세` : '-'}</td>}
                       {!mobileMode && <td style={{ color:tx2 }}>{s.school || '-'}</td>}
                       {!mobileMode && canContacts && <td style={{ color:tx2 }} onClick={e => e.stopPropagation()}><PhoneActions phone={s.phone} label={`${s.name} 학생`} /></td>}
                       {canContacts && <td style={{ color:tx2 }} onClick={e => e.stopPropagation()}>
@@ -672,7 +677,7 @@ export default function StudentsPage() {
                           </div>
                         </td>
                       )}
-                      <td><span className="badge" style={STATUS_COLORS[s.enrollment_status ?? 'enrolled']}>{STATUS_LABELS[s.enrollment_status ?? 'enrolled']}</span></td>
+                      <td><span className="badge" style={s.is_test ? { background:rbg,color:re } : STATUS_COLORS[s.enrollment_status ?? 'enrolled']}>{s.is_test ? STATUS_LABELS.test : STATUS_LABELS[s.enrollment_status ?? 'enrolled']}</span></td>
                       {!mobileMode && isAdmin && (
                         <td onClick={e => e.stopPropagation()}>
                           <div style={{ display:'flex',gap:5 }}>
@@ -708,8 +713,8 @@ export default function StudentsPage() {
                 </div>
                 <div>
                   <label className="lb">출생연도</label>
-                  <input type="number" className="fi" value={form.birth_year}
-                    onChange={e => setForm(f => ({...f, birth_year:Number(e.target.value)}))}
+                  <input type="text" inputMode="numeric" maxLength={4} className="fi" value={form.birth_year ?? ''}
+                    onChange={e => { const value = e.target.value.replace(/\D/g, ''); setForm(f => ({...f, birth_year:value ? Number(value) : null})) }}
                     placeholder="예) 2011"/>
                 </div>
               </div>
@@ -727,13 +732,13 @@ export default function StudentsPage() {
                     const col = SCHOOL_COLORS[type]
                     return (
                       <div key={type} style={{ display:'flex',alignItems:'center',gap:8 }}>
-                        <span className="badge" style={{ background:enabled?col.bg:bg, color:enabled?col.color:tx3, flexShrink:0, width:52, justifyContent:'center' }}>
+                        <span className="badge" style={{ background:enabled?col.bg:bg, color:enabled?col.color:tx3, flexShrink:0, minWidth:64, justifyContent:'center' }}>
                           {SCHOOL_LABELS[type]}
                         </span>
                         <input className="fi" value={val} disabled={!enabled}
                           onChange={e => setVal(e.target.value)}
                           placeholder={!ageOk ? '나이에 맞지 않아 입력할 수 없습니다' : noInfo ? '정보 없음으로 표시됨' : `${SCHOOL_LABELS[type]} 이름 (예: 강남${SCHOOL_LABELS[type]})`}
-                          style={{ flex:1, opacity:enabled?1:0.5, background:enabled?'#fff':bg }}
+                          style={{ flex:1, minWidth:0, opacity:enabled?1:0.5, background:enabled?'#fff':bg }}
                         />
                         <label style={{ display:'flex',alignItems:'center',gap:4,fontSize:11,flexShrink:0,cursor:ageOk?'pointer':'default',color:noInfo?re:tx3,opacity:ageOk?1:0.4 }}>
                           <input type="checkbox" checked={noInfo} disabled={!ageOk}
@@ -787,18 +792,24 @@ export default function StudentsPage() {
               </div>
 
               <div style={{ marginBottom:14 }}>
-                <label className="lb" htmlFor="enrollment-status">재원 상태</label>
-                {editId ? <select id="enrollment-status" className="fi" value={form.enrollment_status === 'withdrawn' ? 'withdrawn' : 'active'} onChange={e => setForm(f => ({ ...f,enrollment_status:e.target.value === 'withdrawn' ? 'withdrawn' : f.reg_date > kstDateStr() ? 'prospective' : 'enrolled' }))}>
-                  <option value="active">등록일 기준 자동 (재원생 / 예비재원생)</option>
-                  <option value="withdrawn">퇴원생</option>
-                </select> : <p id="enrollment-status" style={{ fontSize:13,color:tx2 }}>{form.reg_date > kstDateStr() ? '예비재원생' : '재원생'}</p>}
-                <p style={{ fontSize:11,color:tx3,marginTop:6 }}>미래 등록일은 예비재원생으로 등록되며, 등록일이 되면 자동으로 재원생으로 전환됩니다.</p>
+                <label className="lb" htmlFor="registration-date">학원 등록일</label>
+                <input id="registration-date" type="date" className="fi" value={form.reg_date} onChange={e => setForm(f => ({...f, reg_date:e.target.value, enrollment_status:f.enrollment_status === 'withdrawn' ? 'withdrawn' : e.target.value > kstDateStr() ? 'prospective' : 'enrolled'}))}/>
               </div>
-              {/* 등록일 */}
-              <label style={{ display:'flex',alignItems:'center',gap:8,minHeight:44,fontSize:13,color:tx2 }}><input type="checkbox" checked={form.is_test} onChange={e => setForm(f => ({ ...f,is_test:e.target.checked }))} />테스트 학생 (학생 추이 통계 제외)</label>
               <div style={{ marginBottom:14 }}>
-                <label className="lb">학원 등록일</label>
-                <input type="date" className="fi" value={form.reg_date} onChange={e => setForm(f => ({...f, reg_date:e.target.value, enrollment_status:f.enrollment_status === 'withdrawn' ? 'withdrawn' : e.target.value > kstDateStr() ? 'prospective' : 'enrolled'}))}/>
+                <label className="lb" htmlFor="enrollment-status">재원 상태</label>
+                {statusLocked ? (
+                  <p id="enrollment-status" className="fi" style={{ background:bg }}>{STATUS_LABELS[form.enrollment_status]}</p>
+                ) : (
+                  <select id="enrollment-status" className="fi" value={form.is_test ? 'test' : form.enrollment_status === 'withdrawn' ? 'withdrawn' : 'active'} onChange={e => setForm(f => ({ ...f, is_test:e.target.value === 'test', enrollment_status:e.target.value === 'withdrawn' ? 'withdrawn' : f.reg_date > kstDateStr() ? 'prospective' : 'enrolled' }))}>
+                    <option value="active">{form.reg_date > kstDateStr() ? '예비재원생' : '재원생'} (등록일 기준 자동)</option>
+                    <option value="test">테스트 학생 (학생 추이 통계 제외)</option>
+                    {editId && <option value="withdrawn">퇴원생</option>}
+                  </select>
+                )}
+                <p style={{ fontSize:11,color:tx3,marginTop:6,lineHeight:1.6 }}>
+                  {editId && !form.is_test && form.enrollment_status !== 'withdrawn' ? '퇴원 처리는 학생 목록 또는 상세 화면의 퇴원 버튼을 이용하세요. ' : ''}
+                  미래 등록일은 예비재원생으로 등록되며, 등록일이 되면 자동으로 재원생으로 전환됩니다.
+                </p>
               </div>
 
               {!editId && form.parent_phone && (
@@ -836,7 +847,7 @@ export default function StudentsPage() {
                       </span>
                     )}
                   </div>
-                  <p style={{ fontSize:12,color:tx3,margin:0 }}>{ageOf(detailStu.birth_year)}세 · {detailStu.birth_year}년생</p>
+                  <p style={{ fontSize:12,color:tx3,margin:0 }}>{detailStu.birth_year ? `${ageOf(detailStu.birth_year)}세 · ${detailStu.birth_year}년생` : '출생연도 미등록'}</p>
                 </div>
               </div>
               <button onClick={() => setDetailStu(null)} style={{ width:28,height:28,borderRadius:'50%',border:'none',background:bg,cursor:'pointer',fontSize:17,color:tx2 }}>×</button>
@@ -849,7 +860,7 @@ export default function StudentsPage() {
                 <div style={{ display:'grid',gridTemplateColumns:mobileMode?'1fr':'1fr 1fr',gap:10 }}>
                   <div>
                     <p style={{ fontSize:11,color:tx3,margin:'0 0 2px' }}>출생연도</p>
-                    <p style={{ fontSize:13,fontWeight:600,color:tx,margin:0 }}>{detailStu.birth_year}년생</p>
+                    <p style={{ fontSize:13,fontWeight:600,color:tx,margin:0 }}>{detailStu.birth_year ? `${detailStu.birth_year}년생` : '-'}</p>
                   </div>
                   <div>
                     <p style={{ fontSize:11,color:tx3,margin:'0 0 2px' }}>등록일</p>
